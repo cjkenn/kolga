@@ -1,15 +1,29 @@
 extern crate snowc;
 
 use std::fs::File;
+use std::env;
 
 use snowc::lexer::Lexer;
-use snowc::token::Token;
+use snowc::parser::Parser;
 
 fn main() {
-    let infile = File::open("testfile").unwrap_or_else(|_| panic!("Cannot find file"));
+    let args: Vec<String> = env::args().collect();
+    // TODO: repl
+    if args.len() < 2 {
+        println!("Usage: snow [filename]");
+        return;
+    }
+
+
+    let filename = &args[1];
+    let infile = match File::open(filename) {
+        Ok(file) => file,
+        Err(e) => {
+            println!("snow: could not open file '{}': {:?}", filename, e.kind());
+            return;
+        }
+    };
+
     let mut lexer = Lexer::new(infile);
-    let tkn = lexer.lex().unwrap();
-    println!("{:?}", tkn);
-    let tkn2 = lexer.lex().unwrap();
-    println!("{:?}", tkn2);
+    let _parser = Parser::new(&mut lexer);
 }
