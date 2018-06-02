@@ -1,0 +1,13 @@
+[package]
+name = "snow"
+version = "0.1.0"
+authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
+
+[[bin]]
+name = "snowc_bin"
+path = "./src/snowc.rs"
+
+[dependencies]
+syntax = { path = "libsyntax" }
+vm = { path = "libvm" }
+errors = { path = "liberrors" }

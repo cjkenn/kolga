@@ -1,0 +1,11 @@
+[package]
+name = "syntax"
+version = "0.1.0"
+authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
+
+[lib]
+name = "syntax"
+path = "lib.rs"
+
+[dependencies]
+errors = { path = "../liberrors" }
