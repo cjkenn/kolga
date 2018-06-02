@@ -1,10 +1,10 @@
 [package]
-name = "syntax"
+name = "snowc"
 version = "0.1.0"
 authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
 
 [lib]
-name = "syntax"
+name = "snowc"
 path = "lib.rs"
 
 [dependencies]

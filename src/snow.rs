@@ -1,9 +1,9 @@
-extern crate syntax;
+extern crate snowc;
 
 use std::fs::File;
 
-use syntax::lexer::Lexer;
-use syntax::token::Token;
+use snowc::lexer::Lexer;
+use snowc::token::Token;
 
 fn main() {
     let infile = File::open("testfile").unwrap_or_else(|_| panic!("Cannot find file"));

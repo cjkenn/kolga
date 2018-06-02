@@ -4,10 +4,10 @@ version = "0.1.0"
 authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
 
 [[bin]]
-name = "snowc_bin"
-path = "./src/snowc.rs"
+name = "snow_bin"
+path = "./src/snow.rs"
 
 [dependencies]
-syntax = { path = "libsyntax" }
+snowc = { path = "libsnowc" }
 vm = { path = "libvm" }
 errors = { path = "liberrors" }
