@@ -83,3 +83,22 @@ fn test_lex_ident_string_lit() {
     assert_eq!(tkn2.line, 1);
     assert_eq!(tkn2.pos, 6);
 }
+
+#[test]
+fn test_lex_comment() {
+    let file = File::open("./tests/lexer_input/comment").unwrap();
+    let mut lexer = Lexer::new(file);
+    let tkn = lexer.lex();
+    assert_eq!(tkn, None);
+}
+
+#[test]
+fn test_lex_comment_w_line() {
+    let file = File::open("./tests/lexer_input/commentandident").unwrap();
+    let mut lexer = Lexer::new(file);
+    let tkn = lexer.lex().unwrap();
+    assert_eq!(tkn.ty, TokenTy::Ident(String::from("ident")));
+    assert_eq!(tkn.line, 2);
+    assert_eq!(tkn.pos, 0);
+
+}
