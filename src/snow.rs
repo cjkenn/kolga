@@ -5,6 +5,7 @@ use std::env;
 
 use snowc::lexer::Lexer;
 use snowc::parser::Parser;
+use snowc::symtab::SymTab;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -25,5 +26,6 @@ fn main() {
     };
 
     let mut lexer = Lexer::new(infile);
-    let _parser = Parser::new(&mut lexer);
+    let mut symtab = SymTab::new();
+    let _parser = Parser::new(&mut lexer, &mut symtab);
 }

@@ -1,35 +1,40 @@
 use std::rc::Rc;
 
 use tyobj::{TyObj, Expr};
+use op::OpCode;
+use symtab::SymTab;
 use lexer::Lexer;
 use token::{Token, TokenTy};
 use errors::report::ErrReport;
 
 pub struct ParserResult {
-    objs: Vec<TyObj>,
+    ops: Vec<OpCode>,
     error: Vec<ErrReport>
 }
 
 impl ParserResult {
     pub fn new() -> ParserResult {
         ParserResult {
-            objs: Vec::new(),
+            ops: Vec::new(),
             error: Vec::new()
         }
     }
 }
 
-pub struct Parser<'l> {
+pub struct Parser<'l, 's> {
     lexer: &'l mut Lexer,
-    pub result: ParserResult,
+    symtab: &'s mut SymTab,
+    result: ParserResult,
     currtkn: Rc<Option<Token>>
 }
 
-impl<'l> Parser<'l> {
-    pub fn new(lex: &mut Lexer) -> Parser {
+impl<'l, 's> Parser<'l, 's> {
+    pub fn new(lex: &'l mut Lexer, symt: &'s mut SymTab) -> Parser<'l, 's> {
         let firsttkn = Rc::new(lex.lex());
+
         Parser {
             lexer: lex,
+            symtab: symt,
             result: ParserResult::new(),
             currtkn: firsttkn
         }
@@ -37,26 +42,37 @@ impl<'l> Parser<'l> {
 
     pub fn parse(&mut self) {
         while *self.currtkn != None {
-            match self.parse_decl() {
-                Some(obj) => self.result.objs.push(obj),
-                None => ()
-            }
+            self.parse_decl();
         }
     }
 
-    fn parse_decl(&mut self) -> Option<TyObj> {
+    fn parse_decl(&mut self) -> Vec<OpCode> {
         match *Rc::clone(&self.currtkn) {
             Some(ref tkn) if tkn.ty == TokenTy::Let => self.parse_var_decl(),
-            Some(ref tkn) if tkn.ty == TokenTy::Class => self.parse_class_decl(),
-            Some(ref tkn) if tkn.ty == TokenTy::Func => self.parse_func_decl(),
-            Some(_) => self.parse_stmt(),
-            None => {
+            // Some(ref tkn) if tkn.ty == TokenTy::Class => self.parse_class_decl(),
+            // Some(ref tkn) if tkn.ty == TokenTy::Func => self.parse_func_decl(),
+            // Some(_) => self.parse_stmt(),
+            _ => {
                 panic!("snow: Should not have encountered a token with value 'None' when parsing decl.")
             }
         }
     }
 
-    fn parse_var_decl(&mut self) -> Option<TyObj> {
+    /// Takes an input of "let" ["imm"] type ident "=" expr ";"
+    /// Returns a vector of operations storing the name and type of this
+    /// variable into the vm environment.
+    /// Ex.
+    /// let x num = 10;
+    /// produces
+    /// ST "x", 10
+    ///
+    /// let x num = 2 + 2;
+    /// produces
+    /// MV r1, 2
+    /// MV r2, 2
+    /// ADD r3, r1, r2
+    /// ST "x", r3
+    fn parse_var_decl(&mut self) -> Vec<OpCode> {
         self.expect(TokenTy::Let);
 
         let is_imm = match *Rc::clone(&self.currtkn) {
@@ -96,8 +112,7 @@ impl<'l> Parser<'l> {
         self.expect(TokenTy::Eq);
         let var_expr = self.parse_expr();
         self.expect(TokenTy::Semicolon);
-
-        Some(TyObj::Var(var_ty, ident, is_imm, var_expr))
+        Vec::new()
     }
 
     fn parse_func_decl(&mut self) -> Option<TyObj> {

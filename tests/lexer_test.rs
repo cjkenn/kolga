@@ -1,9 +1,9 @@
-extern crate syntax;
+extern crate snowc;
 
 use std::fs::File;
 
-use syntax::lexer::Lexer;
-use syntax::token::TokenTy;
+use snowc::lexer::Lexer;
+use snowc::token::TokenTy;
 
 #[test]
 fn test_lex_empty() {
