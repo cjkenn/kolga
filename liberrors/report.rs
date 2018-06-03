@@ -1,13 +1,13 @@
 #[derive(Debug)]
-pub struct Report {
+pub struct ErrReport {
     line: usize,
     pos: usize,
     text: String
 }
 
-impl Report {
-    pub fn new(li: usize, po: usize, txt: String) -> Report {
-        Report {
+impl ErrReport {
+    pub fn new(li: usize, po: usize, txt: String) -> ErrReport {
+        ErrReport {
             line: li,
             pos: po,
             text: txt

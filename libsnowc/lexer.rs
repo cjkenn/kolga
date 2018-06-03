@@ -2,7 +2,7 @@ use std::io::{BufReader, BufRead};
 use std::fs::File;
 use std::collections::HashMap;
 
-use errors::report::Report;
+use errors::report::ErrReport;
 use token::{Token, TokenTy};
 
 #[derive(Debug)]
@@ -44,11 +44,8 @@ impl Lexer {
                 (String::from("let"), TokenTy::Let),
                 (String::from("imm"), TokenTy::Imm),
                 (String::from("func"), TokenTy::Func),
-                (String::from("fnc"), TokenTy::Func),
                 (String::from("return"), TokenTy::Return),
-                (String::from("ret"), TokenTy::Return),
                 (String::from("class"), TokenTy::Class),
-                (String::from("cls"), TokenTy::Class),
                 (String::from("this"), TokenTy::This),
                 (String::from("if"), TokenTy::If),
                 (String::from("elif"), TokenTy::Elif),
@@ -191,7 +188,7 @@ impl Lexer {
             _ if ch.is_digit(10) => self.lex_num(),
             _ if ch.is_alphabetic() => self.lex_ident(),
             _ => {
-                let err = Report::new(self.linenum, self.pos, format!("Unrecognized character {}", ch));
+                let err = ErrReport::new(self.linenum, self.pos, format!("Unrecognized character {}", ch));
                 err.emit();
                 None
             }
@@ -220,7 +217,7 @@ impl Lexer {
                     }
                 },
                 None => {
-                    let err = Report::new(self.linenum,
+                    let err = ErrReport::new(self.linenum,
                                           self.pos,
                                           format!("Unterminated string literal {}", lit));
                     err.emit();
@@ -229,7 +226,7 @@ impl Lexer {
             }
         }
 
-        let err = Report::new(self.linenum,
+        let err = ErrReport::new(self.linenum,
                               self.pos,
                               format!("Unterminated string literal {}", lit));
         err.emit();

@@ -29,7 +29,7 @@ pub enum TokenTy {
     AmpAmp,
     PipePipe,
 
-    // Values
+    // Identifiers/literals
     Ident(String),
     Str(String),
     Val(f64),
@@ -74,5 +74,11 @@ impl Token {
             line: line,
             pos: pos
         }
+    }
+
+    pub fn is_ty(&self) -> bool {
+        self.ty == TokenTy::Num ||
+            self.ty == TokenTy::String ||
+            self.ty == TokenTy::Bool
     }
 }
