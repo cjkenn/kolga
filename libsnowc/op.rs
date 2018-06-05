@@ -1,13 +1,4 @@
-pub enum TyVal {
-    Str,
-    Num,
-    Bool
-}
-
-pub struct Reg {
-    ty: Option<TyVal>,
-    name: String
-}
+use reg::Reg;
 
 pub enum OpCode {
     Mv(Reg, Reg),

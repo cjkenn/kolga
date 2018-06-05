@@ -1,13 +1,13 @@
-#[derive(Debug)]
-pub struct ErrReport {
+#[derive(Debug,Clone)]
+pub struct ErrC {
     line: usize,
     pos: usize,
     text: String
 }
 
-impl ErrReport {
-    pub fn new(li: usize, po: usize, txt: String) -> ErrReport {
-        ErrReport {
+impl ErrC {
+    pub fn new(li: usize, po: usize, txt: String) -> ErrC {
+        ErrC {
             line: li,
             pos: po,
             text: txt
