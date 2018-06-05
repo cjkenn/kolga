@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq, Clone)]
-pub enum TokenTy {
+pub enum TknTy {
     LeftParen,
     RightParen,
     LeftBrace,
@@ -62,13 +62,13 @@ pub enum TokenTy {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
-    pub ty: TokenTy,
+    pub ty: TknTy,
     pub line: usize,
     pub pos: usize
 }
 
 impl Token {
-    pub fn new(ty: TokenTy, line: usize, pos: usize) -> Token {
+    pub fn new(ty: TknTy, line: usize, pos: usize) -> Token {
         Token {
             ty: ty,
             line: line,
@@ -77,8 +77,8 @@ impl Token {
     }
 
     pub fn is_ty(&self) -> bool {
-        self.ty == TokenTy::Num ||
-            self.ty == TokenTy::String ||
-            self.ty == TokenTy::Bool
+        self.ty == TknTy::Num ||
+            self.ty == TknTy::String ||
+            self.ty == TknTy::Bool
     }
 }

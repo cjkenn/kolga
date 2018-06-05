@@ -3,7 +3,7 @@ use std::fs::File;
 use std::collections::HashMap;
 
 use errors::report::ErrC;
-use token::{Token, TokenTy};
+use token::{Token, TknTy};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -23,7 +23,7 @@ pub struct Lexer {
     buffer: Vec<char>,
 
     /// Reserved words mapping
-    reserved: HashMap<String, TokenTy>
+    reserved: HashMap<String, TknTy>
 }
 
 impl Lexer {
@@ -39,31 +39,31 @@ impl Lexer {
             Some(buffer[0])
         };
 
-        let r: HashMap<String, TokenTy> =
+        let r: HashMap<String, TknTy> =
             [
-                (String::from("let"), TokenTy::Let),
-                (String::from("imm"), TokenTy::Imm),
-                (String::from("func"), TokenTy::Func),
-                (String::from("return"), TokenTy::Return),
-                (String::from("class"), TokenTy::Class),
-                (String::from("this"), TokenTy::This),
-                (String::from("if"), TokenTy::If),
-                (String::from("elif"), TokenTy::Elif),
-                (String::from("then"), TokenTy::Then),
-                (String::from("el"), TokenTy::Else),
-                (String::from("else"), TokenTy::Else),
-                (String::from("while"), TokenTy::While),
-                (String::from("in"), TokenTy::In),
-                (String::from("for"), TokenTy::For),
-                (String::from("num"), TokenTy::Num),
-                (String::from("string"), TokenTy::String),
-                (String::from("str"), TokenTy::String),
-                (String::from("bool"), TokenTy::Bool),
-                (String::from("true"), TokenTy::True),
-                (String::from("false"), TokenTy::False),
-                (String::from("or"), TokenTy::Or),
-                (String::from("and"), TokenTy::And),
-                (String::from("null"), TokenTy::Null)
+                (String::from("let"), TknTy::Let),
+                (String::from("imm"), TknTy::Imm),
+                (String::from("func"), TknTy::Func),
+                (String::from("return"), TknTy::Return),
+                (String::from("class"), TknTy::Class),
+                (String::from("this"), TknTy::This),
+                (String::from("if"), TknTy::If),
+                (String::from("elif"), TknTy::Elif),
+                (String::from("then"), TknTy::Then),
+                (String::from("el"), TknTy::Else),
+                (String::from("else"), TknTy::Else),
+                (String::from("while"), TknTy::While),
+                (String::from("in"), TknTy::In),
+                (String::from("for"), TknTy::For),
+                (String::from("num"), TknTy::Num),
+                (String::from("string"), TknTy::String),
+                (String::from("str"), TknTy::String),
+                (String::from("bool"), TknTy::Bool),
+                (String::from("true"), TknTy::True),
+                (String::from("false"), TknTy::False),
+                (String::from("or"), TknTy::Or),
+                (String::from("and"), TknTy::And),
+                (String::from("null"), TknTy::Null)
             ].iter().cloned().collect();
 
         Lexer {
@@ -78,34 +78,34 @@ impl Lexer {
 
     /// Get the next token from the input stream. If this returns None, it means we're either
     /// at the end of the input, or we've encountered a character we don't recognize.
-    pub fn lex(&mut self) -> Option<Token> {
+    pub fn lex(&mut self) -> Token {
         if self.curr.is_none() {
-            return None;
+            return self.eof_tkn();
         }
 
         // Skip whitespace
         while self.curr.unwrap().is_whitespace() {
             self.advance();
             if self.curr.is_none() {
-                return None;
+                return self.eof_tkn();
             }
         }
 
         let ch = self.curr.unwrap();
         match ch {
-            '(' => self.consume(TokenTy::LeftParen),
-            ')' => self.consume(TokenTy::RightParen),
-            '{' => self.consume(TokenTy::LeftBrace),
-            '}' => self.consume(TokenTy::RightBrace),
-            '[' => self.consume(TokenTy::LeftBracket),
-            ']' => self.consume(TokenTy::RightBracket),
-            ';' => self.consume(TokenTy::Semicolon),
-            '.' => self.consume(TokenTy::Period),
-            ',' => self.consume(TokenTy::Comma),
-            '+' => self.consume(TokenTy::Plus),
-            '-' => self.consume(TokenTy::Minus),
-            '*' => self.consume(TokenTy::Star),
-            '%' => self.consume(TokenTy::Percent),
+            '(' => self.consume(TknTy::LeftParen),
+            ')' => self.consume(TknTy::RightParen),
+            '{' => self.consume(TknTy::LeftBrace),
+            '}' => self.consume(TknTy::RightBrace),
+            '[' => self.consume(TknTy::LeftBracket),
+            ']' => self.consume(TknTy::RightBracket),
+            ';' => self.consume(TknTy::Semicolon),
+            '.' => self.consume(TknTy::Period),
+            ',' => self.consume(TknTy::Comma),
+            '+' => self.consume(TknTy::Plus),
+            '-' => self.consume(TknTy::Minus),
+            '*' => self.consume(TknTy::Star),
+            '%' => self.consume(TknTy::Percent),
             '"' => self.lex_str(),
             '/' => {
                 let nextch = self.peek();
@@ -116,73 +116,73 @@ impl Lexer {
                         }
                         return self.lex();
                     }
-                    _ => self.consume(TokenTy::Slash)
+                    _ => self.consume(TknTy::Slash)
                 }
             },
             '=' => {
                 let nextch = self.peek();
                 match nextch {
                     Some(ch) if ch == '=' => {
-                        let tkn = self.consume(TokenTy::EqEq);
+                        let tkn = self.consume(TknTy::EqEq);
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TokenTy::Eq)
+                    _ => self.consume(TknTy::Eq)
                 }
             },
             '<' => {
                 let nextch = self.peek();
                 match nextch {
                     Some(ch) if ch == '=' => {
-                        let tkn = self.consume(TokenTy::LtEq);
+                        let tkn = self.consume(TknTy::LtEq);
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TokenTy::Lt)
+                    _ => self.consume(TknTy::Lt)
                 }
             },
             '>' => {
                 let nextch = self.peek();
                 match nextch {
                     Some(ch) if ch == '=' => {
-                        let tkn = self.consume(TokenTy::GtEq);
+                        let tkn = self.consume(TknTy::GtEq);
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TokenTy::Gt)
+                    _ => self.consume(TknTy::Gt)
                 }
             },
             '!' => {
                 let nextch = self.peek();
                 match nextch {
                     Some(ch) if ch == '=' => {
-                        let tkn = self.consume(TokenTy::BangEq);
+                        let tkn = self.consume(TknTy::BangEq);
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TokenTy::Bang)
+                    _ => self.consume(TknTy::Bang)
                 }
             },
             '&' => {
                 let nextch = self.peek();
                  match nextch {
                     Some(ch) if ch == '&' => {
-                        let tkn = self.consume(TokenTy::AmpAmp);
+                        let tkn = self.consume(TknTy::AmpAmp);
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TokenTy::Amp)
+                    _ => self.consume(TknTy::Amp)
                  }
             },
             '|' => {
                 let nextch = self.peek();
                 match nextch {
                     Some(ch) if ch == '|' => {
-                        let tkn = self.consume(TokenTy::PipePipe);
+                        let tkn = self.consume(TknTy::PipePipe);
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TokenTy::Pipe)
+                    _ => self.consume(TknTy::Pipe)
                  }
             },
             _ if ch.is_digit(10) => self.lex_num(),
@@ -190,7 +190,7 @@ impl Lexer {
             _ => {
                 let err = ErrC::new(self.linenum, self.pos, format!("Unrecognized character {}", ch));
                 err.emit();
-                None
+                self.eof_tkn()
             }
         }
     }
@@ -198,7 +198,7 @@ impl Lexer {
     /// Lex a string literal. We expect to have a " character when this
     /// function is called, and we consume the last " character during
     /// this call.
-    fn lex_str(&mut self) -> Option<Token> {
+    fn lex_str(&mut self) -> Token {
         let mut lit = String::new();
         let startpos = self.pos;
         let startline = self.linenum;
@@ -210,7 +210,7 @@ impl Lexer {
             match self.curr {
                 Some(ch) => {
                     if ch == '"' {
-                        return self.consume_w_pos(TokenTy::Str(lit), startline, startpos);
+                        return self.consume_w_pos(TknTy::Str(lit), startline, startpos);
                     } else {
                         lit.push(ch);
                         self.advance();
@@ -218,23 +218,23 @@ impl Lexer {
                 },
                 None => {
                     let err = ErrC::new(self.linenum,
-                                          self.pos,
-                                          format!("Unterminated string literal {}", lit));
+                                        self.pos,
+                                        format!("Unterminated string literal {}", lit));
                     err.emit();
-                    return None;
+                    return self.eof_tkn();
                 }
             }
         }
 
         let err = ErrC::new(self.linenum,
-                              self.pos,
-                              format!("Unterminated string literal {}", lit));
+                            self.pos,
+                            format!("Unterminated string literal {}", lit));
         err.emit();
-        None
+        self.eof_tkn()
     }
 
     /// Lex a floating point or integer literal.
-    fn lex_num(&mut self) -> Option<Token> {
+    fn lex_num(&mut self) -> Token {
         let mut lit = String::new();
         let startpos = self.pos;
         let startline = self.linenum;
@@ -267,12 +267,12 @@ impl Lexer {
         }
 
         let numval = lit.parse::<f64>().unwrap();
-        Some(Token::new(TokenTy::Val(numval), startline, startpos))
+        Token::new(TknTy::Val(numval), startline, startpos)
     }
 
     /// Lex an identifier. This is not a string literal and does not
     /// contain quotations around it.
-    fn lex_ident(&mut self) -> Option<Token> {
+    fn lex_ident(&mut self) -> Token {
         let mut lit = String::new();
         let startpos = self.pos;
         let startline = self.linenum;
@@ -289,29 +289,29 @@ impl Lexer {
             }
         }
 
-        let mut ty = TokenTy::Ident(lit.clone());
+        let mut ty = TknTy::Ident(lit.clone());
 
         if self.reserved.contains_key(&lit) {
             ty = self.reserved.get(&lit).unwrap().clone();
         }
 
-        Some(Token::new(ty, startline, startpos))
+        Token::new(ty, startline, startpos)
     }
 
     /// Consume current char and return a token from it.
-    fn consume(&mut self, ty: TokenTy) -> Option<Token> {
+    fn consume(&mut self, ty: TknTy) -> Token {
         let tkn = Token::new(ty, self.linenum, self.pos);
         self.advance();
-        Some(tkn)
+        tkn
     }
 
     /// Consume current char and return a token from it, given a line
     /// and char position. Used so that the correct line/pos combo can be reported
     /// for identifiers, literals, and numbers.
-    fn consume_w_pos(&mut self, ty: TokenTy, line: usize, pos: usize) -> Option<Token> {
+    fn consume_w_pos(&mut self, ty: TknTy, line: usize, pos: usize) -> Token {
         let tkn = Token::new(ty, line, pos);
         self.advance();
-        Some(tkn)
+        tkn
     }
 
     /// Return the next char in the buffer, if any.
@@ -359,5 +359,9 @@ impl Lexer {
     /// we're at the end of the file.
     fn finished(&self) -> bool {
         self.buffer.len() == 0
+    }
+
+    fn eof_tkn(&self) -> Token {
+        Token::new(TknTy::Eof, self.linenum, self.pos)
     }
 }
