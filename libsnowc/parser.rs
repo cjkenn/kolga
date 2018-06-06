@@ -141,27 +141,46 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_unr_expr(&mut self) -> Option<Ast> {
-        unimplemented!()
+        match self.currtkn.ty {
+            TknTy::Bang | TknTy::Minus => {
+                let op = self.currtkn.clone();
+                let rhs = self.parse_unr_expr();
+                return Some(Ast::Unary(op, Box::new(rhs)));
+            },
+            _ => self.parse_fncall_expr()
+        }
     }
 
     fn parse_fncall_expr(&mut self) -> Option<Ast> {
-        let func_name_tkn = self.match_ident_tkn();
+        let mut maybe_ast = self.parse_primary_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        let func_name_tkn = match maybe_ast.unwrap() {
+            Ast::Primary(tkn) => Some(tkn),
+            _ => None
+        };
+
+        // TODO: loop this?
         match self.currtkn.ty {
             TknTy::LeftParen => {
-                self.parse_fnparams_expr(func_name_tkn)
+                maybe_ast = self.parse_fnparams_expr(func_name_tkn);
             },
             TknTy::Period => {
                 // calling a method on a class
                 self.consume();
                 let class_prop_tkn = self.match_ident_tkn();
-                Some(Ast::ClassCall(func_name_tkn, class_prop_tkn))
+                maybe_ast = Some(Ast::ClassCall(func_name_tkn, class_prop_tkn));
             },
             _ => {
                 let err_msg = format!("Unexpected token {:?} found", self.currtkn.ty);
                 self.err_from_tkn(err_msg);
-                None
+                maybe_ast = None;
             }
-        }
+        };
+
+        maybe_ast
     }
 
     /// Parses expr { ',' expr } ; (no parens are expected here)

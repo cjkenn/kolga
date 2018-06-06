@@ -5,6 +5,9 @@ pub enum Ast {
     // Type token, Ident token, mutability, value
     Assign(Option<Token>, Option<Token>, bool, Box<Option<Ast>>),
 
+    // Operator token, expression being operated on
+    Unary(Token, Box<Option<Ast>>),
+
     // Parenthesized expr
     ParenExpr(Box<Option<Ast>>),
 
