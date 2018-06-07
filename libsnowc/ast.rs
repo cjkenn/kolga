@@ -4,11 +4,24 @@ use token::Token;
 pub enum Ast {
     Prog(Vec<Ast>),
 
+    // List of statements/expression in a block
+    BlckStmt(Vec<Option<Ast>>),
+
+    IfStmt,
+
+    WhileStmt,
+
+    ForStmt,
+
+    RetStmt,
+
+    ExprStmt,
+
     // Var type tkn, var name tkn, mutability
     VarDecl(Token, Token, bool),
 
     // Type token, Ident token, mutability, value
-    Assign(Token, Token, bool, Box<Option<Ast>>),
+    VarAssign(Token, Token, bool, Box<Option<Ast>>),
 
     // Operator token, lhs ast, rhs ast
     Logical(Token, Box<Option<Ast>>, Box<Option<Ast>>),
@@ -21,6 +34,9 @@ pub enum Ast {
 
     // Parenthesized expr
     ParenExpr(Box<Option<Ast>>),
+
+    // Func ident, params, func body
+    FnDecl(Token, Vec<Token>, Box<Option<Ast>>),
 
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),

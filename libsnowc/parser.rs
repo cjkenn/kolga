@@ -65,7 +65,6 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    /// Takes an input of "let" ["imm"] type ident "=" expr ";"
     fn parse_var_decl(&mut self) -> Option<Ast> {
         self.expect(TknTy::Let);
 
@@ -101,9 +100,14 @@ impl<'l, 's> Parser<'l, 's> {
                 self.consume();
                 let var_val = self.parse_expr();
                 self.expect(TknTy::Semicolon);
-                Some(Ast::Assign(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm, Box::new(var_val)))
+                Some(Ast::VarAssign(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm, Box::new(var_val)))
             },
             TknTy::Semicolon => {
+                if is_imm {
+                    let err_msg = format!("Cannot declare immutable variable with no value");
+                    self.err_from_tkn(err_msg);
+                    return None;
+                }
                 self.consume();
                 Some(Ast::VarDecl(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm))
             },
@@ -116,7 +120,49 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_func_decl(&mut self) -> Option<Ast> {
-        unimplemented!()
+        self.expect(TknTy::Func);
+        let func_ident_tkn = self.currtkn.clone();
+        self.consume();
+
+        let mut params = Vec::new();
+        self.expect(TknTy::LeftParen);
+
+        while self.currtkn.ty != TknTy::RightParen {
+            if params.len() > FN_PARAM_MAX_LEN {
+                let err_msg = format!("Function param count exceeded limit of {}", FN_PARAM_MAX_LEN);
+                self.err_from_tkn(err_msg);
+                return None;
+            }
+            params.push(self.currtkn.clone());
+            self.consume();
+            if self.currtkn.ty == TknTy::RightParen {
+                break;
+            }
+            self.expect(TknTy::Comma);
+        }
+
+        self.expect(TknTy::RightParen);
+
+        let fn_ret_ty = match self.currtkn.ty {
+            TknTy::String | TknTy::Num | TknTy::Bool => {
+                let tkn = self.currtkn.clone();
+                self.consume();
+                Some(tkn)
+            },
+            _ => {
+                let err_msg = format!("Token is not a valid type: {:?}", self.currtkn.ty);
+                self.err_from_tkn(err_msg);
+                None
+            }
+        };
+
+        if fn_ret_ty.is_none() {
+            return None;
+        }
+
+        let fn_body = self.parse_block_stmt();
+
+        Some(Ast::FnDecl(func_ident_tkn, params, Box::new(fn_body)))
     }
 
     fn parse_class_decl(&mut self) -> Option<Ast> {
@@ -148,8 +194,52 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_stmt(&mut self) -> Option<Ast> {
+        match self.currtkn.ty {
+            TknTy::If => self.parse_if_stmt(),
+            TknTy::While => self.parse_while_stmt(),
+            TknTy::For => self.parse_for_stmt(),
+            TknTy::Return => self.parse_ret_stmt(),
+            TknTy::LeftBrace => self.parse_block_stmt(),
+            _ => self.parse_expr_stmt()
+        }
+    }
+
+    fn parse_block_stmt(&mut self) -> Option<Ast> {
+        self.expect(TknTy::LeftBrace);
+        let mut stmts = Vec::new();
+        loop {
+            match self.currtkn.ty {
+                TknTy::RightBrace | TknTy::Eof => break,
+                _ => stmts.push(self.parse_decl())
+            };
+        }
+        self.expect(TknTy::RightBrace);
+        Some(Ast::BlckStmt(stmts))
+    }
+
+    fn parse_if_stmt(&mut self) -> Option<Ast> {
         unimplemented!()
     }
+
+    fn parse_while_stmt(&mut self) -> Option<Ast> {
+        unimplemented!()
+    }
+
+    fn parse_for_stmt(&mut self) -> Option<Ast> {
+        unimplemented!()
+    }
+
+    fn parse_ret_stmt(&mut self) -> Option<Ast> {
+        unimplemented!()
+    }
+
+    fn parse_expr_stmt(&mut self) -> Option<Ast> {
+        unimplemented!()
+    }
+
+
+
+
 
     fn parse_expr(&mut self) -> Option<Ast> {
         self.parse_assign_expr()
@@ -169,7 +259,12 @@ impl<'l, 's> Parser<'l, 's> {
 
                 match maybe_ast.clone().unwrap() {
                     Ast::VarDecl(ty, ident, imm) => {
-                        return Some(Ast::Assign(ty, ident, imm, Box::new(rhs)));
+                        if imm {
+                            let err_msg = format!("Cannot re-assign immutable variable");
+                            self.err_from_tkn(err_msg);
+                            return None;
+                        }
+                        return Some(Ast::VarAssign(ty, ident, imm, Box::new(rhs)));
                     },
                     Ast::ClassGet(cls, prop) => {
                         return Some(Ast::ClassSet(cls, prop, Box::new(rhs)));
