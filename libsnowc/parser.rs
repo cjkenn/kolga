@@ -87,13 +87,32 @@ impl<'l, 's> Parser<'l, 's> {
             None
         };
 
+        if var_ty_tkn.is_none() {
+            return None;
+        }
+
         let ident_tkn = self.match_ident_tkn();
+        if ident_tkn.is_none() {
+            return None;
+        }
 
-        self.expect(TknTy::Eq);
-        let var_val = self.parse_expr();
-        self.expect(TknTy::Semicolon);
-
-        Some(Ast::Assign(var_ty_tkn, ident_tkn, is_imm, Box::new(var_val)))
+        match self.currtkn.ty {
+            TknTy::Eq => {
+                self.consume();
+                let var_val = self.parse_expr();
+                self.expect(TknTy::Semicolon);
+                Some(Ast::Assign(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm, Box::new(var_val)))
+            },
+            TknTy::Semicolon => {
+                self.consume();
+                Some(Ast::VarDecl(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm))
+            },
+            _ => {
+                let err_msg = format!("Invalid var declaration: {:?}", self.currtkn.ty);
+                self.err_from_tkn(err_msg);
+                None
+            }
+        }
     }
 
     fn parse_func_decl(&mut self) -> Option<Ast> {
@@ -101,7 +120,31 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_class_decl(&mut self) -> Option<Ast> {
-        unimplemented!()
+        self.expect(TknTy::Class);
+        let class_tkn = self.currtkn.clone();
+        self.consume();
+        self.expect(TknTy::LeftBrace);
+
+        let mut methods = Vec::new();
+        let mut props = Vec::new();
+
+        loop {
+            match self.currtkn.ty {
+                TknTy::Let => props.push(self.parse_var_decl()),
+                TknTy::Func => methods.push(self.parse_func_decl()),
+                TknTy::RightBrace => {
+                    self.consume();
+                    break;
+                },
+                _ => {
+                    let err_msg = format!("Invalid token in class declaration: {:?}", self.currtkn.ty);
+                    self.err_from_tkn(err_msg);
+                    break;
+                }
+            }
+        }
+
+        Some(Ast::ClassDecl(class_tkn, methods, props))
     }
 
     fn parse_stmt(&mut self) -> Option<Ast> {
@@ -113,37 +156,168 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_assign_expr(&mut self) -> Option<Ast> {
-        unimplemented!()
+        let maybe_ast = self.parse_logicor_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        match self.currtkn.ty {
+            TknTy::Eq => {
+                let op = self.currtkn.clone();
+                self.consume();
+                let rhs = self.parse_assign_expr();
+
+                match maybe_ast.clone().unwrap() {
+                    Ast::VarDecl(ty, ident, imm) => {
+                        return Some(Ast::Assign(ty, ident, imm, Box::new(rhs)));
+                    },
+                    Ast::ClassGet(cls, prop) => {
+                        return Some(Ast::ClassSet(cls, prop, Box::new(rhs)));
+                    },
+                    _ => {
+                        let err_msg = format!("Token {:?} is invalid for assignment", op.ty);
+                        let error = ErrC::new(op.line, op.pos, err_msg);
+                        self.errors.push(error);
+                    }
+                }
+            },
+            _ => ()
+        };
+
+        maybe_ast
     }
 
     fn parse_logicor_expr(&mut self) -> Option<Ast> {
-        unimplemented!()
+        let mut maybe_ast = self.parse_logicand_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        loop {
+            match self.currtkn.ty {
+                TknTy::PipePipe | TknTy::Or => {
+                    let op = self.currtkn.clone();
+                    self.consume();
+                    let rhs = self.parse_logicand_expr();
+                    maybe_ast = Some(Ast::Logical(op, Box::new(maybe_ast), Box::new(rhs)));
+                },
+                _ => break
+            }
+        }
+
+        maybe_ast
     }
 
     fn parse_logicand_expr(&mut self) -> Option<Ast> {
-        unimplemented!()
+        let mut maybe_ast = self.parse_eq_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        loop {
+            match self.currtkn.ty {
+                TknTy::AmpAmp | TknTy::And => {
+                    let op = self.currtkn.clone();
+                    self.consume();
+                    let rhs = self.parse_eq_expr();
+                    maybe_ast = Some(Ast::Logical(op, Box::new(maybe_ast), Box::new(rhs)));
+                },
+                _ => break
+            }
+        }
+
+        maybe_ast
     }
 
     fn parse_eq_expr(&mut self) -> Option<Ast> {
-        unimplemented!()
+        let mut maybe_ast = self.parse_cmp_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        loop {
+            match self.currtkn.ty {
+                TknTy::BangEq | TknTy::EqEq => {
+                    let op = self.currtkn.clone();
+                    self.consume();
+                    let rhs = self.parse_cmp_expr();
+                    maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)));
+                },
+                _ => break
+            }
+        }
+
+        maybe_ast
     }
 
     fn parse_cmp_expr(&mut self) -> Option<Ast> {
-            unimplemented!()
+        let mut maybe_ast = self.parse_addsub_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        loop {
+            match self.currtkn.ty {
+                TknTy::Lt | TknTy::LtEq | TknTy::Gt | TknTy::GtEq => {
+                    let op = self.currtkn.clone();
+                    self.consume();
+                    let rhs = self.parse_addsub_expr();
+                    maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)));
+                },
+                _ => break
+            }
+        }
+
+        maybe_ast
     }
 
     fn parse_addsub_expr(&mut self) -> Option<Ast> {
-        unimplemented!()
+        let mut maybe_ast = self.parse_muldiv_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        loop {
+            match self.currtkn.ty {
+                TknTy::Plus | TknTy::Minus => {
+                    let op = self.currtkn.clone();
+                    self.consume();
+                    let rhs = self.parse_muldiv_expr();
+                    maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)));
+                },
+                _ => break
+            }
+        }
+
+        maybe_ast
     }
 
     fn parse_muldiv_expr(&mut self) -> Option<Ast> {
-        unimplemented!()
+        let mut maybe_ast = self.parse_unr_expr();
+        if maybe_ast.is_none() {
+            return None;
+        }
+
+        loop {
+            match self.currtkn.ty {
+                TknTy::Star | TknTy::Slash => {
+                    let op = self.currtkn.clone();
+                    self.consume();
+                    let rhs = self.parse_unr_expr();
+                    maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)))
+                },
+                _ => break
+            }
+        }
+
+        maybe_ast
     }
 
     fn parse_unr_expr(&mut self) -> Option<Ast> {
         match self.currtkn.ty {
             TknTy::Bang | TknTy::Minus => {
                 let op = self.currtkn.clone();
+                self.consume();
                 let rhs = self.parse_unr_expr();
                 return Some(Ast::Unary(op, Box::new(rhs)));
             },
@@ -171,7 +345,7 @@ impl<'l, 's> Parser<'l, 's> {
                 // calling a method on a class
                 self.consume();
                 let class_prop_tkn = self.match_ident_tkn();
-                maybe_ast = Some(Ast::ClassCall(func_name_tkn, class_prop_tkn));
+                maybe_ast = Some(Ast::ClassGet(func_name_tkn, class_prop_tkn));
             },
             _ => {
                 let err_msg = format!("Unexpected token {:?} found", self.currtkn.ty);

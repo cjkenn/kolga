@@ -1,11 +1,22 @@
 use token::Token;
 
+#[derive(Clone)]
 pub enum Ast {
     Prog(Vec<Ast>),
-    // Type token, Ident token, mutability, value
-    Assign(Option<Token>, Option<Token>, bool, Box<Option<Ast>>),
 
-    // Operator token, expression being operated on
+    // Var type tkn, var name tkn, mutability
+    VarDecl(Token, Token, bool),
+
+    // Type token, Ident token, mutability, value
+    Assign(Token, Token, bool, Box<Option<Ast>>),
+
+    // Operator token, lhs ast, rhs ast
+    Logical(Token, Box<Option<Ast>>, Box<Option<Ast>>),
+
+    // Operator token, lhs ast, rhs ast
+    Binary(Token, Box<Option<Ast>>, Box<Option<Ast>>),
+
+    // Operator token, rhs ast
     Unary(Token, Box<Option<Ast>>),
 
     // Parenthesized expr
@@ -14,8 +25,14 @@ pub enum Ast {
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),
 
+    // Class name, class props, class methods
+    ClassDecl(Token, Vec<Option<Ast>>, Vec<Option<Ast>>),
+
     // Name of the class, function/property name
-    ClassCall(Option<Token>, Option<Token>),
+    ClassGet(Option<Token>, Option<Token>),
+
+    // Class name, class prop, rhs ast
+    ClassSet(Option<Token>, Option<Token>, Box<Option<Ast>>),
 
     // Identifier/Literal token
     Primary(Token)
