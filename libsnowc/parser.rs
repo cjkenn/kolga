@@ -502,7 +502,7 @@ impl<'l, 's> Parser<'l, 's> {
             return None;
         }
 
-        let func_name_tkn = match maybe_ast.unwrap() {
+        let func_name_tkn = match maybe_ast.clone().unwrap() {
             Ast::Primary(tkn) => Some(tkn),
             _ => None
         };
@@ -518,11 +518,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let class_prop_tkn = self.match_ident_tkn();
                 maybe_ast = Some(Ast::ClassGet(func_name_tkn, class_prop_tkn));
             },
-            _ => {
-                let err_msg = format!("Unexpected token {:?} found", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
-                maybe_ast = None;
-            }
+            _ => ()
         };
 
         maybe_ast
@@ -554,7 +550,7 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_primary_expr(&mut self) -> Option<Ast> {
-        match &self.currtkn.ty {
+        match self.currtkn.ty {
             TknTy::Str(_) |
             TknTy::Val(_) |
             TknTy::Ident(_) |
