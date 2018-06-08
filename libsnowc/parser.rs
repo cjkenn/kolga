@@ -218,28 +218,104 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_if_stmt(&mut self) -> Option<Ast> {
-        unimplemented!()
+        self.expect(TknTy::If);
+        let maybe_if_cond = self.parse_expr();
+        if maybe_if_cond.is_none() {
+            return None;
+        }
+
+        let maybe_if_blck = self.parse_block_stmt();
+        let mut maybe_else_blck = None;
+        let mut else_ifs = Vec::new();
+        loop {
+            match self.currtkn.ty {
+                TknTy::Elif => {
+                    self.consume();
+                    let maybe_elif_ast = self.parse_expr();
+                    let maybe_elif_blck = self.parse_block_stmt();
+                    else_ifs.push(Some(Ast::ElifStmt(Box::new(maybe_elif_ast), Box::new(maybe_elif_blck))));
+                },
+                TknTy::Else => {
+                    self.consume();
+                    maybe_else_blck = self.parse_block_stmt();
+                },
+                _ => break
+            };
+        }
+
+        Some(Ast::IfStmt(Box::new(maybe_if_cond),
+                     Box::new(maybe_if_blck),
+                     else_ifs,
+                     Box::new(maybe_else_blck)))
     }
 
     fn parse_while_stmt(&mut self) -> Option<Ast> {
-        unimplemented!()
+        self.expect(TknTy::While);
+        // TODO: skip expr for infinite loop when we have a break stmt
+        let maybe_while_cond = self.parse_expr();
+        if maybe_while_cond.is_none() {
+            return None;
+        }
+
+        let while_stmts = self.parse_block_stmt();
+        Some(Ast::WhileStmt(Box::new(maybe_while_cond), Box::new(while_stmts)))
     }
 
     fn parse_for_stmt(&mut self) -> Option<Ast> {
-        unimplemented!()
+        self.expect(TknTy::For);
+        let mut for_var_decl = None;
+        let mut for_var_cond = None;
+        let mut for_incr_expr = None;
+
+        match self.currtkn.ty {
+            TknTy::Semicolon => self.consume(),
+            TknTy::Let => {
+                for_var_decl = self.parse_var_decl();
+            },
+            _ => {
+                let err_msg = String::from("Invalid for statement");
+                self.err_from_tkn(err_msg);
+            }
+        };
+
+        match self.currtkn.ty {
+            TknTy::Semicolon => self.consume(),
+            _ => for_var_cond = self.parse_expr_stmt()
+        };
+
+        match self.currtkn.ty {
+            TknTy::Semicolon => self.consume(),
+            _ => for_incr_expr = self.parse_expr_stmt()
+        };
+
+        let for_stmt = self.parse_block_stmt();
+
+        Some(Ast::ForStmt(Box::new(for_var_decl),
+                          Box::new(for_var_cond),
+                          Box::new(for_incr_expr),
+                          Box::new(for_stmt)))
     }
 
     fn parse_ret_stmt(&mut self) -> Option<Ast> {
-        unimplemented!()
+        self.expect(TknTy::Return);
+        match self.currtkn.ty {
+            TknTy::Semicolon => {
+                self.consume();
+                Some(Ast::RetStmt(Box::new(None)))
+            },
+            _ => {
+                let maybe_ret_expr = self.parse_expr();
+                self.expect(TknTy::Semicolon);
+                Some(Ast::RetStmt(Box::new(maybe_ret_expr)))
+            }
+        }
     }
 
     fn parse_expr_stmt(&mut self) -> Option<Ast> {
-        unimplemented!()
+        let maybe_expr = self.parse_expr();
+        self.expect(TknTy::Semicolon);
+        Some(Ast::ExprStmt(Box::new(maybe_expr)))
     }
-
-
-
-
 
     fn parse_expr(&mut self) -> Option<Ast> {
         self.parse_assign_expr()

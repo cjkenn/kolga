@@ -7,15 +7,31 @@ pub enum Ast {
     // List of statements/expression in a block
     BlckStmt(Vec<Option<Ast>>),
 
-    IfStmt,
+    // Condition expr, if block stmt, else if exprs, else stmts
+    IfStmt(Box<Option<Ast>>,
+           Box<Option<Ast>>,
+           Vec<Option<Ast>>,
+           Box<Option<Ast>>
+    ),
 
-    WhileStmt,
+    // Condition expr, stmts
+    ElifStmt(Box<Option<Ast>>, Box<Option<Ast>>),
 
-    ForStmt,
+    // Condition expr, stmts
+    WhileStmt(Box<Option<Ast>>, Box<Option<Ast>>),
 
-    RetStmt,
+    // Var decl, condition expr, incr/decr expr, stmts
+    ForStmt(Box<Option<Ast>>,
+            Box<Option<Ast>>,
+            Box<Option<Ast>>,
+            Box<Option<Ast>>
+    ),
 
-    ExprStmt,
+    // Return expr, if any
+    RetStmt(Box<Option<Ast>>),
+
+    // expr
+    ExprStmt(Box<Option<Ast>>),
 
     // Var type tkn, var name tkn, mutability
     VarDecl(Token, Token, bool),
