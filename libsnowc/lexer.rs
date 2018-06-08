@@ -332,7 +332,7 @@ impl Lexer {
             _ => false
         };
 
-        if self.pos == self.buffer.len() || on_new_line {
+        if self.pos == self.buffer.len()-1 || on_new_line {
             self.next_line();
         } else {
             self.pos = self.pos + 1;

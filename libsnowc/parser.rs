@@ -7,8 +7,8 @@ use errors::report::ErrC;
 const FN_PARAM_MAX_LEN: usize = 64;
 
 pub struct ParserResult {
-    ast: Option<Box<Ast>>,
-    error: Vec<ErrC>
+    pub ast: Option<Box<Ast>>,
+    pub error: Vec<ErrC>
 }
 
 impl ParserResult {
