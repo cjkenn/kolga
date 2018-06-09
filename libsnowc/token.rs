@@ -66,6 +66,8 @@ impl TknTy {
             TknTy::Str(_) => TknTy::String,
             TknTy::Val(_) => TknTy::Num,
             TknTy::True | TknTy::False => TknTy::Bool,
+            TknTy::Minus => TknTy::Num,
+            TknTy::Bang => TknTy::Bool,
             _ => self.clone()
         }
     }
