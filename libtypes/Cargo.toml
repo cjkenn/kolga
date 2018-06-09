@@ -1,0 +1,12 @@
+[package]
+name = "types"
+version = "0.1.0"
+authors = ["cjkenn <cam.j.kennedy@gmail.com"]
+
+[lib]
+name = "types"
+path = "lib.rs"
+
+[dependencies]
+errors = { path = "../liberrors" }
+snowc = { path = "../libsnowc" }

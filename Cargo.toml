@@ -11,3 +11,4 @@ path = "./src/snow.rs"
 snowc = { path = "libsnowc" }
 vm = { path = "libvm" }
 errors = { path = "liberrors" }
+types = { path = "libtypes" }

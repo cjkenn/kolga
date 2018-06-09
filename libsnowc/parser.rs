@@ -2,7 +2,7 @@ use ast::Ast;
 use symtab::SymTab;
 use lexer::Lexer;
 use token::{Token, TknTy};
-use errors::report::ErrC;
+use errors::ErrC;
 
 const FN_PARAM_MAX_LEN: usize = 64;
 

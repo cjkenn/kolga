@@ -2,7 +2,7 @@ use std::io::{BufReader, BufRead};
 use std::fs::File;
 use std::collections::HashMap;
 
-use errors::report::ErrC;
+use errors::ErrC;
 use token::{Token, TknTy};
 
 #[derive(Debug)]
