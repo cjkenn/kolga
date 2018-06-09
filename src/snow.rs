@@ -41,5 +41,12 @@ fn main() {
 
     // We can be assured that all ast values are Some, since None is only returned
     // if there are parsing errors
-    let tychk = TyCheck::new(&result.ast.unwrap()).check();
+    let tyresult = TyCheck::new(&result.ast.unwrap()).check();
+    if tyresult.len() > 0 {
+        for err in &tyresult {
+            err.emit();
+        }
+
+        return;
+    }
 }

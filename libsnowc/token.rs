@@ -60,6 +60,17 @@ pub enum TknTy {
     Eof
 }
 
+impl TknTy {
+    pub fn to_ty(&self) -> TknTy {
+        match self {
+            TknTy::Str(_) => TknTy::String,
+            TknTy::Val(_) => TknTy::Num,
+            TknTy::True | TknTy::False => TknTy::Bool,
+            _ => self.clone()
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub ty: TknTy,
