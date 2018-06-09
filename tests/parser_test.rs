@@ -26,9 +26,9 @@ fn test_parse_empty() {
 fn test_parse_var_decl_mutable() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_decl_mutable").unwrap());
     let mut symtab = SymTab::new();
-    let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap().extract_head();
+    let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
-    let var_decl = &ast[0];
+    let var_decl = &extract_head(ast)[0];
     match *var_decl {
         Ast::VarDecl(ref varty, ref ident, imm) => {
             assert_eq!(varty.ty, TknTy::Num);
@@ -57,9 +57,9 @@ fn test_parse_var_decl_imm() {
 fn test_parse_var_assign_mutable() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_assign_mutable").unwrap());
     let mut symtab = SymTab::new();
-    let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap().extract_head();
+    let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
-    let var_assign = &ast[0];
+    let var_assign = &extract_head(ast)[0];
     match *var_assign {
         Ast::VarAssign(ref varty, ref ident, imm, ref val_ast) => {
             assert_eq!(varty.ty, TknTy::Num);
@@ -84,6 +84,72 @@ fn test_parse_var_assign_mutable() {
             }
         },
         _ => expected_ast("VarAssign", &var_assign)
+    }
+}
+
+#[test]
+fn test_parse_var_assign_imm() {
+    let mut lexer = Lexer::new(File::open("./tests/parser_input/var_assign_imm").unwrap());
+    let mut symtab = SymTab::new();
+    let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
+
+    let var_assign = &extract_head(ast)[0];
+    match *var_assign {
+        Ast::VarAssign(ref varty, ref ident, imm, ref rhs) => {
+            assert_eq!(varty.ty, TknTy::Num);
+            assert_eq!(imm, true);
+
+            match ident.ty {
+                TknTy::Ident(ref id) => {
+                    assert_eq!(id, "x");
+                },
+                _ => expected_tkn("Ident", &ident.ty)
+            }
+
+            let vast = rhs.clone();
+            match *vast {
+                Some(ast) => {
+                    match ast {
+                        Ast::Primary(_) => assert!(true),
+                        _ => expected_ast("Primary", &ast)
+                    }
+                },
+                _ => ()
+            }
+        },
+        _ => expected_ast("VarAssign", &var_assign)
+    }
+}
+
+#[test]
+fn test_parse_unary_expr() {
+    let mut lexer = Lexer::new(File::open("./tests/parser_input/unary_expr").unwrap());
+    let mut symtab = SymTab::new();
+    let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
+
+    let exprstmt = &extract_head(ast)[0];
+
+    match *exprstmt {
+        Ast::ExprStmt(ref unr) => {
+            let unr2 = unr.clone();
+            match *unr2 {
+                Some(ast) => {
+                    match ast {
+                        Ast::Unary(_, _) => assert!(true),
+                        _ => expected_ast("Unary", &ast)
+                    }
+                },
+                _ => ()
+            }
+        },
+        _ => expected_ast("ExprStmt", &exprstmt)
+    }
+}
+
+fn extract_head(ast: Box<Ast>) -> Vec<Ast> {
+    match *ast {
+        Ast::Prog(ref stmts) => stmts.clone(),
+        _ => panic!("Cannot call extract_head on an ast not of type Ast::Prog")
     }
 }
 

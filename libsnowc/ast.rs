@@ -69,12 +69,3 @@ pub enum Ast {
     // Identifier/Literal token
     Primary(Token)
 }
-
-impl Ast {
-    pub fn extract_head(&self) -> Vec<Ast> {
-        match self {
-            &Ast::Prog(ref stmts) => stmts.clone(),
-            _ => panic!("Cannot call extract_head on an ast not of type Ast::Prog")
-        }
-    }
-}
