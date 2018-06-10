@@ -6,21 +6,21 @@ pub struct TyCheck<'t> {
     ast: &'t Ast
 }
 
-struct TyExt {
-    pub lty: TknTy,
-    pub rty: Option<TknTy>
+struct TyPair {
+    pub lhs_ty: TknTy,
+    pub rhs_ty: Option<TknTy>
 }
 
-impl TyExt {
-    pub fn new(l: TknTy, r: Option<TknTy>) -> TyExt {
-        TyExt {
-            lty: l,
-            rty: r
+impl TyPair {
+    pub fn new(lt: TknTy, rt: Option<TknTy>) -> TyPair {
+        TyPair {
+            lhs_ty: lt,
+            rhs_ty: rt
         }
     }
 
-    pub fn is_unr_ty(&self) -> bool {
-        self.rty.is_none()
+    pub fn is_single_ty(&self) -> bool {
+        self.rhs_ty.is_none()
     }
 }
 
@@ -77,65 +77,67 @@ impl<'t> TyCheck<'t> {
 
         let assign_tyext = self.extract_expr_ty(&assign_ast);
 
-        if assign_tyext.is_unr_ty() {
-            if !self.match_tkn_ty(&exp_ty, &assign_tyext.lty) {
-                return Some(self.ty_err(&tkn, exp_ty, assign_tyext.lty));
+        if assign_tyext.is_single_ty() {
+            if !self.match_tkn_ty(&exp_ty, &assign_tyext.lhs_ty) {
+                return Some(self.ty_err(&tkn, exp_ty, assign_tyext.lhs_ty));
             }
         } else {
             // TODO: This should be a call to check_expr
-            let assign_rty = assign_tyext.rty.unwrap();
+            let assign_rhs_ty = assign_tyext.rhs_ty.unwrap();
             // Expression valid types
-            if !self.match_tkn_ty(&assign_tyext.lty, &assign_rty) {
-                return Some(self.ty_err(&tkn, assign_tyext.lty, assign_rty));
+            if !self.match_tkn_ty(&assign_tyext.lhs_ty, &assign_rhs_ty) {
+                return Some(self.ty_err(&tkn, assign_tyext.lhs_ty, assign_rhs_ty));
             }
 
             // If the expression is valid, check that the expr evaluated
             // type matches the var
-            if !self.match_tkn_ty(&exp_ty, &assign_tyext.lty) {
-                return Some(self.ty_err(&tkn, exp_ty, assign_tyext.lty));
+            if !self.match_tkn_ty(&exp_ty, &assign_tyext.lhs_ty) {
+                return Some(self.ty_err(&tkn, exp_ty, assign_tyext.lhs_ty));
             }
         }
 
         None
     }
 
-    fn check_unary(&self, stmt: &Ast) -> Option<ErrC> {
-        let op_tkn = self.extract_varop_tkn(stmt);
+    fn check_unary(&self, expr: &Ast) -> Option<ErrC> {
+        let op_tkn = self.extract_varop_tkn(expr);
         let op_ty = op_tkn.ty.clone();
 
-        let unr_tyext = self.extract_expr_ty(&stmt);
+        let unary_ty_pair = self.extract_expr_ty(&expr);
 
-        if unr_tyext.is_unr_ty() {
-            if !self.match_unr_op_ty(&op_ty, &unr_tyext.lty) {
-                return Some(self.ty_err(&op_tkn, op_ty.to_ty(), unr_tyext.lty))
+        // If we have two types in the pair, we need to match lhs ty and rhs ty
+        // in the pair, and also the operator with one of the types
+        if unary_ty_pair.is_single_ty() {
+            if !self.match_unary_ty_pair(&op_ty, &unary_ty_pair.lhs_ty) {
+                return Some(self.ty_err(&op_tkn, op_ty.to_ty(), unary_ty_pair.lhs_ty))
             }
         } else {
-            let unr_rty = unr_tyext.rty.unwrap();
-            if !self.match_unr_op_ty(&unr_tyext.lty, &unr_rty) {
-                return Some(self.ty_err(&op_tkn, unr_tyext.lty, unr_rty));
+            let unr_rhs_ty = unary_ty_pair.rhs_ty.unwrap();
+            if !self.match_unary_ty_pair(&unary_ty_pair.lhs_ty, &unr_rhs_ty) {
+                return Some(self.ty_err(&op_tkn, unary_ty_pair.lhs_ty, unr_rhs_ty));
             }
 
-            if !self.match_unr_op_ty(&op_ty, &unr_tyext.lty) {
-                return Some(self.ty_err(&op_tkn, op_ty.to_ty(), unr_tyext.lty))
+            if !self.match_unary_ty_pair(&op_ty, &unary_ty_pair.lhs_ty) {
+                return Some(self.ty_err(&op_tkn, op_ty.to_ty(), unary_ty_pair.lhs_ty))
             }
         }
 
         None
     }
 
-    fn extract_expr_ty(&self, stmt: &Ast) -> TyExt {
+    fn extract_expr_ty(&self, stmt: &Ast) -> TyPair {
         match stmt {
             Ast::Primary(ref tkn) => {
-                TyExt::new(tkn.ty.clone(), None)
+                TyPair::new(tkn.ty.clone(), None)
             },
             Ast::Unary(_, ref rhs) => {
-                let lhsty = self.extract_expr_ty(&rhs.clone().unwrap()).lty;
-                TyExt::new(lhsty, None)
+                let lhsty = self.extract_expr_ty(&rhs.clone().unwrap()).lhs_ty;
+                TyPair::new(lhsty, None)
             },
             Ast::Binary(_, ref lhs, ref rhs) => {
-                let lhsty = self.extract_expr_ty(&lhs.clone().unwrap()).lty;
-                let rhsty = self.extract_expr_ty(&rhs.clone().unwrap()).lty;
-                TyExt::new(lhsty, Some(rhsty))
+                let lhsty = self.extract_expr_ty(&lhs.clone().unwrap()).lhs_ty;
+                let rhsty = self.extract_expr_ty(&rhs.clone().unwrap()).lhs_ty;
+                TyPair::new(lhsty, Some(rhsty))
             }
             _ => panic!()
         }
@@ -158,7 +160,7 @@ impl<'t> TyCheck<'t> {
         }
     }
 
-    fn match_unr_op_ty(&self, lty: &TknTy, rty: &TknTy) -> bool {
+    fn match_unary_ty_pair(&self, lty: &TknTy, rty: &TknTy) -> bool {
         match *rty {
             TknTy::Val(_) | TknTy::Num => *lty == TknTy::Minus,
             TknTy::True | TknTy::False | TknTy::Bool => *lty == TknTy::Bang,
