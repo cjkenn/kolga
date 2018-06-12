@@ -61,7 +61,9 @@ pub enum TknTy {
 }
 
 impl TknTy {
-    pub fn to_ty(&self) -> TknTy {
+    // TODO: this isnt a token type, but a language type. Need a different data
+    // structure to hold this
+    pub fn to_equiv_ty(&self) -> TknTy {
         match self {
             TknTy::Str(_) => TknTy::String,
             TknTy::Val(_) => TknTy::Num,
@@ -70,6 +72,68 @@ impl TknTy {
             TknTy::Bang => TknTy::Bool,
             _ => self.clone()
         }
+    }
+
+    pub fn is_numerical(&self) -> bool {
+        match self {
+            TknTy::Num | TknTy::Val(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn is_bin_op(&self) -> bool {
+        match self {
+            TknTy::Plus |
+            TknTy::Minus |
+            TknTy::Star |
+            TknTy::Slash |
+            TknTy::Percent |
+            TknTy::EqEq |
+            TknTy::BangEq |
+            TknTy::Gt |
+            TknTy::Lt |
+            TknTy::GtEq |
+            TknTy::LtEq => true,
+            _ => false
+        }
+    }
+
+    pub fn is_numerical_op(&self) -> bool {
+        match self {
+            TknTy::Plus |
+            TknTy::Minus |
+            TknTy::Star |
+            TknTy::Slash |
+            TknTy::Percent => true,
+            _ => false
+        }
+    }
+
+    pub fn is_cmp_op(&self) -> bool {
+        match self {
+            TknTy::EqEq |
+            TknTy::BangEq |
+            TknTy::Gt |
+            TknTy::Lt |
+            TknTy::GtEq |
+            TknTy::LtEq => true,
+            _ => false
+        }
+    }
+
+    pub fn is_logical_op(&self) -> bool {
+        match self {
+            TknTy::AmpAmp | TknTy::PipePipe | TknTy::Or | TknTy::And => true,
+             _ => false
+        }
+    }
+
+    pub fn is_unary_op(&self) -> bool {
+        match self {
+            TknTy::Minus | TknTy::Bang => true,
+            _ => false
+        }
+
     }
 }
 

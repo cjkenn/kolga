@@ -69,3 +69,19 @@ pub enum Ast {
     // Identifier/Literal token
     Primary(Token)
 }
+
+impl Ast {
+    pub fn is_primary(&self) -> bool {
+        match self {
+            Ast::Primary(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn extract_primary_tkn(&self) -> Token {
+        match self {
+            Ast::Primary(tkn) => tkn.clone(),
+            _ => panic!()
+        }
+    }
+}
