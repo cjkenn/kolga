@@ -31,11 +31,14 @@ impl<'t> TyCheck<'t> {
 
     fn check_stmt(&mut self, stmt: Ast) {
         match stmt {
-            // &Ast::VarAssign(_, _, _, _) => self.check_var_assign(stmt),
+            Ast::VarDecl(_, _, _) => (), // ignore var assign
+            Ast::VarAssign(_, _, _, _) => {
+                self.check_var_assign(stmt);
+            },
             Ast::ExprStmt(ref ast) => {
                 self.check_expr(ast.clone().unwrap());
             },
-            _ => ()
+            _ => panic!("Unrecognized statement type found!")
         }
     }
 
@@ -52,7 +55,8 @@ impl<'t> TyCheck<'t> {
                     return self.eval_unary_ty(op_tkn.clone(), rhs_ty);
                 }
             },
-            Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) => {
+            Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) |
+            Ast::Logical(op_tkn, maybe_lhs, maybe_rhs) => {
                 let lhs = maybe_lhs.unwrap();
                 let rhs = maybe_rhs.unwrap();
 
@@ -85,8 +89,24 @@ impl<'t> TyCheck<'t> {
         }
     }
 
-    fn eval_unary_ty(&self, op_tkn: Token, rhs_ty: TknTy) -> TknTy {
-        unimplemented!()
+    fn eval_unary_ty(&mut self, op_tkn: Token, rhs_ty: TknTy) -> TknTy {
+        match op_tkn.ty {
+            TknTy::Minus => {
+                if rhs_ty.to_equiv_ty() != TknTy::Num {
+                    let err = self.ty_mismatch(&op_tkn, &TknTy::Num, &rhs_ty);
+                    self.errors.push(err);
+                }
+                return TknTy::Num;
+            },
+            TknTy::Bang => {
+                if rhs_ty.to_equiv_ty() != TknTy::Bool {
+                    let err = self.ty_mismatch(&op_tkn, &TknTy::Bool, &rhs_ty);
+                    self.errors.push(err);
+                }
+                return TknTy::Bool;
+            },
+            _ => panic!("Unimplemented unary operator found!")
+        };
     }
 
     // Returns the expected type given the operator, even if there is an error.
@@ -122,45 +142,39 @@ impl<'t> TyCheck<'t> {
                 return TknTy::Bool
             },
             TknTy::And | TknTy::Or | TknTy::AmpAmp | TknTy::PipePipe => {
+                if lhs_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                    let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
+                    self.errors.push(err);
+                }
+
+                if !lhs_ty.is_bool() || !rhs_ty.is_bool() {
+                    let err = self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
+                    self.errors.push(err);
+                }
+
                 return TknTy::Bool
             },
-            _ => panic!()
+            _ => panic!("Unimplemented binary operator found!")
         }
     }
 
-    // fn check_var_assign(&self, stmt: &Ast) {
-    //     let tkn = self.extract_varop_tkn(stmt);
-    //     let exp_ty = tkn.ty.clone();
+    fn check_var_assign(&mut self, stmt: Ast) -> TknTy {
+        match stmt {
+            Ast::VarAssign(var_ty_tkn, ident_tkn, _imm, maybe_rhs) => {
+                let lhs_ty = var_ty_tkn.ty;
+                let rhs = maybe_rhs.unwrap();
 
-    //     // The value of an assignment can be an expression. We don't
-    //     // need to evaluate the expression, but we can get the types of
-    //     // the expression operators and check them here.
-    //     let assign_ast = match stmt {
-    //         &Ast::VarAssign(_, _, _, ref ast) => {
-    //             ast.clone().unwrap()
-    //         },
-    //         _ => panic!()
-    //     };
+                let rhs_ty = self.check_expr(rhs);
+                if lhs_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                    let err = self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
+                    self.errors.push(err);
+                }
 
-    //     let assign_ty_pair = self.extract_expr_ty(&assign_ast);
-
-    //     if !assign_ty_pair.is_single_ty() {
-    //         // TODO: This should be a call to check_expr
-    //         let assign_rhs_ty = assign_ty_pair.rhs_ty.unwrap();
-    //         // Expression valid types
-    //         if !self.match_tkn_ty(&assign_ty_pair.lhs_ty, &assign_rhs_ty) {
-    //             return Some(self.ty_err(&tkn, assign_ty_pair.lhs_ty, assign_rhs_ty));
-    //         }
-    //     }
-
-    //     // If the expression is valid, check that the expr evaluated
-    //     // type matches the var
-    //     if !self.match_tkn_ty(&exp_ty, &assign_ty_pair.lhs_ty) {
-    //         return Some(self.ty_err(&tkn, exp_ty, assign_ty_pair.lhs_ty));
-    //     }
-
-    //     None
-    // }
+                return lhs_ty;
+            },
+            _ => panic!("Invalid ast found when checking variable assignment")
+        }
+    }
 
     fn ty_mismatch(&self, tkn: &Token, lhs: &TknTy, rhs: &TknTy) -> ErrC {
         let msg = format!("Type mismatch: Wanted {:?}, but found {:?}",

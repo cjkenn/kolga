@@ -81,6 +81,13 @@ impl TknTy {
         }
     }
 
+    pub fn is_bool(&self) -> bool {
+        match self {
+            TknTy::Bool | TknTy::True | TknTy::False => true,
+            _ => false
+        }
+    }
+
     pub fn is_bin_op(&self) -> bool {
         match self {
             TknTy::Plus |
