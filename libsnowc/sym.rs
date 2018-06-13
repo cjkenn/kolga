@@ -1,37 +1,28 @@
+use token::Token;
+
 pub enum SymTy {
     Var,
     Func,
     Class,
 }
-
-pub enum ValTy {
-    Str,
-    Num,
-    Bool
-}
-
-pub enum SymVal {
-    Str(String),
-    Num(f64),
-    Bool(bool)
-}
-
+// TODO: probably need to store the associated rhs ast for these values
+// at some point
 pub struct Sym {
     pub sym_ty: SymTy,
-    pub val_ty: Option<ValTy>,
     pub name: String,
-    pub val: Option<SymVal>,
-    pub imm: bool
+    pub imm: bool,
+    pub ty_tkn: Token,
+    pub val_tkn: Token
 }
 
 impl Sym {
-    pub fn new(ty: SymTy, vty: Option<ValTy>, n: &str, v: Option<SymVal>, im: bool) -> Sym {
+    pub fn new(sym_ty: SymTy, n: &str, im: bool, ty_tkn: Token, val_tkn: Token) -> Sym {
         Sym {
-            sym_ty: ty,
-            val_ty: vty,
+            sym_ty: sym_ty,
             name: n.to_string(),
-            val: v,
-            imm: im
+            imm: im,
+            ty_tkn: ty_tkn,
+            val_tkn: val_tkn
         }
     }
 }

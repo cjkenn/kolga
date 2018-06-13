@@ -1,5 +1,6 @@
 use ast::Ast;
 use symtab::SymTab;
+use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
 use errors::ErrC;
@@ -100,6 +101,15 @@ impl<'l, 's> Parser<'l, 's> {
                 self.consume();
                 let var_val = self.parse_expr();
                 self.expect(TknTy::Semicolon);
+
+                let name = ident_tkn.clone().unwrap().get_name();
+                let sym = Sym::new(SymTy::Var,
+                                   &name,
+                                   is_imm,
+                                   var_ty_tkn.clone().unwrap(),
+                                   ident_tkn.clone().unwrap());
+
+                self.symtab.store(&name, sym);
                 Some(Ast::VarAssign(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm, Box::new(var_val)))
             },
             TknTy::Semicolon => {
@@ -109,6 +119,15 @@ impl<'l, 's> Parser<'l, 's> {
                     return None;
                 }
                 self.consume();
+
+                let name = ident_tkn.clone().unwrap().get_name();
+                let sym = Sym::new(SymTy::Var,
+                                   &name,
+                                   is_imm,
+                                   var_ty_tkn.clone().unwrap(),
+                                   ident_tkn.clone().unwrap());
+
+                self.symtab.store(&name, sym);
                 Some(Ast::VarDecl(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm))
             },
             _ => {
@@ -273,19 +292,23 @@ impl<'l, 's> Parser<'l, 's> {
                 for_var_decl = self.parse_var_decl();
             },
             _ => {
-                let err_msg = String::from("Invalid for statement");
+                let err_msg = String::from("Invalid for statement: Must start with a var declaration");
                 self.err_from_tkn(err_msg);
             }
         };
 
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
-            _ => for_var_cond = self.parse_expr_stmt()
+            _ => {
+                for_var_cond = self.parse_expr_stmt();
+            }
         };
 
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
-            _ => for_incr_expr = self.parse_expr_stmt()
+            _ => {
+                for_incr_expr = self.parse_expr_stmt();
+            }
         };
 
         let for_stmt = self.parse_block_stmt();
@@ -334,13 +357,36 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.parse_assign_expr();
 
                 match maybe_ast.clone().unwrap() {
-                    Ast::VarDecl(ty, ident, imm) => {
-                        if imm {
-                            let err_msg = format!("Cannot re-assign immutable variable");
-                            self.err_from_tkn(err_msg);
-                            return None;
-                        }
-                        return Some(Ast::VarAssign(ty, ident, imm, Box::new(rhs)));
+                    Ast::Primary(tkn) => {
+                        match tkn.ty {
+                            TknTy::Ident(name) => {
+                                let maybe_sym = self.symtab.retrieve(&name);
+                                if maybe_sym.is_none() {
+                                    let err_msg = format!("Undeclared variable {:?} found, cannot assign",
+                                                          name);
+                                    self.err_from_tkn(err_msg);
+                                    return None;
+                                }
+
+                                let sym = maybe_sym.unwrap();
+
+                                if sym.imm {
+                                    let err_msg = format!("Cannot re-assign immutable variable");
+                                    self.err_from_tkn(err_msg);
+                                    return None;
+                                }
+
+                                return Some(Ast::VarAssign(sym.ty_tkn.clone(),
+                                                           sym.val_tkn.clone(),
+                                                           sym.imm,
+                                                           Box::new(rhs)));
+                            },
+                            _ => {
+                                let err_msg = format!("Token {:?} is invalid for assignment", tkn.ty.clone());
+                                self.err_from_tkn(err_msg);
+                                return None;
+                            }
+                        };
                     },
                     Ast::ClassGet(cls, prop) => {
                         return Some(Ast::ClassSet(cls, prop, Box::new(rhs)));
@@ -524,7 +570,6 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    /// Parses expr { ',' expr } ; (no parens are expected here)
     fn parse_fnparams_expr(&mut self, fn_tkn: Option<Token>) -> Option<Ast> {
         let mut params: Vec<Ast> = Vec::new();
         while self.currtkn.ty != TknTy::RightParen {

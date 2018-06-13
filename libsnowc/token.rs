@@ -140,7 +140,6 @@ impl TknTy {
             TknTy::Minus | TknTy::Bang => true,
             _ => false
         }
-
     }
 }
 
@@ -164,5 +163,12 @@ impl Token {
         self.ty == TknTy::Num ||
             self.ty == TknTy::String ||
             self.ty == TknTy::Bool
+    }
+
+    pub fn get_name(&self) -> String {
+        match self.ty {
+            TknTy::Ident(ref name) => name.to_string(),
+            _ => "".to_string()
+        }
     }
 }

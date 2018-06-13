@@ -31,12 +31,40 @@ impl<'t> TyCheck<'t> {
 
     fn check_stmt(&mut self, stmt: Ast) {
         match stmt {
-            Ast::VarDecl(_, _, _) => (), // ignore var assign
+            Ast::VarDecl(_, _, _) => (), // ignore var declaration without assign
             Ast::VarAssign(_, _, _, _) => {
                 self.check_var_assign(stmt);
             },
             Ast::ExprStmt(ref ast) => {
                 self.check_expr(ast.clone().unwrap());
+            },
+            Ast::IfStmt(expr_ast, maybe_stmt_ast, elif_stmts, maybe_el_stmts) => {
+                self.check_expr(expr_ast.clone().unwrap());
+                self.check_stmt(maybe_stmt_ast.clone().unwrap());
+
+                for stmt in &elif_stmts {
+                    self.check_stmt(stmt.clone().unwrap());
+                }
+
+                if maybe_el_stmts.is_some() {
+                    self.check_stmt(maybe_el_stmts.clone().unwrap());
+                }
+            },
+            Ast::WhileStmt(maybe_expr_ast, maybe_stmts) => {
+                self.check_expr(maybe_expr_ast.clone().unwrap());
+                self.check_stmt(maybe_stmts.clone().unwrap());
+            },
+            Ast::ElifStmt(maybe_expr_ast, maybe_stmt_ast) => {
+                self.check_expr(maybe_expr_ast.clone().unwrap());
+                self.check_stmt(maybe_stmt_ast.clone().unwrap());
+            },
+            Ast::ForStmt(decl_ast, cond_expr, incr_expr, stmts) => {
+                unimplemented!();
+            },
+            Ast::BlckStmt(stmts) => {
+                for stmt in &stmts {
+                    self.check_stmt(stmt.clone().unwrap());
+                }
             },
             _ => panic!("Unrecognized statement type found!")
         }
@@ -44,6 +72,9 @@ impl<'t> TyCheck<'t> {
 
     fn check_expr(&mut self, expr: Ast) -> TknTy {
         match expr {
+            Ast::VarAssign(_, _, _, _) => {
+                self.check_var_assign(expr)
+            },
             Ast::Unary(op_tkn, maybe_rhs) => {
                 let rhs = maybe_rhs.unwrap();
 
