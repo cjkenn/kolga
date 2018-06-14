@@ -81,7 +81,31 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone().unwrap());
                 }
             },
+            Ast::FnDecl(ident_tkn, param_list, ret_ty_tkn, maybe_stmts) => {
+                let fn_ty = ret_ty_tkn.ty;
+                let stmts = maybe_stmts.unwrap();
+                match stmts {
+                    Ast::BlckStmt(stmt_list) => self.check_fn_stmts(ident_tkn.clone(), fn_ty, stmt_list),
+                    _ => self.check_stmt(stmts.clone())
+                };
+            }
             _ => panic!("Unrecognized statement type found!")
+        }
+    }
+
+    fn check_fn_stmts(&mut self, fn_tkn: Token, fn_ret_ty: TknTy, stmts: Vec<Option<Ast>>) {
+        for maybe_stmt in &stmts {
+            let stmt = maybe_stmt.clone().unwrap();
+            match stmt {
+                Ast::RetStmt(maybe_expr) => {
+                    let rhs_ty = self.check_expr(maybe_expr.clone().unwrap());
+                    if fn_ret_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                        let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
+                        self.errors.push(err);
+                    }
+                },
+                _ => self.check_stmt(stmt)
+            };
         }
     }
 

@@ -181,7 +181,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         let fn_body = self.parse_block_stmt();
 
-        Some(Ast::FnDecl(func_ident_tkn, params, Box::new(fn_body)))
+        Some(Ast::FnDecl(func_ident_tkn, params, fn_ret_ty.unwrap(), Box::new(fn_body)))
     }
 
     fn parse_class_decl(&mut self) -> Option<Ast> {

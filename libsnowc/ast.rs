@@ -48,11 +48,8 @@ pub enum Ast {
     // Operator token, rhs ast
     Unary(Token, Box<Option<Ast>>),
 
-    // Parenthesized expr
-    ParenExpr(Box<Option<Ast>>),
-
-    // Func ident, params, func body
-    FnDecl(Token, Vec<Token>, Box<Option<Ast>>),
+    // Func ident, params, return token, func body
+    FnDecl(Token, Vec<Token>, Token, Box<Option<Ast>>),
 
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),
