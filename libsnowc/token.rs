@@ -171,4 +171,11 @@ impl Token {
             _ => "".to_string()
         }
     }
+
+    pub fn is_ident(&self) -> bool {
+        match self.ty {
+            TknTy::Ident(_) => true,
+            _ => false
+        }
+    }
 }

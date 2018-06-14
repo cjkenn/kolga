@@ -1,16 +1,19 @@
 use snowc::ast::Ast;
 use snowc::token::{Token, TknTy};
+use snowc::symtab::SymTab;
 use errors::ErrC;
 
-pub struct TyCheck<'t> {
+pub struct TyCheck<'t, 's> {
     ast: &'t Ast,
+    symtab: &'s mut SymTab,
     errors: Vec<ErrC>
 }
 
-impl<'t> TyCheck<'t> {
-    pub fn new(a: &'t Ast) -> TyCheck {
+impl<'t, 's> TyCheck<'t, 's> {
+    pub fn new(ast: &'t Ast, symtab: &'s mut SymTab) -> TyCheck<'t, 's> {
         TyCheck {
-            ast: a,
+            ast: ast,
+            symtab: symtab,
             errors: Vec::new()
         }
     }
@@ -59,7 +62,19 @@ impl<'t> TyCheck<'t> {
                 self.check_stmt(maybe_stmt_ast.clone().unwrap());
             },
             Ast::ForStmt(decl_ast, cond_expr, incr_expr, stmts) => {
-                unimplemented!();
+                if decl_ast.is_some() {
+                    self.check_stmt(decl_ast.clone().unwrap());
+                }
+
+                if cond_expr.is_some() {
+                    self.check_stmt(cond_expr.clone().unwrap());
+                }
+
+                if incr_expr.is_some() {
+                    self.check_stmt(incr_expr.clone().unwrap());
+                }
+
+                self.check_stmt(stmts.clone().unwrap());
             },
             Ast::BlckStmt(stmts) => {
                 for stmt in &stmts {
@@ -95,17 +110,51 @@ impl<'t> TyCheck<'t> {
                     let lhs_tkn = lhs.extract_primary_tkn();
                     let rhs_tkn = rhs.extract_primary_tkn();
 
-                    return self.eval_bin_ty(op_tkn.clone(), lhs_tkn.ty, rhs_tkn.ty);
+                    let mut lhs_ty = lhs_tkn.ty.clone();
+                    let mut rhs_ty = rhs_tkn.ty.clone();
+
+                    if lhs_tkn.is_ident() {
+                        match self.find_sym_ty(&lhs_tkn) {
+                            Some(ty) => lhs_ty = ty,
+                            None => ()
+                        }
+                    }
+
+                    if rhs_tkn.is_ident() {
+                        match self.find_sym_ty(&rhs_tkn) {
+                            Some(ty) => rhs_ty = ty,
+                            None => ()
+                        }
+                    }
+
+                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
                 } else if lhs.is_primary() && !rhs.is_primary() {
                     let lhs_tkn = lhs.extract_primary_tkn();
+
+                    let mut lhs_ty = lhs_tkn.ty.clone();
+                    if lhs_tkn.is_ident() {
+                        match self.find_sym_ty(&lhs_tkn) {
+                            Some(ty) => lhs_ty = ty,
+                            None => ()
+                        }
+                    }
+
                     let rhs_ty = self.check_expr(rhs);
 
-                    return self.eval_bin_ty(op_tkn.clone(), lhs_tkn.ty, rhs_ty);
+                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
                 } else if !lhs.is_primary() && rhs.is_primary() {
                     let lhs_ty = self.check_expr(lhs);
                     let rhs_tkn = rhs.extract_primary_tkn();
 
-                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_tkn.ty);
+                    let mut rhs_ty = rhs_tkn.ty.clone();
+                    if rhs_tkn.is_ident() {
+                        match self.find_sym_ty(&rhs_tkn) {
+                            Some(ty) => rhs_ty = ty,
+                            None => ()
+                        }
+                    }
+
+                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
                 } else {
                     let lhs_ty = self.check_expr(lhs);
                     let rhs_ty = self.check_expr(rhs);
@@ -114,8 +163,16 @@ impl<'t> TyCheck<'t> {
                 }
             },
             Ast::Primary(prim_tkn) => {
-                return prim_tkn.ty;
-            }
+                match prim_tkn.ty {
+                    TknTy::Ident(ref name) => {
+                        let sym = self.symtab.retrieve(name).unwrap();
+                        return sym.ty_tkn.ty.to_equiv_ty();
+                    },
+                    _ => {
+                        return prim_tkn.ty.to_equiv_ty();
+                    }
+                }
+            },
             _ => panic!()
         }
     }
@@ -229,5 +286,18 @@ impl<'t> TyCheck<'t> {
                           lhs.to_equiv_ty(),
                           rhs.to_equiv_ty());
         ErrC::new(tkn.line, tkn.pos, msg)
+    }
+
+    fn find_sym_ty(&mut self, ident_tkn: &Token) -> Option<TknTy> {
+        let name = ident_tkn.get_name();
+        let sym = self.symtab.retrieve(&name);
+        match sym {
+            Some(symbol) => Some(symbol.ty_tkn.ty.to_equiv_ty()),
+            None => {
+                let err_msg = format!("Undeclared symbol {:?} found", name);
+                self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));
+                None
+            }
+        }
     }
 }

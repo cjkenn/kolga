@@ -26,13 +26,22 @@ fn main() {
         }
     };
 
-    let mut lexer = Lexer::new(infile);
     let mut symtab = SymTab::new();
-    let mut parser = Parser::new(&mut lexer, &mut symtab);
+    let parse_result;
 
-    let result = parser.parse();
-    if result.error.len() > 0 {
-        for err in &result.error {
+    // New scope for this so the borrow of the symbol table
+    // expires so we can use it in the type checker. We don't care if the
+    // lexer or parser go out of scope either, since we only need the ast
+    // in the result later on
+    {
+        let mut lexer = Lexer::new(infile);
+        let mut parser = Parser::new(&mut lexer, &mut symtab);
+        parse_result = parser.parse();
+
+    }
+
+    if parse_result.error.len() > 0 {
+        for err in &parse_result.error {
             err.emit();
         }
 
@@ -41,7 +50,7 @@ fn main() {
 
     // We can be assured that all ast values are Some, since None is only returned
     // if there are parsing errors
-    let tyresult = TyCheck::new(&result.ast.unwrap()).check();
+    let tyresult = TyCheck::new(&parse_result.ast.unwrap(), &mut symtab).check();
     if tyresult.len() > 0 {
         for err in &tyresult {
             err.emit();
