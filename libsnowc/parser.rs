@@ -102,14 +102,15 @@ impl<'l, 's> Parser<'l, 's> {
                 let var_val = self.parse_expr();
                 self.expect(TknTy::Semicolon);
 
-                let name = ident_tkn.clone().unwrap().get_name();
                 let sym = Sym::new(SymTy::Var,
-                                   &name,
                                    is_imm,
                                    var_ty_tkn.clone().unwrap(),
-                                   ident_tkn.clone().unwrap());
+                                   ident_tkn.clone().unwrap(),
+                                   var_val.clone());
 
-                self.symtab.store(&name, sym);
+                let name = &ident_tkn.clone().unwrap().get_name();
+                self.symtab.store(name, sym);
+
                 Some(Ast::VarAssign(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm, Box::new(var_val)))
             },
             TknTy::Semicolon => {
@@ -120,14 +121,15 @@ impl<'l, 's> Parser<'l, 's> {
                 }
                 self.consume();
 
-                let name = ident_tkn.clone().unwrap().get_name();
                 let sym = Sym::new(SymTy::Var,
-                                   &name,
                                    is_imm,
                                    var_ty_tkn.clone().unwrap(),
-                                   ident_tkn.clone().unwrap());
+                                   ident_tkn.clone().unwrap(),
+                                   None);
 
-                self.symtab.store(&name, sym);
+                let name = &ident_tkn.clone().unwrap().get_name();
+                self.symtab.store(name, sym);
+
                 Some(Ast::VarDecl(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm))
             },
             _ => {
@@ -180,6 +182,13 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         let fn_body = self.parse_block_stmt();
+        let fn_sym = Sym::new(SymTy::Func,
+                              true,
+                              fn_ret_ty.clone().unwrap(),
+                              func_ident_tkn.clone(),
+                              fn_body.clone());
+        let name = &func_ident_tkn.get_name();
+        self.symtab.store(name, fn_sym);
 
         Some(Ast::FnDecl(func_ident_tkn, params, fn_ret_ty.unwrap(), Box::new(fn_body)))
     }
@@ -209,8 +218,17 @@ impl<'l, 's> Parser<'l, 's> {
             }
         }
 
-        Some(Ast::ClassDecl(class_tkn, methods, props))
+        let ast = Some(Ast::ClassDecl(class_tkn.clone(), methods, props));
+        let sym = Sym::new(SymTy::Class,
+                           true,
+                           class_tkn.clone(),
+                           class_tkn.clone(),
+                           ast.clone());
+        self.symtab.store(&class_tkn.get_name(), sym);
+
+        ast
     }
+
 
     fn parse_stmt(&mut self) -> Option<Ast> {
         match self.currtkn.ty {
@@ -377,7 +395,7 @@ impl<'l, 's> Parser<'l, 's> {
                                 }
 
                                 return Some(Ast::VarAssign(sym.ty_tkn.clone(),
-                                                           sym.val_tkn.clone(),
+                                                           sym.ident_tkn.clone(),
                                                            sym.imm,
                                                            Box::new(rhs)));
                             },
