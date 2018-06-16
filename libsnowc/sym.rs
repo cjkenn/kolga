@@ -1,5 +1,6 @@
 use token::Token;
 use ast::Ast;
+use type_record::TyRecord;
 
 pub enum SymTy {
     Var,
@@ -10,7 +11,7 @@ pub enum SymTy {
 pub struct Sym {
     pub sym_ty: SymTy,
     pub imm: bool,
-    pub ty_tkn: Token,
+    pub ty_rec: TyRecord,
     pub ident_tkn: Token,
     pub assign_val: Option<Ast>
 }
@@ -18,13 +19,13 @@ pub struct Sym {
 impl Sym {
     pub fn new(sym_ty: SymTy,
                imm: bool,
-               ty_tkn: Token,
+               ty_rec: TyRecord,
                ident_tkn: Token,
                rhs: Option<Ast>) -> Sym {
         Sym {
             sym_ty: sym_ty,
             imm: imm,
-            ty_tkn: ty_tkn,
+            ty_rec: ty_rec,
             ident_tkn: ident_tkn,
             assign_val: rhs
         }

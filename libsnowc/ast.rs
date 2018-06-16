@@ -1,4 +1,5 @@
 use token::Token;
+use type_record::TyRecord;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
@@ -34,10 +35,10 @@ pub enum Ast {
     ExprStmt(Box<Option<Ast>>),
 
     // Var type tkn, var name tkn, mutability
-    VarDecl(Token, Token, bool),
+    VarDecl(TyRecord, Token, bool),
 
     // Type token, Ident token, mutability, value
-    VarAssign(Token, Token, bool, Box<Option<Ast>>),
+    VarAssign(TyRecord, Token, bool, Box<Option<Ast>>),
 
     // Operator token, lhs ast, rhs ast
     Logical(Token, Box<Option<Ast>>, Box<Option<Ast>>),
@@ -49,7 +50,7 @@ pub enum Ast {
     Unary(Token, Box<Option<Ast>>),
 
     // Func ident, params, return token, func body
-    FnDecl(Token, Vec<Token>, Token, Box<Option<Ast>>),
+    FnDecl(Token, Vec<Token>, TyRecord, Box<Option<Ast>>),
 
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),
@@ -64,7 +65,7 @@ pub enum Ast {
     ClassSet(Option<Token>, Option<Token>, Box<Option<Ast>>),
 
     // Identifier/Literal token
-    Primary(Token)
+    Primary(TyRecord)
 }
 
 impl Ast {
@@ -77,7 +78,7 @@ impl Ast {
 
     pub fn extract_primary_tkn(&self) -> Token {
         match self {
-            Ast::Primary(tkn) => tkn.clone(),
+            Ast::Primary(tyrec) => tyrec.tkn.clone(),
             _ => panic!()
         }
     }

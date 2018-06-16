@@ -3,6 +3,7 @@ use symtab::SymTab;
 use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
+use type_record::TyRecord;
 use errors::ErrC;
 
 const FN_PARAM_MAX_LEN: usize = 64;
@@ -102,16 +103,20 @@ impl<'l, 's> Parser<'l, 's> {
                 let var_val = self.parse_expr();
                 self.expect(TknTy::Semicolon);
 
+                let ty_rec = TyRecord::new_from_tkn(var_ty_tkn.unwrap());
                 let sym = Sym::new(SymTy::Var,
                                    is_imm,
-                                   var_ty_tkn.clone().unwrap(),
+                                   ty_rec.clone(),
                                    ident_tkn.clone().unwrap(),
                                    var_val.clone());
 
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Some(Ast::VarAssign(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm, Box::new(var_val)))
+                Some(Ast::VarAssign(ty_rec,
+                                    ident_tkn.unwrap(),
+                                    is_imm,
+                                    Box::new(var_val)))
             },
             TknTy::Semicolon => {
                 if is_imm {
@@ -121,16 +126,17 @@ impl<'l, 's> Parser<'l, 's> {
                 }
                 self.consume();
 
+                let ty_rec = TyRecord::new_from_tkn(var_ty_tkn.unwrap());
                 let sym = Sym::new(SymTy::Var,
                                    is_imm,
-                                   var_ty_tkn.clone().unwrap(),
+                                   ty_rec.clone(),
                                    ident_tkn.clone().unwrap(),
                                    None);
 
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Some(Ast::VarDecl(var_ty_tkn.unwrap(), ident_tkn.unwrap(), is_imm))
+                Some(Ast::VarDecl(ty_rec, ident_tkn.unwrap(), is_imm))
             },
             _ => {
                 let err_msg = format!("Invalid var declaration: {:?}", self.currtkn.ty);
@@ -164,7 +170,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         self.expect(TknTy::RightParen);
 
-        let fn_ret_ty = match self.currtkn.ty {
+        let fn_ret_ty_tkn = match self.currtkn.ty {
             TknTy::String | TknTy::Num | TknTy::Bool => {
                 let tkn = self.currtkn.clone();
                 self.consume();
@@ -177,20 +183,22 @@ impl<'l, 's> Parser<'l, 's> {
             }
         };
 
-        if fn_ret_ty.is_none() {
+        if fn_ret_ty_tkn.is_none() {
             return None;
         }
+
+        let fn_ty_rec = TyRecord::new_from_tkn(fn_ret_ty_tkn.clone().unwrap());
 
         let fn_body = self.parse_block_stmt();
         let fn_sym = Sym::new(SymTy::Func,
                               true,
-                              fn_ret_ty.clone().unwrap(),
+                              fn_ty_rec.clone(),
                               func_ident_tkn.clone(),
                               fn_body.clone());
         let name = &func_ident_tkn.get_name();
         self.symtab.store(name, fn_sym);
 
-        Some(Ast::FnDecl(func_ident_tkn, params, fn_ret_ty.unwrap(), Box::new(fn_body)))
+        Some(Ast::FnDecl(func_ident_tkn, params, fn_ty_rec, Box::new(fn_body)))
     }
 
     fn parse_class_decl(&mut self) -> Option<Ast> {
@@ -221,7 +229,7 @@ impl<'l, 's> Parser<'l, 's> {
         let ast = Some(Ast::ClassDecl(class_tkn.clone(), methods, props));
         let sym = Sym::new(SymTy::Class,
                            true,
-                           class_tkn.clone(),
+                           TyRecord::new_from_tkn(class_tkn.clone()),
                            class_tkn.clone(),
                            ast.clone());
         self.symtab.store(&class_tkn.get_name(), sym);
@@ -375,8 +383,8 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.parse_assign_expr();
 
                 match maybe_ast.clone().unwrap() {
-                    Ast::Primary(tkn) => {
-                        match tkn.ty {
+                    Ast::Primary(tyrec) => {
+                        match tyrec.tkn.ty {
                             TknTy::Ident(name) => {
                                 let maybe_sym = self.symtab.retrieve(&name);
                                 if maybe_sym.is_none() {
@@ -394,13 +402,14 @@ impl<'l, 's> Parser<'l, 's> {
                                     return None;
                                 }
 
-                                return Some(Ast::VarAssign(sym.ty_tkn.clone(),
+                                return Some(Ast::VarAssign(sym.ty_rec.clone(),
                                                            sym.ident_tkn.clone(),
                                                            sym.imm,
                                                            Box::new(rhs)));
                             },
                             _ => {
-                                let err_msg = format!("Token {:?} is invalid for assignment", tkn.ty.clone());
+                                let err_msg = format!("Token {:?} is invalid for assignment",
+                                                      tyrec.tkn.ty.clone());
                                 self.err_from_tkn(err_msg);
                                 return None;
                             }
@@ -567,7 +576,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         let func_name_tkn = match maybe_ast.clone().unwrap() {
-            Ast::Primary(tkn) => Some(tkn),
+            Ast::Primary(tyrec) => Some(tyrec.tkn),
             _ => None
         };
 
@@ -620,7 +629,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::True |
             TknTy::False |
             TknTy::Null => {
-                let ast = Some(Ast::Primary(self.currtkn.clone()));
+                let ast = Some(Ast::Primary(TyRecord::new_from_tkn(self.currtkn.clone())));
                 self.consume();
                 ast
             },
