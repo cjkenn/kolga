@@ -61,33 +61,6 @@ pub enum TknTy {
 }
 
 impl TknTy {
-    // TODO: this isnt a token type, but a language type. Need a different data
-    // structure to hold this
-    pub fn to_equiv_ty(&self) -> TknTy {
-        match self {
-            TknTy::Str(_) => TknTy::String,
-            TknTy::Val(_) => TknTy::Num,
-            TknTy::True | TknTy::False => TknTy::Bool,
-            TknTy::Minus => TknTy::Num,
-            TknTy::Bang => TknTy::Bool,
-            _ => self.clone()
-        }
-    }
-
-    pub fn is_numerical(&self) -> bool {
-        match self {
-            TknTy::Num | TknTy::Val(_) => true,
-            _ => false
-        }
-    }
-
-    pub fn is_bool(&self) -> bool {
-        match self {
-            TknTy::Bool | TknTy::True | TknTy::False => true,
-            _ => false
-        }
-    }
-
     pub fn is_bin_op(&self) -> bool {
         match self {
             TknTy::Plus |

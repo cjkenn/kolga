@@ -76,9 +76,9 @@ impl Ast {
         }
     }
 
-    pub fn extract_primary_tkn(&self) -> Token {
+    pub fn extract_primary_ty_rec(&self) -> TyRecord {
         match self {
-            Ast::Primary(tyrec) => tyrec.tkn.clone(),
+            Ast::Primary(tyrec) => tyrec.clone(),
             _ => panic!()
         }
     }

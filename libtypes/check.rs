@@ -1,6 +1,7 @@
 use snowc::ast::Ast;
 use snowc::token::{Token, TknTy};
 use snowc::symtab::SymTab;
+use snowc::type_record::TyName;
 use errors::ErrC;
 
 pub struct TyCheck<'t, 's> {
@@ -81,8 +82,8 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone().unwrap());
                 }
             },
-            Ast::FnDecl(ident_tkn, param_list, ret_ty_tkn, maybe_stmts) => {
-                let fn_ty = ret_ty_tkn.ty;
+            Ast::FnDecl(ident_tkn, param_list, ret_ty_rec, maybe_stmts) => {
+                let fn_ty = ret_ty_rec.ty.unwrap();
                 let stmts = maybe_stmts.unwrap();
                 match stmts {
                     Ast::BlckStmt(stmt_list) => self.check_fn_stmts(ident_tkn.clone(), fn_ty, stmt_list),
@@ -93,13 +94,13 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_fn_stmts(&mut self, fn_tkn: Token, fn_ret_ty: TknTy, stmts: Vec<Option<Ast>>) {
+    fn check_fn_stmts(&mut self, fn_tkn: Token, fn_ret_ty: TyName, stmts: Vec<Option<Ast>>) {
         for maybe_stmt in &stmts {
             let stmt = maybe_stmt.clone().unwrap();
             match stmt {
                 Ast::RetStmt(maybe_expr) => {
                     let rhs_ty = self.check_expr(maybe_expr.clone().unwrap());
-                    if fn_ret_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                    if fn_ret_ty != rhs_ty {
                         let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
                         self.errors.push(err);
                     }
@@ -109,7 +110,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_expr(&mut self, expr: Ast) -> TknTy {
+    fn check_expr(&mut self, expr: Ast) -> TyName {
         match expr {
             Ast::VarAssign(_, _, _, _) => {
                 self.check_var_assign(expr)
@@ -118,8 +119,8 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let rhs = maybe_rhs.unwrap();
 
                 if rhs.is_primary() {
-                    let rhs_tkn = rhs.extract_primary_tkn();
-                    return self.eval_unary_ty(op_tkn.clone(), rhs_tkn.ty);
+                    let rhs_ty_rec = rhs.extract_primary_ty_rec();
+                    return self.eval_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
                 } else {
                     let rhs_ty = self.check_expr(rhs);
                     return self.eval_unary_ty(op_tkn.clone(), rhs_ty);
@@ -131,21 +132,21 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let rhs = maybe_rhs.unwrap();
 
                 if lhs.is_primary() && rhs.is_primary() {
-                    let lhs_tkn = lhs.extract_primary_tkn();
-                    let rhs_tkn = rhs.extract_primary_tkn();
+                    let lhs_ty_rec = lhs.extract_primary_ty_rec();
+                    let rhs_ty_rec = rhs.extract_primary_ty_rec();
 
-                    let mut lhs_ty = lhs_tkn.ty.clone();
-                    let mut rhs_ty = rhs_tkn.ty.clone();
+                    let mut lhs_ty = lhs_ty_rec.ty.unwrap().clone();
+                    let mut rhs_ty = rhs_ty_rec.ty.unwrap().clone();
 
-                    if lhs_tkn.is_ident() {
-                        match self.find_sym_ty(&lhs_tkn) {
+                    if lhs_ty_rec.tkn.is_ident() {
+                        match self.find_sym_ty(&lhs_ty_rec.tkn) {
                             Some(ty) => lhs_ty = ty,
                             None => ()
                         }
                     }
 
-                    if rhs_tkn.is_ident() {
-                        match self.find_sym_ty(&rhs_tkn) {
+                    if rhs_ty_rec.tkn.is_ident() {
+                        match self.find_sym_ty(&rhs_ty_rec.tkn) {
                             Some(ty) => rhs_ty = ty,
                             None => ()
                         }
@@ -153,11 +154,11 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                     return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
                 } else if lhs.is_primary() && !rhs.is_primary() {
-                    let lhs_tkn = lhs.extract_primary_tkn();
+                    let lhs_ty_rec = lhs.extract_primary_ty_rec();
 
-                    let mut lhs_ty = lhs_tkn.ty.clone();
-                    if lhs_tkn.is_ident() {
-                        match self.find_sym_ty(&lhs_tkn) {
+                    let mut lhs_ty = lhs_ty_rec.ty.unwrap().clone();
+                    if lhs_ty_rec.tkn.is_ident() {
+                        match self.find_sym_ty(&lhs_ty_rec.tkn) {
                             Some(ty) => lhs_ty = ty,
                             None => ()
                         }
@@ -168,11 +169,11 @@ impl<'t, 's> TyCheck<'t, 's> {
                     return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
                 } else if !lhs.is_primary() && rhs.is_primary() {
                     let lhs_ty = self.check_expr(lhs);
-                    let rhs_tkn = rhs.extract_primary_tkn();
+                    let rhs_ty_rec = rhs.extract_primary_ty_rec();
 
-                    let mut rhs_ty = rhs_tkn.ty.clone();
-                    if rhs_tkn.is_ident() {
-                        match self.find_sym_ty(&rhs_tkn) {
+                    let mut rhs_ty = rhs_ty_rec.ty.unwrap().clone();
+                    if rhs_ty_rec.tkn.is_ident() {
+                        match self.find_sym_ty(&rhs_ty_rec.tkn) {
                             Some(ty) => rhs_ty = ty,
                             None => ()
                         }
@@ -186,14 +187,14 @@ impl<'t, 's> TyCheck<'t, 's> {
                     return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
                 }
             },
-            Ast::Primary(prim_tkn) => {
-                match prim_tkn.ty {
+            Ast::Primary(prim_ty_rec) => {
+                match prim_ty_rec.tkn.ty {
                     TknTy::Ident(ref name) => {
                         let sym = self.symtab.retrieve(name).unwrap();
-                        return sym.ty_tkn.ty.to_equiv_ty();
+                        return sym.ty_rec.ty.clone().unwrap();
                     },
                     _ => {
-                        return prim_tkn.ty.to_equiv_ty();
+                        return prim_ty_rec.ty.clone().unwrap();
                     }
                 }
             },
@@ -201,21 +202,21 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn eval_unary_ty(&mut self, op_tkn: Token, rhs_ty: TknTy) -> TknTy {
+    fn eval_unary_ty(&mut self, op_tkn: Token, rhs_ty: TyName) -> TyName {
         match op_tkn.ty {
             TknTy::Minus => {
-                if rhs_ty.to_equiv_ty() != TknTy::Num {
-                    let err = self.ty_mismatch(&op_tkn, &TknTy::Num, &rhs_ty);
+                if rhs_ty != TyName::Num {
+                    let err = self.ty_mismatch(&op_tkn, &TyName::Num, &rhs_ty);
                     self.errors.push(err);
                 }
-                return TknTy::Num;
+                return TyName::Num;
             },
             TknTy::Bang => {
-                if rhs_ty.to_equiv_ty() != TknTy::Bool {
-                    let err = self.ty_mismatch(&op_tkn, &TknTy::Bool, &rhs_ty);
+                if rhs_ty != TyName::Bool {
+                    let err = self.ty_mismatch(&op_tkn, &TyName::Bool, &rhs_ty);
                     self.errors.push(err);
                 }
-                return TknTy::Bool;
+                return TyName::Bool;
             },
             _ => panic!("Unimplemented unary operator found!")
         };
@@ -223,11 +224,11 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     // Returns the expected type given the operator, even if there is an error.
     // The expected type is one which we expect the given operator to evaluate to.
-    fn eval_bin_ty(&mut self, op_tkn: Token, lhs_ty: TknTy, rhs_ty: TknTy) -> TknTy {
+    fn eval_bin_ty(&mut self, op_tkn: Token, lhs_ty: TyName, rhs_ty: TyName) -> TyName {
         match op_tkn.ty {
             TknTy::Plus | TknTy::Minus | TknTy::Star | TknTy::Slash => {
                 // We can only operate on types of the same kind
-                if lhs_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);
                 }
@@ -238,10 +239,10 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.errors.push(err);
                 }
 
-                return TknTy::Num
+                return TyName::Num
             },
             TknTy::Gt | TknTy::GtEq | TknTy::Lt | TknTy::LtEq => {
-                if lhs_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);
                 }
@@ -251,10 +252,10 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.errors.push(err);
                 }
 
-                return TknTy::Bool
+                return TyName::Bool
             },
             TknTy::And | TknTy::Or | TknTy::AmpAmp | TknTy::PipePipe => {
-                if lhs_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);
                 }
@@ -264,20 +265,20 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.errors.push(err);
                 }
 
-                return TknTy::Bool
+                return TyName::Bool
             },
             _ => panic!("Unimplemented binary operator found!")
         }
     }
 
-    fn check_var_assign(&mut self, stmt: Ast) -> TknTy {
+    fn check_var_assign(&mut self, stmt: Ast) -> TyName {
         match stmt {
-            Ast::VarAssign(var_ty_tkn, ident_tkn, _imm, maybe_rhs) => {
-                let lhs_ty = var_ty_tkn.ty;
+            Ast::VarAssign(var_ty_rec, ident_tkn, _imm, maybe_rhs) => {
+                let lhs_ty = var_ty_rec.ty.unwrap();
                 let rhs = maybe_rhs.unwrap();
 
                 let rhs_ty = self.check_expr(rhs);
-                if lhs_ty.to_equiv_ty() != rhs_ty.to_equiv_ty() {
+                if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);
                 }
@@ -288,35 +289,35 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn ty_mismatch(&self, tkn: &Token, lhs: &TknTy, rhs: &TknTy) -> ErrC {
+    fn ty_mismatch(&self, tkn: &Token, lhs: &TyName, rhs: &TyName) -> ErrC {
         let msg = format!("Type mismatch: Wanted {:?}, but found {:?}",
-                          lhs.to_equiv_ty(),
-                          rhs.to_equiv_ty());
+                          lhs,
+                          rhs);
         ErrC::new(tkn.line, tkn.pos, msg)
     }
 
-    fn op_mismatch(&self, tkn: &Token, lhs: &TknTy, rhs: &TknTy) -> ErrC {
+    fn op_mismatch(&self, tkn: &Token, lhs: &TyName, rhs: &TyName) -> ErrC {
         let ty = tkn.ty.clone();
         let op_desired = if ty.is_numerical_op() {
-            (TknTy::Num, TknTy::Num)
+            (TyName::Num, TyName::Num)
         } else {
-            (TknTy::Bool, TknTy::Bool)
+            (TyName::Bool, TyName::Bool)
         };
 
         let msg = format!("Operator mismatch: {:?} wants {:?} and {:?}, but found {:?} and {:?}",
                           tkn.ty,
                           op_desired.0,
                           op_desired.1,
-                          lhs.to_equiv_ty(),
-                          rhs.to_equiv_ty());
+                          lhs,
+                          rhs);
         ErrC::new(tkn.line, tkn.pos, msg)
     }
 
-    fn find_sym_ty(&mut self, ident_tkn: &Token) -> Option<TknTy> {
+    fn find_sym_ty(&mut self, ident_tkn: &Token) -> Option<TyName> {
         let name = ident_tkn.get_name();
         let sym = self.symtab.retrieve(&name);
         match sym {
-            Some(symbol) => Some(symbol.ty_tkn.ty.to_equiv_ty()),
+            Some(symbol) => Some(symbol.ty_rec.ty.clone().unwrap()),
             None => {
                 let err_msg = format!("Undeclared symbol {:?} found", name);
                 self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));
