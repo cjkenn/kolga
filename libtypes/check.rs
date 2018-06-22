@@ -1,7 +1,10 @@
+use std::rc::Rc;
+
 use snowc::ast::Ast;
 use snowc::token::{Token, TknTy};
 use snowc::symtab::SymTab;
 use snowc::type_record::TyName;
+use snowc::sym::Sym;
 use errors::ErrC;
 
 pub struct TyCheck<'t, 's> {
@@ -198,6 +201,15 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             },
+            Ast::FnCall(name_tkn, params) => {
+                // Look up fn name in sym tab
+                let fn_sym = self.find_fn_sym(&name_tkn.unwrap());
+
+                // extract params from it
+                let fn_param_tys = &fn_sym.unwrap().fn_params;
+
+                unimplemented!()
+            },
             _ => panic!()
         }
     }
@@ -318,6 +330,19 @@ impl<'t, 's> TyCheck<'t, 's> {
         let sym = self.symtab.retrieve(&name);
         match sym {
             Some(symbol) => Some(symbol.ty_rec.ty.clone().unwrap()),
+            None => {
+                let err_msg = format!("Undeclared symbol {:?} found", name);
+                self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));
+                None
+            }
+        }
+    }
+
+    fn find_fn_sym(&mut self, ident_tkn: &Token) -> Option<Rc<Sym>> {
+        let name = ident_tkn.get_name();
+        let sym = self.symtab.retrieve(&name);
+        match sym {
+            Some(symbol) => Some(symbol),
             None => {
                 let err_msg = format!("Undeclared symbol {:?} found", name);
                 self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));

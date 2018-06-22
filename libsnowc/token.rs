@@ -20,6 +20,7 @@ pub enum TknTy {
     Percent,
     Amp,
     Pipe,
+    Tilde,
 
     // Multi character tokens
     EqEq,

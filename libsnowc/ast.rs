@@ -50,7 +50,7 @@ pub enum Ast {
     Unary(Token, Box<Option<Ast>>),
 
     // Func ident, params, return token, func body
-    FnDecl(Token, Vec<Token>, TyRecord, Box<Option<Ast>>),
+    FnDecl(Token, Vec<TyRecord>, TyRecord, Box<Option<Ast>>),
 
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),

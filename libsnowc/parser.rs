@@ -78,6 +78,13 @@ impl<'l, 's> Parser<'l, 's> {
             _ => false
         };
 
+        let ident_tkn = self.match_ident_tkn();
+        if ident_tkn.is_none() {
+            return None;
+        }
+
+        self.expect(TknTy::Tilde);
+
         let var_ty_tkn = if self.currtkn.is_ty() {
             let tkn = Some(self.currtkn.clone());
             self.consume();
@@ -92,11 +99,6 @@ impl<'l, 's> Parser<'l, 's> {
             return None;
         }
 
-        let ident_tkn = self.match_ident_tkn();
-        if ident_tkn.is_none() {
-            return None;
-        }
-
         match self.currtkn.ty {
             TknTy::Eq => {
                 self.consume();
@@ -108,7 +110,8 @@ impl<'l, 's> Parser<'l, 's> {
                                    is_imm,
                                    ty_rec.clone(),
                                    ident_tkn.clone().unwrap(),
-                                   var_val.clone());
+                                   var_val.clone(),
+                                   None);
 
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
@@ -131,6 +134,7 @@ impl<'l, 's> Parser<'l, 's> {
                                    is_imm,
                                    ty_rec.clone(),
                                    ident_tkn.clone().unwrap(),
+                                   None,
                                    None);
 
                 let name = &ident_tkn.clone().unwrap().get_name();
@@ -160,7 +164,15 @@ impl<'l, 's> Parser<'l, 's> {
                 self.err_from_tkn(err_msg);
                 return None;
             }
-            params.push(self.currtkn.clone());
+
+            let ident_tkn = self.currtkn.clone();
+            self.consume();
+            self.expect(TknTy::Tilde);
+
+            let mut ty_rec = TyRecord::new_from_tkn(self.currtkn.clone());
+            ty_rec.tkn = ident_tkn.clone();
+
+            params.push(ty_rec);
             self.consume();
             if self.currtkn.ty == TknTy::RightParen {
                 break;
@@ -194,7 +206,9 @@ impl<'l, 's> Parser<'l, 's> {
                               true,
                               fn_ty_rec.clone(),
                               func_ident_tkn.clone(),
-                              fn_body.clone());
+                              fn_body.clone(),
+                              Some(params.clone()));
+
         let name = &func_ident_tkn.get_name();
         self.symtab.store(name, fn_sym);
 
@@ -231,7 +245,8 @@ impl<'l, 's> Parser<'l, 's> {
                            true,
                            TyRecord::new_from_tkn(class_tkn.clone()),
                            class_tkn.clone(),
-                           ast.clone());
+                           ast.clone(),
+                           None);
         self.symtab.store(&class_tkn.get_name(), sym);
 
         ast
@@ -598,6 +613,8 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_fnparams_expr(&mut self, fn_tkn: Option<Token>) -> Option<Ast> {
+        self.expect(TknTy::LeftParen);
+
         let mut params: Vec<Ast> = Vec::new();
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {

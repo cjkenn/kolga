@@ -106,6 +106,7 @@ impl Lexer {
             '-' => self.consume(TknTy::Minus),
             '*' => self.consume(TknTy::Star),
             '%' => self.consume(TknTy::Percent),
+            '~' => self.consume(TknTy::Tilde),
             '"' => self.lex_str(),
             '/' => {
                 let nextch = self.peek();

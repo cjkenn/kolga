@@ -13,7 +13,8 @@ pub struct Sym {
     pub imm: bool,
     pub ty_rec: TyRecord,
     pub ident_tkn: Token,
-    pub assign_val: Option<Ast>
+    pub assign_val: Option<Ast>,
+    pub fn_params: Option<Vec<TyRecord>>
 }
 
 impl Sym {
@@ -21,13 +22,15 @@ impl Sym {
                imm: bool,
                ty_rec: TyRecord,
                ident_tkn: Token,
-               rhs: Option<Ast>) -> Sym {
+               rhs: Option<Ast>,
+               params: Option<Vec<TyRecord>>) -> Sym {
         Sym {
             sym_ty: sym_ty,
             imm: imm,
             ty_rec: ty_rec,
             ident_tkn: ident_tkn,
-            assign_val: rhs
+            assign_val: rhs,
+            fn_params: params
         }
     }
 }
