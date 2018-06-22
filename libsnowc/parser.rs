@@ -615,6 +615,16 @@ impl<'l, 's> Parser<'l, 's> {
     fn parse_fnparams_expr(&mut self, fn_tkn: Option<Token>) -> Option<Ast> {
         self.expect(TknTy::LeftParen);
 
+        let fn_sym = self.symtab.retrieve(&fn_tkn.clone().unwrap().get_name());
+
+        if fn_sym.is_none() {
+            let tkn = fn_tkn.clone().unwrap();
+            let err_msg = format!("Undeclared symbol {:?} found",
+                                  tkn.get_name());
+            let error = ErrC::new(tkn.line, tkn.pos, err_msg);
+            self.errors.push(error);
+        }
+
         let mut params: Vec<Ast> = Vec::new();
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
@@ -635,6 +645,19 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         self.expect(TknTy::RightParen);
+
+        let expected_params = fn_sym.clone().unwrap().fn_params.clone().unwrap();
+
+        if expected_params.len() != params.len() {
+            // TODO could pass in a list here and print the list instead of the counts
+            let err_msg = format!("Incorrect function parameters: Expected {} arguments, but found {}.",
+                                  expected_params.len(),
+                                  params.len());
+            let tkn = fn_tkn.clone().unwrap();
+            let error = ErrC::new(tkn.line, tkn.pos, err_msg);
+            self.errors.push(error);
+        }
+
         Some(Ast::FnCall(fn_tkn, params))
     }
 

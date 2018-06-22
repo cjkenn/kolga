@@ -42,8 +42,18 @@ impl<'t, 's> TyCheck<'t, 's> {
             Ast::VarAssign(_, _, _, _) => {
                 self.check_var_assign(stmt);
             },
-            Ast::ExprStmt(ref ast) => {
-                self.check_expr(ast.clone().unwrap());
+            Ast::ExprStmt(ref maybe_ast) => {
+                let ast = maybe_ast.clone().unwrap();
+                match ast {
+                    Ast::FnCall(_, _) => {
+                        self.check_fn_params(ast);
+                        ()
+                    },
+                    _ => {
+                        self.check_expr(ast);
+                        ()
+                    }
+                };
             },
             Ast::IfStmt(expr_ast, maybe_stmt_ast, elif_stmts, maybe_el_stmts) => {
                 self.check_expr(expr_ast.clone().unwrap());
@@ -201,16 +211,33 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             },
-            Ast::FnCall(name_tkn, params) => {
-                // Look up fn name in sym tab
-                let fn_sym = self.find_fn_sym(&name_tkn.unwrap());
-
-                // extract params from it
-                let fn_param_tys = &fn_sym.unwrap().fn_params;
-
-                unimplemented!()
-            },
             _ => panic!()
+        }
+    }
+
+    fn check_fn_params(&mut self, fn_call_ast: Ast) {
+        match fn_call_ast {
+            Ast::FnCall(name_tkn, params) => {
+                let fn_sym = self.find_fn_sym(&name_tkn.clone().unwrap());
+                let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
+
+                let mut passed_in_param_tys = Vec::new();
+
+                for ast in &params {
+                    passed_in_param_tys.push(self.check_expr(ast.clone()));
+                }
+
+                for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
+                    let ty_name = mb_ty_rec.clone().ty.unwrap();
+                    if passed_in_param_tys[idx] != ty_name {
+                        let err = self.ty_mismatch(&name_tkn.clone().unwrap(),
+                                                   &passed_in_param_tys[idx],
+                                                   &ty_name);
+                        self.errors.push(err);
+                    }
+                }
+            },
+            _ => ()
         }
     }
 
