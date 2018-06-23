@@ -49,7 +49,7 @@ pub enum Ast {
     // Operator token, rhs ast
     Unary(Token, Box<Option<Ast>>),
 
-    // Func ident, params, return token, func body
+    // Func ident, params, return type record, func body
     FnDecl(Token, Vec<TyRecord>, TyRecord, Box<Option<Ast>>),
 
     // Func name, params

@@ -1,0 +1,5 @@
+func myFn(x~num) num {
+     return 10;
+}
+
+myFn(5);

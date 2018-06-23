@@ -650,7 +650,7 @@ impl<'l, 's> Parser<'l, 's> {
         let expected_params = fn_sym.clone().unwrap().fn_params.clone().unwrap();
 
         if expected_params.len() != params.len() {
-            // TODO could pass in a list here and print the list instead of the counts
+            // TODO: could pass in a list here and print the list instead of the counts
             let err_msg = format!("Incorrect function parameters: Expected {} arguments, but found {}.",
                                   expected_params.len(),
                                   params.len());
