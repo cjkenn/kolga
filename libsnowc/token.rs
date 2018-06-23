@@ -1,4 +1,6 @@
-#[derive(Debug, PartialEq, Clone)]
+use std::fmt;
+
+#[derive(PartialEq, Clone)]
 pub enum TknTy {
     LeftParen,
     RightParen,
@@ -114,6 +116,67 @@ impl TknTy {
             TknTy::Minus | TknTy::Bang => true,
             _ => false
         }
+    }
+}
+
+impl fmt::Debug for TknTy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let pretty_ty = match self {
+            TknTy::LeftParen => "(".to_string(),
+            TknTy::RightParen => ")".to_string(),
+            TknTy::LeftBrace => "{".to_string(),
+            TknTy::RightBrace => "}".to_string(),
+            TknTy::LeftBracket => "[".to_string(),
+            TknTy::RightBracket => "]".to_string(),
+            TknTy::Semicolon => ";".to_string(),
+            TknTy::Eq => "=".to_string(),
+            TknTy::Lt => "<".to_string(),
+            TknTy::Gt => ">".to_string(),
+            TknTy::Period => ".".to_string(),
+            TknTy::Comma => ",".to_string(),
+            TknTy::Bang => "!".to_string(),
+            TknTy::Plus => "+".to_string(),
+            TknTy::Minus => "-".to_string(),
+            TknTy::Star => "*".to_string(),
+            TknTy::Slash => "/".to_string(),
+            TknTy::Percent => "%".to_string(),
+            TknTy::Amp => "&".to_string(),
+            TknTy::Pipe => "|".to_string(),
+            TknTy::Tilde => "~".to_string(),
+            TknTy::EqEq => "==".to_string(),
+            TknTy::LtEq => "<=".to_string(),
+            TknTy::GtEq => ">=".to_string(),
+            TknTy::BangEq => "!=".to_string(),
+            TknTy::AmpAmp => "&&".to_string(),
+            TknTy::PipePipe => "||".to_string(),
+            TknTy::Ident(name) => name.to_string(),
+            TknTy::Str(name) => name.to_string(),
+            TknTy::Val(val) => val.to_string(),
+            TknTy::Let => "let".to_string(),
+            TknTy::Imm => "imm".to_string(),
+            TknTy::Func => "func".to_string(),
+            TknTy::Return => "return".to_string(),
+            TknTy::Class => "class".to_string(),
+            TknTy::This => "this".to_string(),
+            TknTy::If => "if".to_string(),
+            TknTy::Elif => "elif".to_string(),
+            TknTy::Then => "then".to_string(),
+            TknTy::Else => "else".to_string(),
+            TknTy::While => "while".to_string(),
+            TknTy::In => "in".to_string(),
+            TknTy::For => "for".to_string(),
+            TknTy::Num => "num".to_string(),
+            TknTy::String => "string".to_string(),
+            TknTy::Bool => "bool".to_string(),
+            TknTy::True => "true".to_string(),
+            TknTy::False => "false".to_string(),
+            TknTy::Or => "or".to_string(),
+            TknTy::And => "and".to_string(),
+            TknTy::Null => "null".to_string(),
+            TknTy::Eof => "EOF".to_string()
+        };
+
+        write!(f, "{}", pretty_ty)
     }
 }
 
