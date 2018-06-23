@@ -7,6 +7,7 @@ use snowc::token::TknTy;
 use snowc::parser::Parser;
 use snowc::ast::Ast;
 use snowc::symtab::SymTab;
+use snowc::type_record::TyName;
 
 #[test]
 fn test_parse_empty() {
@@ -30,8 +31,8 @@ fn test_parse_var_decl_mutable() {
 
     let var_decl = &extract_head(ast)[0];
     match *var_decl {
-        Ast::VarDecl(ref varty, ref ident, imm) => {
-            assert_eq!(varty.ty, TknTy::Num);
+        Ast::VarDecl(ref varty_rec, ref ident, imm) => {
+            assert_eq!(varty_rec.ty, Some(TyName::Num));
             assert_eq!(imm, false);
 
             match ident.ty {
@@ -61,8 +62,8 @@ fn test_parse_var_assign_mutable() {
 
     let var_assign = &extract_head(ast)[0];
     match *var_assign {
-        Ast::VarAssign(ref varty, ref ident, imm, ref val_ast) => {
-            assert_eq!(varty.ty, TknTy::Num);
+        Ast::VarAssign(ref varty_rec, ref ident, imm, ref val_ast) => {
+            assert_eq!(varty_rec.ty, Some(TyName::Num));
             assert_eq!(imm, false);
 
             match ident.ty {
@@ -95,8 +96,8 @@ fn test_parse_var_assign_imm() {
 
     let var_assign = &extract_head(ast)[0];
     match *var_assign {
-        Ast::VarAssign(ref varty, ref ident, imm, ref rhs) => {
-            assert_eq!(varty.ty, TknTy::Num);
+        Ast::VarAssign(ref varty_rec, ref ident, imm, ref rhs) => {
+            assert_eq!(varty_rec.ty, Some(TyName::Num));
             assert_eq!(imm, true);
 
             match ident.ty {
