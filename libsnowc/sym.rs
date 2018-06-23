@@ -2,12 +2,14 @@ use token::Token;
 use ast::Ast;
 use type_record::TyRecord;
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum SymTy {
     Var,
     Func,
     Class,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Sym {
     pub sym_ty: SymTy,
     pub imm: bool,

@@ -358,6 +358,7 @@ impl<'l, 's> Parser<'l, 's> {
                           Box::new(for_var_cond),
                           Box::new(for_incr_expr),
                           Box::new(for_stmt)))
+
     }
 
     fn parse_ret_stmt(&mut self) -> Option<Ast> {
@@ -662,14 +663,36 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn parse_primary_expr(&mut self) -> Option<Ast> {
-        match self.currtkn.ty {
+        match self.currtkn.ty.clone() {
             TknTy::Str(_) |
             TknTy::Val(_) |
-            TknTy::Ident(_) |
             TknTy::True |
             TknTy::False |
             TknTy::Null => {
                 let ast = Some(Ast::Primary(TyRecord::new_from_tkn(self.currtkn.clone())));
+                self.consume();
+                ast
+            },
+            TknTy::Ident(ref ident_name) => {
+                let mb_sym = self.symtab.retrieve(ident_name);
+                if mb_sym.is_none() {
+                    let msg = format!("Undeclared variable {} found", ident_name);
+                    self.err_from_tkn(msg);
+                    self.consume();
+                    return None;
+                }
+
+                let sym = mb_sym.unwrap();
+                if sym.assign_val.is_none() {
+                    let msg = format!("Cannot use un-assigned variable {} in operation", ident_name);
+                    self.err_from_tkn(msg);
+                    self.consume();
+                    return None;
+                }
+
+                let mut ty_rec = sym.ty_rec.clone();
+                ty_rec.tkn = self.currtkn.clone();
+                let ast = Some(Ast::Primary(ty_rec.clone()));
                 self.consume();
                 ast
             },
@@ -679,9 +702,16 @@ impl<'l, 's> Parser<'l, 's> {
                 self.expect(TknTy::RightParen);
                 ast
             },
+            TknTy::String | TknTy::Num | TknTy::Bool => {
+                let err_msg = format!("Cannot assign reserved type '{:?}' to variable", self.currtkn.ty);
+                self.err_from_tkn(err_msg);
+                self.consume();
+                None
+            },
             _ => {
                 let err_msg = format!("Unknown token {:?} found", self.currtkn.ty);
                 self.err_from_tkn(err_msg);
+                self.consume();
                 None
             }
         }
