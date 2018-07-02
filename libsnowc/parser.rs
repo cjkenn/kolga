@@ -635,14 +635,26 @@ impl<'l, 's> Parser<'l, 's> {
                 maybe_ast = self.parse_fnparams_expr(func_name_tkn);
             },
             TknTy::Period => {
-                // calling a method on a class
+                // calling a method on a class or getting a property
                 self.consume();
-                let class_prop_tkn = self.match_ident_tkn();
-                maybe_ast = Some(Ast::ClassGet(func_name_tkn, class_prop_tkn));
+                let name = self.match_ident_tkn();
+                match self.currtkn.ty {
+                    TknTy::LeftParen => {
+                        let fn_ast = self.parse_fnparams_expr(name.clone());
+                        let params = fn_ast.unwrap().extract_params();
+                        maybe_ast = Some(Ast::ClassFnCall(func_name_tkn.clone().unwrap(),
+                                                          name.unwrap().clone(),
+                                                          params));
+                    },
+                    _ => {
+                        maybe_ast = Some(Ast::ClassGet(func_name_tkn, name));
+                    }
+                }
             },
             _ => ()
         };
 
+        println!("{:?}", maybe_ast.clone());
         maybe_ast
     }
 

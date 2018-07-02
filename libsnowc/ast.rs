@@ -61,6 +61,9 @@ pub enum Ast {
     // Name of the class, function/property name
     ClassGet(Option<Token>, Option<Token>),
 
+    // Class name, func name, arguments
+    ClassFnCall(Token, Token, Vec<Ast>),
+
     // Class name, class prop, rhs ast
     ClassSet(Option<Token>, Option<Token>, Box<Option<Ast>>),
 
@@ -80,6 +83,13 @@ impl Ast {
         match self {
             Ast::Primary(tyrec) => tyrec.clone(),
             _ => panic!()
+        }
+    }
+
+    pub fn extract_params(&self) -> Vec<Ast> {
+        match self {
+            Ast::FnCall(_, pars) => pars.clone(),
+            _ => Vec::new()
         }
     }
 }
