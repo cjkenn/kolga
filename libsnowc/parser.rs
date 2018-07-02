@@ -84,6 +84,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         self.expect(TknTy::Tilde);
+        let mut is_class_type = false;
 
         let var_ty_tkn = if self.currtkn.is_ty() {
             let tkn = Some(self.currtkn.clone());
@@ -97,6 +98,7 @@ impl<'l, 's> Parser<'l, 's> {
                 self.err_from_tkn(err_msg);
                 None
             } else if maybe_class_sym.unwrap().sym_ty == SymTy::Class {
+                is_class_type = true;
                 let tkn = Some(self.currtkn.clone());
                 self.consume();
                 tkn
@@ -140,6 +142,25 @@ impl<'l, 's> Parser<'l, 's> {
                     return None;
                 }
                 self.consume();
+
+                if is_class_type {
+                    let class_sym = self.symtab.retrieve(&var_ty_tkn.clone().unwrap().get_name()).unwrap();
+                    let cl_ty_rec = TyRecord::new_from_tkn(var_ty_tkn.clone().unwrap());
+                    let cl_assign = class_sym.assign_val.clone();
+                    let cl_sym = Sym::new(SymTy::Var,
+                                          is_imm,
+                                          cl_ty_rec.clone(),
+                                          ident_tkn.clone().unwrap(),
+                                          cl_assign.clone(),
+                                          None);
+
+                    let name = &ident_tkn.clone().unwrap().get_name();
+                    self.symtab.store(name, cl_sym);
+                    return Some(Ast::VarAssign(cl_ty_rec,
+                                        ident_tkn.clone().unwrap(),
+                                        is_imm,
+                                        Box::new(cl_assign)));
+                }
 
                 let ty_rec = TyRecord::new_from_tkn(var_ty_tkn.unwrap());
                 let sym = Sym::new(SymTy::Var,

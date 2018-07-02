@@ -4,7 +4,8 @@ use token::{Token, TknTy};
 pub enum TyName {
     String,
     Num,
-    Bool
+    Bool,
+    Class(String)
 }
 
 impl TyName {
@@ -40,6 +41,7 @@ impl TyRecord {
             TknTy::True | TknTy::False => Some(TyName::Bool),
             TknTy::Minus => Some(TyName::Num),
             TknTy::Bang => Some(TyName::Bool),
+            TknTy::Ident(ref idnt) => Some(TyName::Class(idnt.clone())),
             _ => None
         };
 
