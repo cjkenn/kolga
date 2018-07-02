@@ -90,9 +90,21 @@ impl<'l, 's> Parser<'l, 's> {
             self.consume();
             tkn
         } else {
-            let err_msg = format!("{:?} is not a valid type", self.currtkn.ty);
-            self.err_from_tkn(err_msg);
-            None
+            let ty_name = self.currtkn.get_name();
+            let maybe_class_sym = self.symtab.retrieve(&ty_name);
+            if maybe_class_sym.is_none() {
+                let err_msg = format!("{:?} is not a valid type", self.currtkn.ty);
+                self.err_from_tkn(err_msg);
+                None
+            } else if maybe_class_sym.unwrap().sym_ty == SymTy::Class {
+                let tkn = Some(self.currtkn.clone());
+                self.consume();
+                tkn
+            } else {
+                let err_msg = format!("{:?} is not a valid type", self.currtkn.ty);
+                self.err_from_tkn(err_msg);
+                None
+            }
         };
 
         if var_ty_tkn.is_none() {
@@ -748,7 +760,8 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn err_from_tkn(&mut self, message: String) {
-        let error = ErrC::new(self.currtkn.line, self.currtkn.pos, message);
+        let prefixed_msg = format!("Parse Error - {}", message);
+        let error = ErrC::new(self.currtkn.line, self.currtkn.pos, prefixed_msg);
         self.errors.push(error);
     }
 }
