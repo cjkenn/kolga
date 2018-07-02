@@ -654,7 +654,6 @@ impl<'l, 's> Parser<'l, 's> {
             _ => ()
         };
 
-        println!("{:?}", maybe_ast.clone());
         maybe_ast
     }
 
