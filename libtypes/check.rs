@@ -38,7 +38,7 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_stmt(&mut self, stmt: Ast) {
         match stmt {
-            Ast::VarDecl(_, _, _) => (), // ignore var declaration without assign
+            Ast::VarDecl(_, _, _) => (), // ignore var declaration without assign (nothing to check)
             Ast::VarAssign(_, _, _, _) => {
                 self.check_var_assign(stmt);
             },
@@ -102,8 +102,19 @@ impl<'t, 's> TyCheck<'t, 's> {
                     Ast::BlckStmt(stmt_list) => self.check_fn_stmts(ident_tkn.clone(), fn_ty, stmt_list),
                     _ => self.check_stmt(stmts.clone())
                 };
+            },
+            Ast::ClassDecl(name_tkn, methods, props) => {
+                for prop_stmt in props {
+                    self.check_stmt(prop_stmt.clone().unwrap());
+                }
+
+                for stmt in &methods {
+                    self.check_stmt(stmt.clone().unwrap());
+                }
+            },
+            _ => {
+                panic!("Unrecognized statement type found!")
             }
-            _ => panic!("Unrecognized statement type found!")
         }
     }
 
@@ -211,7 +222,48 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             },
-            _ => panic!()
+            Ast::ClassDecl(name_tkn,_,_) => {
+                let sym = self.symtab.retrieve(&name_tkn.get_name()).unwrap();
+                return sym.ty_rec.ty.clone().unwrap();
+            },
+            Ast::ClassGet(class_name_tkn, prop_tkn) => {
+                let class_sym = self.symtab.retrieve(&class_name_tkn.unwrap().get_name()).unwrap();
+                let class_decl_ast = class_sym.assign_val.clone().unwrap();
+
+                self.extract_prop_ty(&class_decl_ast, &prop_tkn.unwrap())
+            },
+            _ => {
+                panic!("Unrecognized expression type found!")
+            }
+        }
+    }
+
+    fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name_tkn: &Token) -> TyName {
+        let prop_name = prop_name_tkn.get_name();
+
+        match class_decl_ast {
+            Ast::ClassDecl(_, _, props) => {
+                let mut prop_ty = None;
+                // TODO: this is O(n) and not efficient
+                for prop in props {
+                    match prop.clone().unwrap() {
+                        Ast::VarDecl(ref ty_rec, ref tkn, _) if tkn.get_name() == prop_name => {
+                            prop_ty = Some(ty_rec.ty.clone().unwrap());
+                        },
+                        Ast::VarAssign(ref ty_rec, ref tkn, _, _) if tkn.get_name() == prop_name  => {
+                            prop_ty = Some(ty_rec.ty.clone().unwrap());
+                        },
+                        _ => ()
+                    };
+                }
+
+                if prop_ty.is_none() {
+                    panic!("Cannot type check variable that isnt declared in class");
+                }
+
+                return prop_ty.unwrap();
+            },
+            _ => panic!("Cannot extract property type from this ast")
         }
     }
 

@@ -55,7 +55,7 @@ pub enum Ast {
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),
 
-    // Class name, class props, class methods
+    // Class name, class methods, class props
     ClassDecl(Token, Vec<Option<Ast>>, Vec<Option<Ast>>),
 
     // Name of the class, function/property name
