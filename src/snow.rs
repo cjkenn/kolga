@@ -1,5 +1,6 @@
 extern crate snowc;
 extern crate types;
+extern crate vm;
 
 use std::fs::File;
 use std::env;
@@ -8,8 +9,19 @@ use snowc::lexer::Lexer;
 use snowc::parser::Parser;
 use snowc::symtab::SymTab;
 use types::check::TyCheck;
+use vm::vm::Vm;
+use vm::reg::Reg;
+use vm::op::OpCode;
 
 fn main() {
+    let mut vm = Vm::new();
+    let dest = Reg::new(String::from("r0"));
+    let op1 = Reg::new(String::from("r1"));
+    let op2 = Reg::with_val(String::from("r2"), 5.0);
+
+    let mut code = OpCode::Add(dest, op1, op2);
+    let _res = vm.execute(&mut code);
+
     let args: Vec<String> = env::args().collect();
     // TODO: repl
     if args.len() < 2 {
