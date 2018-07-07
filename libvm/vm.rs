@@ -15,8 +15,32 @@ impl Vm {
         }
     }
 
+    pub fn from_instrs(instrs: Vec<OpCode>) -> Vm {
+        Vm {
+            instrs: instrs,
+            iptr: 0
+        }
+    }
+
+    pub fn run(&mut self) {
+        // TODO: no clone here
+        for mut instr in self.instrs.clone() {
+            self.execute(&mut instr);
+        }
+    }
+
     pub fn execute(&mut self, instr: &mut OpCode) -> Result<(), ErrRuntime> {
         match instr {
+            OpCode::MvReg(ref mut dest, ref src) => {
+                if src.val.is_none() {
+                    dest.free();
+                } else {
+                    dest.set(src.val.unwrap());
+                }
+            },
+            OpCode::MvVal(ref mut dest, ref new_val) => {
+                dest.set(*new_val);
+            },
             OpCode::Add(ref mut dest, ref lhs, ref rhs) => {
                 match self.bin_op_err(lhs, rhs) {
                     Some(err) => return Err(err),

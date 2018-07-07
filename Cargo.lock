@@ -17,6 +17,7 @@ name = "snowc"
 version = "0.1.0"
 dependencies = [
  "errors 0.1.0",
+ "vm 0.1.0",
 ]
 
 [[package]]

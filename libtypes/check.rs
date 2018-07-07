@@ -95,7 +95,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone().unwrap());
                 }
             },
-            Ast::FnDecl(ident_tkn, param_list, ret_ty_rec, maybe_stmts) => {
+            Ast::FnDecl(ident_tkn, _, ret_ty_rec, maybe_stmts) => {
                 let fn_ty = ret_ty_rec.ty.unwrap();
                 let stmts = maybe_stmts.unwrap();
                 match stmts {
@@ -103,7 +103,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     _ => self.check_stmt(stmts.clone())
                 };
             },
-            Ast::ClassDecl(name_tkn, methods, props) => {
+            Ast::ClassDecl(_, methods, props) => {
                 for prop_stmt in props {
                     self.check_stmt(prop_stmt.clone().unwrap());
                 }
