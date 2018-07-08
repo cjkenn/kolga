@@ -1,23 +1,23 @@
 use ast::Ast;
 use token::{TknTy, Token};
 use symtab::SymTab;
-use vm::reg::{RegPool, Reg};
+use vm::reg::RegPool;
 use vm::op::OpCode;
 
 pub struct CodeGen<'c, 's> {
     ast: &'c Ast,
     symtab: &'s SymTab,
-    ops: Vec<OpCode>,
-    reg_pool: RegPool
+    reg_pool: &'s mut RegPool,
+    ops: Vec<OpCode>
 }
 
 impl <'c, 's> CodeGen<'c, 's> {
-    pub fn new(ast: &'c Ast, symtab: &'s SymTab) -> CodeGen<'c, 's> {
+    pub fn new(ast: &'c Ast, symtab: &'s SymTab, regpool: &'s mut RegPool) -> CodeGen<'c, 's> {
         CodeGen {
             ast: ast,
             symtab: symtab,
-            ops: Vec::new(),
-            reg_pool: RegPool::new()
+            reg_pool: regpool,
+            ops: Vec::new()
         }
     }
 
@@ -59,13 +59,12 @@ impl <'c, 's> CodeGen<'c, 's> {
         match op_tkn.ty {
             TknTy::Plus => {
                 // TODO: assuming two literals for now (both sides are Ast::Primary)
-                // TODO: need to allocate registers in the reg pool, and get/set them
                 let l_val = lhs.extract_primary_ty_rec().tkn.get_val();
                 let r_val = rhs.extract_primary_ty_rec().tkn.get_val();
 
-                let l_reg = Reg::new(self.reg_pool.next());
-                let r_reg = Reg::new(self.reg_pool.next());
-                let dest = Reg::new(self.reg_pool.next());
+                let l_reg = self.reg_pool.alloc();
+                let r_reg = self.reg_pool.alloc();
+                let dest = self.reg_pool.alloc();
 
                 let l_op = OpCode::MvVal(l_reg.clone(), l_val);
                 let r_op = OpCode::MvVal(r_reg.clone(), r_val);

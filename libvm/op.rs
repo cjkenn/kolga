@@ -4,13 +4,13 @@ use reg::Reg;
 pub enum OpCode {
     // Move Operators
     // destination, src
-    MvReg(Reg, Reg),
-    MvVal(Reg, f64),
+    MvReg(String, String),
+    MvVal(String, f64),
 
     // Binary Operators
     // Dest, lhs operand, rhs operand
-    Add(Reg, Reg, Reg),
-    Sub(Reg, Reg, Reg),
-    Mul(Reg, Reg, Reg),
-    Div(Reg, Reg, Reg)
+    Add(String, String, String),
+    Sub(String, String, String),
+    Mul(String, String, String),
+    Div(String, String, String)
 }

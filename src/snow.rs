@@ -11,8 +11,7 @@ use snowc::symtab::SymTab;
 use snowc::codegen::CodeGen;
 use types::check::TyCheck;
 use vm::vm::Vm;
-use vm::reg::Reg;
-use vm::op::OpCode;
+use vm::reg::RegPool;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -66,9 +65,14 @@ fn main() {
         return;
     }
 
-    // TODO: reg pool needs to be shared by codegen and vm
+    let mut reg_pool = RegPool::new();
 
-    let instrs = CodeGen::new(&ast, &mut symtab).gen();
-    let mut vm = Vm::from_instrs(instrs);
+    let instrs;
+    {
+        let mut code_gen = CodeGen::new(&ast, &symtab, &mut reg_pool);
+        instrs = code_gen.gen();
+    }
+
+    let mut vm = Vm::from_instrs(instrs, &mut reg_pool);
     vm.run();
 }

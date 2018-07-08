@@ -1,22 +1,25 @@
 use op::OpCode;
 use errors::ErrRuntime;
-use reg::Reg;
+use reg::RegPool;
 
-pub struct Vm {
+pub struct Vm<'rp> {
+    reg_pool: &'rp mut RegPool,
     instrs: Vec<OpCode>,
     iptr: usize
 }
 
-impl Vm {
-    pub fn new() -> Vm {
+impl<'rp> Vm<'rp> {
+    pub fn new(rpool: &'rp mut RegPool) -> Vm<'rp> {
         Vm {
+            reg_pool: rpool,
             instrs: Vec::new(),
             iptr: 0
         }
     }
 
-    pub fn from_instrs(instrs: Vec<OpCode>) -> Vm {
+    pub fn from_instrs(instrs: Vec<OpCode>, rpool: &'rp mut RegPool) -> Vm<'rp> {
         Vm {
+            reg_pool: rpool,
             instrs: instrs,
             iptr: 0
         }
@@ -30,72 +33,40 @@ impl Vm {
     }
 
     pub fn execute(&mut self, instr: &mut OpCode) -> Result<(), ErrRuntime> {
-        match instr {
-            OpCode::MvReg(ref mut dest, ref src) => {
-                if src.val.is_none() {
-                    dest.free();
-                } else {
-                    dest.set(src.val.unwrap());
-                }
+        match *instr {
+            OpCode::MvReg(ref dest_name, ref src_name) => {
+                unimplemented!();
             },
-            OpCode::MvVal(ref mut dest, ref new_val) => {
-                dest.set(*new_val);
+            OpCode::MvVal(ref dest_name, ref new_val) => {
+                self.reg_pool.alter(dest_name, *new_val);
             },
-            OpCode::Add(ref mut dest, ref lhs, ref rhs) => {
-                match self.bin_op_err(lhs, rhs) {
-                    Some(err) => return Err(err),
-                    None => ()
-                };
-
+            OpCode::Add(ref dest_name, ref lhs_name, ref rhs_name) => {
+                let lhs = self.reg_pool.get(lhs_name).unwrap().clone();
+                let rhs = self.reg_pool.get(rhs_name).unwrap().clone();
                 let result = lhs.val.unwrap() + rhs.val.unwrap();
-                dest.set(result);
+                self.reg_pool.alter(dest_name, result);
             },
-            OpCode::Sub(ref mut dest, ref lhs, ref rhs) => {
-                match self.bin_op_err(lhs, rhs) {
-                    Some(err) => return Err(err),
-                    None => ()
-                };
-
+            OpCode::Sub(ref dest_name, ref lhs_name, ref rhs_name) => {
+                let lhs = self.reg_pool.get(lhs_name).unwrap().clone();
+                let rhs = self.reg_pool.get(rhs_name).unwrap().clone();
                 let result = lhs.val.unwrap() - rhs.val.unwrap();
-                dest.set(result);
+                self.reg_pool.alter(dest_name, result);
             },
-            OpCode::Mul(ref mut dest, ref lhs, ref rhs) => {
-                match self.bin_op_err(lhs, rhs) {
-                    Some(err) => return Err(err),
-                    None => ()
-                };
-
+            OpCode::Mul(ref dest_name, ref lhs_name, ref rhs_name) => {
+                let lhs = self.reg_pool.get(lhs_name).unwrap().clone();
+                let rhs = self.reg_pool.get(rhs_name).unwrap().clone();
                 let result = lhs.val.unwrap() * rhs.val.unwrap();
-                dest.set(result);
+                self.reg_pool.alter(dest_name, result);
             },
-            OpCode::Div(ref mut dest, ref lhs, ref rhs) => {
-                match self.bin_op_err(lhs, rhs) {
-                    Some(err) => return Err(err),
-                    None => ()
-                };
-
+            OpCode::Div(ref dest_name, ref lhs_name, ref rhs_name) => {
+                let lhs = self.reg_pool.get(lhs_name).unwrap().clone();
+                let rhs = self.reg_pool.get(rhs_name).unwrap().clone();
                 let result = lhs.val.unwrap() / rhs.val.unwrap();
-                dest.set(result);
+                self.reg_pool.alter(dest_name, result);
             },
             _ => unimplemented!()
         };
 
         Ok(())
-    }
-
-    fn bin_op_err(&self, lhs_reg: &Reg, rhs_reg: &Reg) -> Option<ErrRuntime> {
-        let mut err = None;
-
-        if lhs_reg.val.is_none() {
-            let msg = format!("Cannot perform operation: Register {} has no value", lhs_reg.name);
-            err = Some(ErrRuntime::new(msg));
-        }
-
-        if rhs_reg.val.is_none() {
-            let msg = format!("Cannot perform operation: Register {} has no value", rhs_reg.name);
-            err = Some(ErrRuntime::new(msg));
-        }
-
-        err
     }
 }

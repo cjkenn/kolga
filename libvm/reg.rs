@@ -1,32 +1,52 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
-pub struct Reg {
-    pub name: String,
-    pub is_free: bool,
-    pub val: Option<f64>
-}
-
-#[derive(Debug, Clone)]
 pub struct RegPool {
-    regs: HashMap<String, Reg>,
+    pool: HashMap<String, Reg>,
     cnt: usize
 }
 
 impl RegPool {
     pub fn new() -> RegPool {
         RegPool {
-            regs: HashMap::new(),
+            pool: HashMap::new(),
             cnt: 0
         }
     }
 
-    // TODO: Infinite registers for now
+    pub fn alloc(&mut self) -> String {
+        let name = self.next();
+        let reg = Reg::new(name.clone());
+        self.pool.insert(name.clone(), reg);
+        name
+    }
+
+    pub fn get(&self, key: &str) -> Option<&Reg> {
+        self.pool.get(key)
+    }
+
+    pub fn set(&mut self, key: &str, val: Reg) {
+        self.pool.insert(key.to_string(), val);
+    }
+
+    pub fn alter(&mut self, key: &str, change: f64) {
+        self.pool.get_mut(key).unwrap().set(change);
+    }
+
+    // TODO: Infinite registers for now. Could write an
+    // allocator and limit registers.
     pub fn next(&mut self) -> String {
         let name = format!("r{}", self.cnt);
         self.cnt = self.cnt + 1;
         name
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct Reg {
+    pub name: String,
+    pub is_free: bool,
+    pub val: Option<f64>
 }
 
 impl Reg {
