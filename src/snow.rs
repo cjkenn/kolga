@@ -73,6 +73,6 @@ fn main() {
         instrs = code_gen.gen();
     }
 
-    let mut vm = Vm::from_instrs(instrs, &mut reg_pool);
-    vm.run();
+    let mut vm = Vm::new(&mut reg_pool);
+    vm.run(instrs);
 }
