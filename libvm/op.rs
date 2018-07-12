@@ -6,6 +6,10 @@ pub enum OpCode {
     // destination, src
     MvReg(String, String),
     MvVal(String, f64),
+    Ld(String, String),
+
+    // For storage, the destination is a var name
+    St(String, String),
 
     // Binary Operators
     // Dest, lhs operand, rhs operand

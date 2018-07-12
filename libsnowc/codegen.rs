@@ -46,82 +46,96 @@ impl <'c, 's> CodeGen<'c, 's> {
                 let ast = maybe_ast.clone().unwrap();
                 self.gen_expr(&ast)
             },
-            _ => unimplemented!()
+            Ast::VarAssign(_, ident_tkn, _, maybe_assign_ast) => {
+                let ast = maybe_assign_ast.clone().unwrap();
+                let mut gen_assign = self.gen_expr(&ast);
+                let storage_location = ident_tkn.get_name();
+
+                let mut st_op = vec![OpCode::St(ident_tkn.get_name(), gen_assign.dest_name)];
+                gen_assign.instrs.append(&mut st_op);
+
+                return GenResult{
+                    instrs: gen_assign.instrs,
+                    dest_name: storage_location
+                }
+            },
+
+            _ => unimplemented!("{:?}", stmt)
         }
     }
 
     fn gen_expr(&mut self, expr: &Ast) -> GenResult {
         match expr {
+            Ast::Primary(ty_rec) => {
+                let dest_reg = self.reg_pool.alloc();
+                GenResult {
+                    instrs: vec![OpCode::MvVal(dest_reg.clone(), ty_rec.tkn.get_val())],
+                    dest_name: dest_reg
+                }
+            },
             Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) => {
                 let lhs = maybe_lhs.clone().unwrap();
                 let rhs = maybe_rhs.clone().unwrap();
                 self.gen_bin_op(op_tkn, &lhs, &rhs)
             },
-            _ => unimplemented!()
+            _ => unimplemented!("{:?}", expr)
         }
     }
 
     fn gen_bin_op(&mut self, op_tkn: &Token, lhs: &Ast, rhs: &Ast) -> GenResult {
         if lhs.is_primary() && rhs.is_primary() {
-            let r_reg = self.reg_pool.alloc();
-            let l_reg = self.reg_pool.alloc();
-            let l_val = lhs.extract_primary_ty_rec().tkn.get_val();
-            let r_val = rhs.extract_primary_ty_rec().tkn.get_val();
+            let lhs_reg = self.reg_pool.alloc();
+            let rhs_reg = self.reg_pool.alloc();
 
-            let l_op = OpCode::MvVal(l_reg.clone(), l_val);
-            let r_op = OpCode::MvVal(r_reg.clone(), r_val);
-            let op = self.get_bin_op_ty(op_tkn, &l_reg, &r_reg);
+            let ops = vec![
+                self.get_primary_ast_op(lhs, &lhs_reg),
+                self.get_primary_ast_op(rhs, &rhs_reg),
+                self.get_bin_op_ty(op_tkn, &lhs_reg, &rhs_reg)
+            ];
 
             return GenResult {
-                instrs: vec![l_op, r_op, op],
-                dest_name: l_reg
+                instrs: ops,
+                dest_name: lhs_reg
             };
         } else if lhs.is_primary() && !rhs.is_primary() {
-            let l_reg = self.reg_pool.alloc();
-            let l_val = lhs.extract_primary_ty_rec().tkn.get_val();
-            let l_op = OpCode::MvVal(l_reg.clone(), l_val);
+            let lhs_reg = self.reg_pool.alloc();
+            let lhs_op = self.get_primary_ast_op(lhs, &lhs_reg);
 
-            let rhs_gen_result = self.gen_expr(rhs);
+            let mut rhs_gen_result = self.gen_expr(rhs);
             let prev_dest_reg = rhs_gen_result.dest_name;
-            let op = self.get_bin_op_ty(op_tkn, &l_reg, &prev_dest_reg);
-            let mut rhs_instrs = rhs_gen_result.instrs;
+            let op = self.get_bin_op_ty(op_tkn, &lhs_reg, &prev_dest_reg);
+            let mut instrs = vec![lhs_op, op];
 
-            let mut instrs = vec![l_op, op];
-
-            rhs_instrs.append(&mut instrs);
+            rhs_gen_result.instrs.append(&mut instrs);
             return GenResult {
-                instrs: rhs_instrs,
+                instrs: rhs_gen_result.instrs,
                 dest_name: prev_dest_reg
             };
         } else if !lhs.is_primary() && rhs.is_primary() {
             let rhs_reg = self.reg_pool.alloc();
-            let rhs_val = rhs.extract_primary_ty_rec().tkn.get_val();
-            let rhs_op = OpCode::MvVal(rhs_reg.clone(), rhs_val);
+            let rhs_op =  self.get_primary_ast_op(rhs, &rhs_reg);
 
-            let lhs_gen_result = self.gen_expr(lhs);
+            let mut lhs_gen_result = self.gen_expr(lhs);
             let prev_dest_reg = lhs_gen_result.dest_name;
             let op = self.get_bin_op_ty(op_tkn, &prev_dest_reg, &rhs_reg);
-            let mut lhs_instrs = lhs_gen_result.instrs;
-
             let mut instrs = vec![rhs_op, op];
 
-            lhs_instrs.append(&mut instrs);
+            lhs_gen_result.instrs.append(&mut instrs);
             return GenResult {
-                instrs: lhs_instrs,
+                instrs: lhs_gen_result.instrs,
                 dest_name: prev_dest_reg
             };
         } else {
-            let lhs_gen_result = self.gen_expr(lhs);
+            let mut lhs_gen_result = self.gen_expr(lhs);
             let mut rhs_gen_result = self.gen_expr(rhs);
             let op = self.get_bin_op_ty(op_tkn, &lhs_gen_result.dest_name, &rhs_gen_result.dest_name);
 
-            let mut lhs_instrs = lhs_gen_result.instrs;
-            lhs_instrs.append(&mut rhs_gen_result.instrs);
+            lhs_gen_result.instrs.append(&mut rhs_gen_result.instrs);
             let mut instrs = vec![op];
-            lhs_instrs.append(&mut instrs);
+            lhs_gen_result.instrs.append(&mut instrs);
 
             return GenResult {
-                instrs: lhs_instrs,
+                instrs: lhs_gen_result.instrs,
                 dest_name: lhs_gen_result.dest_name
             };
         }
@@ -150,6 +164,23 @@ impl <'c, 's> CodeGen<'c, 's> {
                             rhs_operand.to_string())
             },
             _ => panic!("Unknown binary operator found")
+        }
+    }
+
+    fn get_primary_ast_op(&self, ast: &Ast, dest_reg: &str) -> OpCode {
+        match ast {
+            Ast::Primary(ty_rec) => {
+                match ty_rec.tkn.ty {
+                    TknTy::Ident(ref name) => {
+                        OpCode::Ld(dest_reg.to_string(), name.to_string())
+                    },
+                    TknTy::Val(v) => {
+                        OpCode::MvVal(dest_reg.to_string(), v)
+                    },
+                    _ => panic!("Invalid primary token found")
+                }
+            },
+            _ => panic!("Cannot get primary op from non-primary ast")
         }
     }
 }

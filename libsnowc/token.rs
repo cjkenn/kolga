@@ -212,7 +212,7 @@ impl Token {
     pub fn get_val(&self) -> f64 {
         match self.ty {
             TknTy::Val(v) => v,
-            _ => panic!("Wrong token type!")
+            _ => panic!("{:?} Wrong token type!", self)
         }
     }
 
