@@ -2,17 +2,18 @@ use reg::Reg;
 
 #[derive(Debug, Clone)]
 pub enum OpCode {
-    // Move Operators
-    // destination, src
+    // Move Operators: (Destination, Source)
     MvReg(String, String),
     MvVal(String, f64),
+    // For ld/st, the destination is a var name
+    St(String, String),
     Ld(String, String),
 
-    // For storage, the destination is a var name
-    St(String, String),
+    // Unary Operators: (Destination, Source)
+    Neg(String, String),
+    Not(String, String),
 
-    // Binary Operators
-    // Dest, lhs operand, rhs operand
+    // Binary Operators: (Destination, LHS operand, RHS operand)
     Add(String, String, String),
     Sub(String, String, String),
     Mul(String, String, String),

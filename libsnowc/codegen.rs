@@ -68,10 +68,15 @@ impl <'c, 's> CodeGen<'c, 's> {
         match expr {
             Ast::Primary(ty_rec) => {
                 let dest_reg = self.reg_pool.alloc();
+                // TODO need to handle bools here
                 GenResult {
                     instrs: vec![OpCode::MvVal(dest_reg.clone(), ty_rec.tkn.get_val())],
                     dest_name: dest_reg
                 }
+            },
+            Ast::Unary(op_tkn, maybe_rhs) => {
+                let rhs = maybe_rhs.clone().unwrap();
+                self.gen_unary_op(op_tkn, &rhs)
             },
             Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) => {
                 let lhs = maybe_lhs.clone().unwrap();
@@ -79,6 +84,25 @@ impl <'c, 's> CodeGen<'c, 's> {
                 self.gen_bin_op(op_tkn, &lhs, &rhs)
             },
             _ => unimplemented!("{:?}", expr)
+        }
+    }
+
+    fn gen_unary_op(&mut self, op_tkn: &Token, rhs: &Ast) -> GenResult {
+        let mut rhs_gen_result = self.gen_expr(rhs);
+        let op = match op_tkn.ty {
+            TknTy::Bang => {
+                OpCode::Not(rhs_gen_result.dest_name.clone(), rhs_gen_result.dest_name.clone())
+            },
+            TknTy::Minus => {
+                OpCode::Neg(rhs_gen_result.dest_name.clone(), rhs_gen_result.dest_name.clone())
+            },
+            _ => panic!("Invalid unary operator found!")
+        };
+
+        rhs_gen_result.instrs.append(&mut vec![op]);
+        GenResult {
+            instrs: rhs_gen_result.instrs,
+            dest_name: rhs_gen_result.dest_name
         }
     }
 
