@@ -46,6 +46,30 @@ impl <'c, 's> CodeGen<'c, 's> {
                 let ast = maybe_ast.clone().unwrap();
                 self.gen_expr(&ast)
             },
+            Ast::BlckStmt(stmts) => {
+                let mut stmt_instrs = Vec::new();
+                let mut final_dest = String::new();
+                for stmt in stmts {
+                    let mut result = self.gen_stmt(&stmt.clone().unwrap());
+                    stmt_instrs.append(&mut result.instrs);
+                    final_dest = result.dest_name;
+                }
+
+                GenResult {
+                    instrs: stmt_instrs,
+                    dest_name: final_dest.to_string()
+                }
+            },
+            Ast::VarDecl(_, ident_tkn, _) => {
+                let dest = &self.reg_pool.alloc();
+                GenResult {
+                    instrs: vec![
+                        OpCode::MvVal(dest.to_string(), 0.0),
+                        OpCode::St(ident_tkn.get_name(), dest.to_string())
+                    ],
+                    dest_name: dest.to_string()
+                }
+            },
             Ast::VarAssign(_, ident_tkn, _, maybe_assign_ast) => {
                 let ast = maybe_assign_ast.clone().unwrap();
                 let mut gen_assign = self.gen_expr(&ast);
@@ -54,12 +78,11 @@ impl <'c, 's> CodeGen<'c, 's> {
                 let mut st_op = vec![OpCode::St(ident_tkn.get_name(), gen_assign.dest_name)];
                 gen_assign.instrs.append(&mut st_op);
 
-                return GenResult{
+                GenResult {
                     instrs: gen_assign.instrs,
                     dest_name: storage_location
                 }
             },
-
             _ => unimplemented!("{:?}", stmt)
         }
     }
@@ -68,9 +91,8 @@ impl <'c, 's> CodeGen<'c, 's> {
         match expr {
             Ast::Primary(ty_rec) => {
                 let dest_reg = self.reg_pool.alloc();
-                // TODO need to handle bools here
                 GenResult {
-                    instrs: vec![OpCode::MvVal(dest_reg.clone(), ty_rec.tkn.get_val())],
+                    instrs: vec![self.get_primary_ast_op(expr, &dest_reg)],
                     dest_name: dest_reg
                 }
             },
@@ -83,6 +105,9 @@ impl <'c, 's> CodeGen<'c, 's> {
                 let rhs = maybe_rhs.clone().unwrap();
                 self.gen_bin_op(op_tkn, &lhs, &rhs)
             },
+            Ast::VarAssign(_,_,_,_) => {
+                self.gen_stmt(expr)
+            }
             _ => unimplemented!("{:?}", expr)
         }
     }
@@ -200,6 +225,12 @@ impl <'c, 's> CodeGen<'c, 's> {
                     },
                     TknTy::Val(v) => {
                         OpCode::MvVal(dest_reg.to_string(), v)
+                    },
+                    TknTy::True => {
+                        OpCode::MvVal(dest_reg.to_string(), 1.0)
+                    },
+                    TknTy::False => {
+                        OpCode::MvVal(dest_reg.to_string(), 0.0)
                     },
                     _ => panic!("Invalid primary token found")
                 }
