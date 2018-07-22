@@ -100,7 +100,8 @@ impl <'c, 's> CodeGen<'c, 's> {
                 let rhs = maybe_rhs.clone().unwrap();
                 self.gen_unary_op(op_tkn, &rhs)
             },
-            Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) => {
+            Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) |
+            Ast::Logical(op_tkn, maybe_lhs, maybe_rhs) => {
                 let lhs = maybe_lhs.clone().unwrap();
                 let rhs = maybe_rhs.clone().unwrap();
                 self.gen_bin_op(op_tkn, &lhs, &rhs)
@@ -212,6 +213,16 @@ impl <'c, 's> CodeGen<'c, 's> {
                             lhs_operand.to_string(),
                             rhs_operand.to_string())
             },
+            TknTy::And | TknTy::AmpAmp => {
+                OpCode::And(lhs_operand.to_string(),
+                            lhs_operand.to_string(),
+                            rhs_operand.to_string())
+            },
+            TknTy::Or | TknTy::PipePipe => {
+                OpCode::Or(lhs_operand.to_string(),
+                           lhs_operand.to_string(),
+                           rhs_operand.to_string())
+            },
             _ => panic!("Unknown binary operator found")
         }
     }
@@ -231,6 +242,9 @@ impl <'c, 's> CodeGen<'c, 's> {
                     },
                     TknTy::False => {
                         OpCode::MvVal(dest_reg.to_string(), 0.0)
+                    },
+                    TknTy::Str(ref st) => {
+                        OpCode::MvStr(dest_reg.to_string(), st.clone())
                     },
                     _ => panic!("Invalid primary token found")
                 }

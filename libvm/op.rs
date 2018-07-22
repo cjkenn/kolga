@@ -5,6 +5,7 @@ pub enum OpCode {
     // Move Operators: (Destination, Source)
     MvReg(String, String),
     MvVal(String, f64),
+    MvStr(String, String),
     // For ld/st, the destination is a var name
     St(String, String),
     Ld(String, String),
@@ -17,5 +18,7 @@ pub enum OpCode {
     Add(String, String, String),
     Sub(String, String, String),
     Mul(String, String, String),
-    Div(String, String, String)
+    Div(String, String, String),
+    And(String, String, String),
+    Or(String, String, String)
 }
