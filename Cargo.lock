@@ -3,17 +3,17 @@ name = "errors"
 version = "0.1.0"
 
 [[package]]
-name = "snow"
+name = "kolga"
 version = "0.1.0"
 dependencies = [
  "errors 0.1.0",
- "snowc 0.1.0",
+ "kolgac 0.1.0",
  "types 0.1.0",
  "vm 0.1.0",
 ]
 
 [[package]]
-name = "snowc"
+name = "kolgac"
 version = "0.1.0"
 dependencies = [
  "errors 0.1.0",
@@ -25,7 +25,7 @@ name = "types"
 version = "0.1.0"
 dependencies = [
  "errors 0.1.0",
- "snowc 0.1.0",
+ "kolgac 0.1.0",
 ]
 
 [[package]]

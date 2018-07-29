@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
-use snowc::ast::Ast;
-use snowc::token::{Token, TknTy};
-use snowc::symtab::SymTab;
-use snowc::type_record::TyName;
-use snowc::sym::Sym;
+use kolgac::ast::Ast;
+use kolgac::token::{Token, TknTy};
+use kolgac::symtab::SymTab;
+use kolgac::type_record::TyName;
+use kolgac::sym::Sym;
 use errors::ErrC;
 
 pub struct TyCheck<'t, 's> {

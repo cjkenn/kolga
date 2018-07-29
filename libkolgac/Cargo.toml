@@ -1,10 +1,10 @@
 [package]
-name = "snowc"
+name = "kolgac"
 version = "0.1.0"
 authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
 
 [lib]
-name = "snowc"
+name = "kolgac"
 path = "lib.rs"
 
 [dependencies]

@@ -1,13 +1,13 @@
-extern crate snowc;
+extern crate kolgac;
 
 use std::fs::File;
 
-use snowc::lexer::Lexer;
-use snowc::token::TknTy;
-use snowc::parser::Parser;
-use snowc::ast::Ast;
-use snowc::symtab::SymTab;
-use snowc::type_record::TyName;
+use kolgac::lexer::Lexer;
+use kolgac::token::TknTy;
+use kolgac::parser::Parser;
+use kolgac::ast::Ast;
+use kolgac::symtab::SymTab;
+use kolgac::type_record::TyName;
 
 #[test]
 fn test_parse_empty() {

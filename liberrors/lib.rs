@@ -20,7 +20,7 @@ impl ErrC {
     }
 
     pub fn emit(&self) {
-        println!("snow: [Line {}:{}] {}", self.line, self.pos, self.text);
+        println!("kolga: [Line {}:{}] {}", self.line, self.pos, self.text);
     }
 }
 
@@ -32,6 +32,6 @@ impl ErrRuntime {
     }
 
     pub fn emit(&self) {
-        println!("snow: Runtime Error -> {}", self.text)
+        println!("kolga: Runtime Error -> {}", self.text)
     }
 }

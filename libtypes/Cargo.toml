@@ -9,4 +9,4 @@ path = "lib.rs"
 
 [dependencies]
 errors = { path = "../liberrors" }
-snowc = { path = "../libsnowc" }
+kolgac = { path = "../libkolgac" }

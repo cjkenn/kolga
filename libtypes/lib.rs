@@ -1,4 +1,4 @@
-extern crate snowc;
+extern crate kolgac;
 extern crate errors;
 
 pub mod check;

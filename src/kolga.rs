@@ -1,14 +1,14 @@
-extern crate snowc;
+extern crate kolgac;
 extern crate types;
 extern crate vm;
 
 use std::fs::File;
 use std::env;
 
-use snowc::lexer::Lexer;
-use snowc::parser::Parser;
-use snowc::symtab::SymTab;
-use snowc::codegen::CodeGen;
+use kolgac::lexer::Lexer;
+use kolgac::parser::Parser;
+use kolgac::symtab::SymTab;
+use kolgac::codegen::CodeGen;
 use types::check::TyCheck;
 use vm::vm::Vm;
 use vm::reg::RegPool;
@@ -17,7 +17,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     // TODO: repl
     if args.len() < 2 {
-        println!("Usage: snow [filename]");
+        println!("Usage: kolga [filename]");
         return;
     }
 
@@ -25,7 +25,7 @@ fn main() {
     let infile = match File::open(filename) {
         Ok(file) => file,
         Err(e) => {
-            println!("snow: could not open file '{}': {:?}", filename, e.kind());
+            println!("kolga: could not open file '{}': {:?}", filename, e.kind());
             return;
         }
     };
@@ -73,6 +73,8 @@ fn main() {
         instrs = code_gen.gen();
     }
 
-    let mut vm = Vm::new(&mut reg_pool);
-    vm.run(instrs);
+    println!("{:?}", instrs);
+
+    //let mut vm = Vm::new(&mut reg_pool);
+    //vm.run(instrs);
 }

@@ -1,14 +1,14 @@
 [package]
-name = "snow"
+name = "kolga"
 version = "0.1.0"
 authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
 
 [[bin]]
-name = "snow_bin"
-path = "./src/snow.rs"
+name = "kolga_bin"
+path = "./src/kolga.rs"
 
 [dependencies]
-snowc = { path = "libsnowc" }
+kolgac = { path = "libkolgac" }
 vm = { path = "libvm" }
 errors = { path = "liberrors" }
 types = { path = "libtypes" }

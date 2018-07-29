@@ -1,9 +1,9 @@
-extern crate snowc;
+extern crate kolgac;
 
 use std::fs::File;
 
-use snowc::lexer::Lexer;
-use snowc::token::TknTy;
+use kolgac::lexer::Lexer;
+use kolgac::token::TknTy;
 
 #[test]
 fn test_lex_empty() {
