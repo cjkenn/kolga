@@ -10,5 +10,6 @@ path = "./src/kolga.rs"
 [dependencies]
 kolgac = { path = "libkolgac" }
 vm = { path = "libvm" }
+llvm_codegen = { path = "libllvm_codegen" }
 errors = { path = "liberrors" }
 types = { path = "libtypes" }

@@ -1,6 +1,6 @@
 extern crate kolgac;
 extern crate types;
-extern crate vm;
+extern crate llvm_codegen;
 
 use std::fs::File;
 use std::env;
@@ -8,10 +8,10 @@ use std::env;
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
 use kolgac::symtab::SymTab;
-use kolgac::codegen::CodeGen;
+
 use types::check::TyCheck;
-use vm::vm::Vm;
-use vm::reg::RegPool;
+
+use llvm_codegen::gen::Gen;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -65,16 +65,6 @@ fn main() {
         return;
     }
 
-    let mut reg_pool = RegPool::new();
-
-    let instrs;
-    {
-        let mut code_gen = CodeGen::new(&ast, &symtab, &mut reg_pool);
-        instrs = code_gen.gen();
-    }
-
-    println!("{:?}", instrs);
-
-    //let mut vm = Vm::new(&mut reg_pool);
-    //vm.run(instrs);
+    let mut llvm_codegen = Gen::new(&ast, &mut symtab);
+    llvm_codegen.gen();
 }

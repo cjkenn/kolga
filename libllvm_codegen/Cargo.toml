@@ -1,0 +1,13 @@
+[package]
+name = "llvm_codegen"
+version = "0.1.0"
+authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
+
+[lib]
+name = "llvm_codegen"
+path = "lib.rs"
+
+[dependencies]
+errors = { path = "../liberrors" }
+kolgac = { path = "../libkolgac" }
+llvm-sys = "60.0.2"
