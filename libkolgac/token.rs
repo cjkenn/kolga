@@ -205,7 +205,8 @@ impl Token {
     pub fn get_name(&self) -> String {
         match self.ty {
             TknTy::Ident(ref name) => name.to_string(),
-            _ => "".to_string()
+            TknTy::Str(ref name) => name.to_string(),
+            _ => panic!("{:?} Wrong token type!", self)
         }
     }
 
