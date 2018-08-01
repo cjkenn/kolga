@@ -75,16 +75,25 @@ impl<'t, 's> Gen<'t, 's> {
 
     fn gen_stmt(&mut self, stmt: &Ast) {
         match stmt {
+            Ast::BlckStmt(stmts) => {
+                for stmt in stmts {
+                    self.gen_stmt(&stmt.clone().unwrap());
+                }
+            },
             Ast::ExprStmt(maybe_ast) => {
                 unsafe {
-                    // Wrap top level expressions in anonymous functions with no params.
-                    let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
-                    let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
-                    let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
-
-                    LLVMPositionBuilderAtEnd(self.builder, anon_bb);
-
                     let ast = maybe_ast.clone().unwrap();
+                    match ast {
+                        Ast::FnCall(_,_) => (),
+                        _ => {
+                            // Wrap top level expressions in anonymous functions with no params.
+                            let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
+                            let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
+                            let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
+                            LLVMPositionBuilderAtEnd(self.builder, anon_bb);
+                        }
+                    };
+
                     let val = self.gen_expr(&ast);
                     match val {
                         Some(exprval) => { LLVMBuildRet(self.builder, exprval); },
@@ -100,11 +109,21 @@ impl<'t, 's> Gen<'t, 's> {
                     let fn_name = self.c_str_from_val(&ident_tkn.get_name());
                     let fn_ty = self.llvm_ty_from_ty_rec(ret_ty_rec);
 
-                    // TODO: handle the fn parameters correctly instead of using null_mut
-                    let llvm_fn_ty = LLVMFunctionType(fn_ty, ptr::null_mut(), params.len() as u32, LLVM_FALSE);
+                    let param_tys = self.llvm_tys_from_ty_rec_arr(params);
+                    let llvm_fn_ty = LLVMFunctionType(fn_ty,
+                                                      param_tys.as_ptr() as *mut _,
+                                                      params.len() as u32,
+                                                      LLVM_FALSE);
+
                     let llvm_fn = LLVMAddFunction(self.module, fn_name, llvm_fn_ty);
+                    self.valuetab.insert(ident_tkn.get_name(), llvm_fn);
+
                     let fn_bb = LLVMAppendBasicBlockInContext(self.context, llvm_fn, fn_name);
                     LLVMPositionBuilderAtEnd(self.builder, fn_bb);
+
+                    // Recursively call gen_stmt() for the function body statements
+                    self.gen_stmt(&body.clone().unwrap());
+                    // TODO: build function return here
                 }
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt)
@@ -169,6 +188,36 @@ impl<'t, 's> Gen<'t, 's> {
                     }
                 }
             },
+            Ast::FnCall(mb_ident_tkn, params) => {
+                let fn_name = mb_ident_tkn.clone().unwrap().get_name();
+                let llvm_fn = self.valuetab.get(&fn_name);
+                if llvm_fn.is_none() {
+                    let msg = format!("Undeclared function call: {:?}", fn_name);
+                    self.errors.push(ErrCodeGen::new(msg));
+                    return None;
+                }
+
+                let mut param_tys: Vec<LLVMValueRef> = Vec::new();
+                // for param in params {
+                //     let llvm_val = self.gen_expr(param);
+                //     if llvm_val.is_none() {
+                //         let msg = format!("Invalid function call param: {:?}", param);
+                //         self.errors.push(ErrCodeGen::new(msg));
+                //         return;
+                //     }
+
+                //     param_tys.push(llvm_val.unwrap());
+                // }
+
+                unsafe {
+                    return Some(LLVMBuildCall(self.builder,
+                                              *llvm_fn.unwrap(),
+                                              param_tys.as_ptr() as *mut _,
+                                              param_tys.len() as u32,
+                                              c_str!("")));
+                }
+
+            },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
         }
     }
@@ -207,10 +256,18 @@ impl<'t, 's> Gen<'t, 's> {
         }
     }
 
+    fn llvm_tys_from_ty_rec_arr(&self, ty_recs: &Vec<TyRecord>) -> Vec<LLVMTypeRef> {
+        let mut llvm_tys = Vec::new();
+        for ty_rec in ty_recs {
+            llvm_tys.push(self.llvm_ty_from_ty_rec(&ty_rec));
+        }
+
+        llvm_tys
+    }
+
     fn str_ty(&self) -> LLVMTypeRef {
-        // String types are actually arrays of chars (i8) in llvm.
-        // TODO: How do we allocate for this array when we don't know the size of the return string?
-        unsafe { LLVMArrayType(self.i8_ty(), 128 as u32) }
+        // TODO: Are strings array types of i8, or pointers of i8?
+        unsafe { LLVMPointerType(self.i8_ty(), 0) }
     }
 
     fn void_ty(&self) -> LLVMTypeRef {
