@@ -10,7 +10,8 @@ use kolgac::type_record::{TyRecord, TyName};
 
 use errors::ErrCodeGen;
 
-use std::collections::HashMap;
+use valtab::ValTab;
+
 use std::ptr;
 
 const LLVM_FALSE: LLVMBool = 0;
@@ -22,17 +23,17 @@ macro_rules! c_str {
     );
 }
 
-pub struct Gen<'t, 's> {
+pub struct Gen<'t, 's, 'v> {
     ast: &'t Ast,
     symtab: &'s mut SymTab,
+    valtab: &'v mut ValTab,
     errors: Vec<ErrCodeGen>,
-    valuetab: HashMap<String, LLVMValueRef>,
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     module: LLVMModuleRef
 }
 
-impl<'t, 's> Drop for Gen<'t, 's> {
+impl<'t, 's, 'v> Drop for Gen<'t, 's, 'v> {
     fn drop(&mut self) {
         unsafe {
             LLVMDisposeBuilder(self.builder);
@@ -42,14 +43,14 @@ impl<'t, 's> Drop for Gen<'t, 's> {
     }
 }
 
-impl<'t, 's> Gen<'t, 's> {
-    pub fn new(ast: &'t Ast, symtab: &'s mut SymTab) -> Gen<'t, 's> {
+impl<'t, 's, 'v> Gen<'t, 's, 'v> {
+    pub fn new(ast: &'t Ast, symtab: &'s mut SymTab, valtab: &'v mut ValTab) -> Gen<'t, 's, 'v> {
         unsafe {
             let context = LLVMContextCreate();
             Gen {
                 ast: ast,
                 symtab: symtab,
-                valuetab: HashMap::new(),
+                valtab: valtab,
                 errors: Vec::new(),
                 context: context,
                 module: LLVMModuleCreateWithNameInContext(c_str!("kolga"), context),
@@ -109,21 +110,22 @@ impl<'t, 's> Gen<'t, 's> {
                     let fn_name = self.c_str_from_val(&ident_tkn.get_name());
                     let fn_ty = self.llvm_ty_from_ty_rec(ret_ty_rec);
 
-                    let param_tys = self.llvm_tys_from_ty_rec_arr(params);
+                    let mut param_tys = self.llvm_tys_from_ty_rec_arr(params);
                     let llvm_fn_ty = LLVMFunctionType(fn_ty,
-                                                      param_tys.as_ptr() as *mut _,
-                                                      params.len() as u32,
+                                                      param_tys.as_mut_ptr(),
+                                                      param_tys.len() as u32,
                                                       LLVM_FALSE);
 
                     let llvm_fn = LLVMAddFunction(self.module, fn_name, llvm_fn_ty);
-                    self.valuetab.insert(ident_tkn.get_name(), llvm_fn);
+                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
 
                     let fn_bb = LLVMAppendBasicBlockInContext(self.context, llvm_fn, fn_name);
                     LLVMPositionBuilderAtEnd(self.builder, fn_bb);
 
                     // Recursively call gen_stmt() for the function body statements
                     self.gen_stmt(&body.clone().unwrap());
-                    // TODO: build function return here
+                    // TODO: build function return here? We need to look for return
+                    // statements in the body.
                 }
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt)
@@ -190,7 +192,7 @@ impl<'t, 's> Gen<'t, 's> {
             },
             Ast::FnCall(mb_ident_tkn, params) => {
                 let fn_name = mb_ident_tkn.clone().unwrap().get_name();
-                let llvm_fn = self.valuetab.get(&fn_name);
+                let llvm_fn = self.valtab.retrieve(&fn_name);
                 if llvm_fn.is_none() {
                     let msg = format!("Undeclared function call: {:?}", fn_name);
                     self.errors.push(ErrCodeGen::new(msg));
@@ -198,21 +200,21 @@ impl<'t, 's> Gen<'t, 's> {
                 }
 
                 let mut param_tys: Vec<LLVMValueRef> = Vec::new();
-                // for param in params {
-                //     let llvm_val = self.gen_expr(param);
-                //     if llvm_val.is_none() {
-                //         let msg = format!("Invalid function call param: {:?}", param);
-                //         self.errors.push(ErrCodeGen::new(msg));
-                //         return;
-                //     }
+                for param in params {
+                    let llvm_val = self.gen_expr(param);
+                    if llvm_val.is_none() {
+                        let msg = format!("Invalid function call param: {:?}", param);
+                        self.errors.push(ErrCodeGen::new(msg));
+                        return None;
+                    }
 
-                //     param_tys.push(llvm_val.unwrap());
-                // }
+                    param_tys.push(llvm_val.unwrap());
+                }
 
                 unsafe {
                     return Some(LLVMBuildCall(self.builder,
-                                              *llvm_fn.unwrap(),
-                                              param_tys.as_ptr() as *mut _,
+                                              llvm_fn.unwrap(),
+                                              param_tys.as_mut_ptr(),
                                               param_tys.len() as u32,
                                               c_str!("")));
                 }
@@ -225,7 +227,12 @@ impl<'t, 's> Gen<'t, 's> {
     fn gen_primary(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
             TknTy::Val(ref val) => {
-                unsafe { return Some(LLVMConstReal(LLVMFloatType(), *val)); }
+                unsafe { return Some(LLVMConstReal(self.float_ty(), *val)); }
+            },
+            TknTy::Str(ref lit) => {
+                unsafe { return Some(LLVMConstString(self.c_str_from_val(lit),
+                                                     lit.len() as u32,
+                                                     LLVM_FALSE)) }
             },
             TknTy::True => {
                 unsafe { return Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)); }
@@ -234,13 +241,7 @@ impl<'t, 's> Gen<'t, 's> {
                 unsafe { return Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)); }
             },
             TknTy::Ident(ref name) => {
-                let val = self.valuetab.get(name);
-                if val.is_none() {
-                    return None;
-                }
-
-                // TODO: there has to be an easier way
-                return Some(*val.clone().unwrap());
+                self.valtab.retrieve(name)
             },
             _ => unimplemented!("Tkn ty {:?} in unimplemented in codegen", ty_rec.tkn.ty)
         }

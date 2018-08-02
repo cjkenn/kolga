@@ -12,6 +12,7 @@ use kolgac::symtab::SymTab;
 use types::check::TyCheck;
 
 use llvm_codegen::gen::Gen;
+use llvm_codegen::valtab::ValTab;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -65,6 +66,7 @@ fn main() {
         return;
     }
 
-    let mut llvm_codegen = Gen::new(&ast, &mut symtab);
+    let mut valtab = ValTab::new();
+    let mut llvm_codegen = Gen::new(&ast, &mut symtab, &mut valtab);
     llvm_codegen.gen();
 }
