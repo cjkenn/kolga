@@ -84,16 +84,10 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
             Ast::ExprStmt(maybe_ast) => {
                 unsafe {
                     let ast = maybe_ast.clone().unwrap();
-                    match ast {
-                        Ast::FnCall(_,_) => (),
-                        _ => {
-                            // Wrap top level expressions in anonymous functions with no params.
-                            let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
-                            let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
-                            let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
-                            LLVMPositionBuilderAtEnd(self.builder, anon_bb);
-                        }
-                    };
+                    let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
+                    let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
+                    let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
+                    LLVMPositionBuilderAtEnd(self.builder, anon_bb);
 
                     let val = self.gen_expr(&ast);
                     match val {
@@ -122,10 +116,20 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                     let fn_bb = LLVMAppendBasicBlockInContext(self.context, llvm_fn, fn_name);
                     LLVMPositionBuilderAtEnd(self.builder, fn_bb);
 
-                    // Recursively call gen_stmt() for the function body statements
-                    self.gen_stmt(&body.clone().unwrap());
-                    // TODO: build function return here? We need to look for return
-                    // statements in the body.
+                    match body.clone().unwrap() {
+                        Ast::BlckStmt(stmts) => {
+                            for stmt in stmts {
+                                match stmt.clone().unwrap() {
+                                    Ast::RetStmt(mb_expr) => {
+                                        let llvm_val = self.gen_expr(&mb_expr.clone().unwrap());
+                                        LLVMBuildRet(self.builder, llvm_val.unwrap());
+                                    },
+                                    _ => { self.gen_stmt(&stmt.clone().unwrap()); }
+                                }
+                            }
+                        },
+                        _ => ()
+                    }
                 }
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt)
@@ -230,9 +234,11 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                 unsafe { return Some(LLVMConstReal(self.float_ty(), *val)); }
             },
             TknTy::Str(ref lit) => {
-                unsafe { return Some(LLVMConstString(self.c_str_from_val(lit),
-                                                     lit.len() as u32,
-                                                     LLVM_FALSE)) }
+                unsafe {
+                    return Some(LLVMBuildGlobalStringPtr(self.builder,
+                                                         self.c_str_from_val(lit),
+                                                         c_str!("")));
+                }
             },
             TknTy::True => {
                 unsafe { return Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)); }
@@ -267,7 +273,6 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
     }
 
     fn str_ty(&self) -> LLVMTypeRef {
-        // TODO: Are strings array types of i8, or pointers of i8?
         unsafe { LLVMPointerType(self.i8_ty(), 0) }
     }
 
