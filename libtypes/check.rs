@@ -332,7 +332,7 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 return TyName::Num
             },
-            TknTy::Gt | TknTy::GtEq | TknTy::Lt | TknTy::LtEq => {
+            TknTy::Gt | TknTy::GtEq | TknTy::Lt | TknTy::LtEq | TknTy::EqEq | TknTy::BangEq => {
                 if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);

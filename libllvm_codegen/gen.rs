@@ -1,4 +1,4 @@
-use llvm_sys::LLVMContext;
+use llvm_sys::{LLVMContext, LLVMRealPredicate};
 use llvm_sys::prelude::*;
 use llvm_sys::core::*;
 use llvm_sys::bit_writer::*;
@@ -76,6 +76,25 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
 
     fn gen_stmt(&mut self, stmt: &Ast) {
         match stmt {
+            Ast::IfStmt(mb_cond, mb_ifs, mb_else_expr, mb_elses) => {
+                unsafe {
+                    // TODO: convert to boolean here at all?
+                    let cond_val = self.gen_expr(&mb_cond.clone().unwrap());
+                    if cond_val.is_none() {
+                        let msg = format!("Error: codegen failed for ast {:?}", stmt);
+                        self.errors.push(ErrCodeGen::new(msg));
+                        return;
+                    }
+
+                    let insert_b = LLVMGetInsertBlock(self.builder);
+                    // TODO: this segfaults?
+                    let mut function = LLVMGetBasicBlockParent(insert_b);
+                    let mut then_b = LLVMAppendBasicBlockInContext(self.context, function, c_str!("thenblck"));
+                    let mut else_b = LLVMAppendBasicBlockInContext(self.context, function, c_str!("elseblck"));
+
+                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), then_b, else_b);
+                }
+            },
             Ast::BlckStmt(stmts) => {
                 for stmt in stmts {
                     self.gen_stmt(&stmt.clone().unwrap());
@@ -116,6 +135,7 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                     let fn_bb = LLVMAppendBasicBlockInContext(self.context, llvm_fn, fn_name);
                     LLVMPositionBuilderAtEnd(self.builder, fn_bb);
 
+                    // TODO: this is hard to read
                     match body.clone().unwrap() {
                         Ast::BlckStmt(stmts) => {
                             for stmt in stmts {
@@ -152,47 +172,8 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
 
                 let lhs_llvm_val = mb_lhs_llvm_val.unwrap();
                 let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
-                unsafe {
-                    match op_tkn.ty {
-                        TknTy::Plus => {
-                            return Some(LLVMBuildFAdd(self.builder,
-                                                      lhs_llvm_val,
-                                                      rhs_llvm_val,
-                                                      c_str!("addtmp")));
-                        },
-                        TknTy::Minus => {
-                            return Some(LLVMBuildFSub(self.builder,
-                                                      lhs_llvm_val,
-                                                      rhs_llvm_val,
-                                                      c_str!("subtmp")));
-                        },
-                        TknTy::Star => {
-                            return Some(LLVMBuildFMul(self.builder,
-                                                      lhs_llvm_val,
-                                                      rhs_llvm_val,
-                                                      c_str!("multmp")));
-                        },
-                        TknTy::Slash => {
-                            return Some(LLVMBuildFDiv(self.builder,
-                                                      lhs_llvm_val,
-                                                      rhs_llvm_val,
-                                                      c_str!("divtmp")));
-                        },
-                        TknTy::AmpAmp | TknTy::And => {
-                            return Some(LLVMBuildAnd(self.builder,
-                                                     lhs_llvm_val,
-                                                     rhs_llvm_val,
-                                                     c_str!("andtmp")));
-                        },
-                        TknTy::PipePipe | TknTy::Or => {
-                            return Some(LLVMBuildOr(self.builder,
-                                                    lhs_llvm_val,
-                                                    rhs_llvm_val,
-                                                    c_str!("ortmp")));
-                        }
-                        _ => panic!("Invalid binary operator found in codegen")
-                    }
-                }
+
+                self.llvm_val_from_op(&op_tkn.ty, lhs_llvm_val, rhs_llvm_val)
             },
             Ast::FnCall(mb_ident_tkn, params) => {
                 let fn_name = mb_ident_tkn.clone().unwrap().get_name();
@@ -230,25 +211,13 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
 
     fn gen_primary(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
-            TknTy::Val(ref val) => {
-                unsafe { return Some(LLVMConstReal(self.float_ty(), *val)); }
-            },
-            TknTy::Str(ref lit) => {
-                unsafe {
-                    return Some(LLVMBuildGlobalStringPtr(self.builder,
-                                                         self.c_str_from_val(lit),
-                                                         c_str!("")));
-                }
-            },
-            TknTy::True => {
-                unsafe { return Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)); }
-            },
-            TknTy::False => {
-                unsafe { return Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)); }
-            },
-            TknTy::Ident(ref name) => {
-                self.valtab.retrieve(name)
-            },
+            TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.float_ty(), *val)) },
+            TknTy::Str(ref lit) => unsafe { Some(LLVMBuildGlobalStringPtr(self.builder,
+                                                                          self.c_str_from_val(lit),
+                                                                          c_str!("")))},
+            TknTy::True => unsafe { Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)) },
+            TknTy::False => unsafe { Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)) },
+            TknTy::Ident(ref name) => self.valtab.retrieve(name),
             _ => unimplemented!("Tkn ty {:?} in unimplemented in codegen", ty_rec.tkn.ty)
         }
     }
@@ -270,6 +239,50 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
         }
 
         llvm_tys
+    }
+
+    fn llvm_val_from_op(&self, op: &TknTy, lhs: LLVMValueRef, rhs: LLVMValueRef) -> Option<LLVMValueRef> {
+        unsafe {
+            match op {
+                TknTy::Plus => Some(LLVMBuildFAdd(self.builder, lhs, rhs,c_str!("addtmp"))),
+                TknTy::Minus => Some(LLVMBuildFSub(self.builder, lhs, rhs, c_str!("subtmp"))),
+                TknTy::Star => Some(LLVMBuildFMul(self.builder, lhs, rhs, c_str!("multmp"))),
+                TknTy::Slash => Some(LLVMBuildFDiv(self.builder, lhs, rhs, c_str!("divtmp"))),
+                TknTy::AmpAmp | TknTy::And => Some(LLVMBuildAnd(self.builder, lhs, rhs, c_str!("andtmp"))),
+                TknTy::PipePipe | TknTy::Or => Some(LLVMBuildOr(self.builder, lhs, rhs, c_str!("ortmp"))),
+                TknTy::Lt => Some(LLVMBuildFCmp(self.builder,
+                                                LLVMRealPredicate::LLVMRealULT,
+                                                lhs,
+                                                rhs,
+                                                c_str!("lttmp"))),
+                TknTy::Gt => Some(LLVMBuildFCmp(self.builder,
+                                                LLVMRealPredicate::LLVMRealUGT,
+                                                lhs,
+                                                rhs,
+                                                c_str!("gttmp"))),
+                TknTy::LtEq => Some(LLVMBuildFCmp(self.builder,
+                                                  LLVMRealPredicate::LLVMRealULE,
+                                                  lhs,
+                                                  rhs,
+                                                  c_str!("ltetmp"))),
+                TknTy::GtEq => Some(LLVMBuildFCmp(self.builder,
+                                                  LLVMRealPredicate::LLVMRealUGE,
+                                                  lhs,
+                                                  rhs,
+                                                  c_str!("gtetmp"))),
+                TknTy::EqEq => Some(LLVMBuildFCmp(self.builder,
+                                                  LLVMRealPredicate::LLVMRealUEQ,
+                                                  lhs,
+                                                  rhs,
+                                                  c_str!("eqtmp"))),
+                TknTy::BangEq => Some(LLVMBuildFCmp(self.builder,
+                                                    LLVMRealPredicate::LLVMRealUNE,
+                                                    lhs,
+                                                    rhs,
+                                                    c_str!("neqtmp"))),
+                _ => None
+            }
+        }
     }
 
     fn str_ty(&self) -> LLVMTypeRef {
