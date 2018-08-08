@@ -1,7 +1,6 @@
-use llvm_sys::{LLVMContext, LLVMRealPredicate};
+use llvm_sys::LLVMRealPredicate;
 use llvm_sys::prelude::*;
 use llvm_sys::core::*;
-use llvm_sys::bit_writer::*;
 
 use kolgac::ast::Ast;
 use kolgac::symtab::SymTab;
@@ -78,7 +77,6 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
         match stmt {
             Ast::IfStmt(mb_cond, mb_ifs, mb_else_expr, mb_elses) => {
                 unsafe {
-                    // TODO: convert to boolean here at all?
                     let cond_val = self.gen_expr(&mb_cond.clone().unwrap());
                     if cond_val.is_none() {
                         let msg = format!("Error: codegen failed for ast {:?}", stmt);
@@ -86,13 +84,30 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                         return;
                     }
 
-                    let insert_b = LLVMGetInsertBlock(self.builder);
-                    // TODO: this segfaults?
-                    let mut function = LLVMGetBasicBlockParent(insert_b);
-                    let mut then_b = LLVMAppendBasicBlockInContext(self.context, function, c_str!("thenblck"));
-                    let mut else_b = LLVMAppendBasicBlockInContext(self.context, function, c_str!("elseblck"));
+                    let insert_bb = LLVMGetInsertBlock(self.builder);
+                    // This can segfault if we don't have a function block we're building. For example,
+                    // if 5 < 10 { ... } will segfault, but
+                    // func main() num {
+                    //    if 5 < 10 { ... }
+                    // }
+                    // is ok
+                    // insert_bb is null without a parent function.
+                    // TODO: Can we detect this so we can add an anon function if needed?
+                    let mut function = LLVMGetBasicBlockParent(insert_bb);
+                    let mut then_bb = LLVMAppendBasicBlockInContext(self.context, function, c_str!("thenblck"));
+                    let mut else_bb = LLVMAppendBasicBlockInContext(self.context, function, c_str!("elseblck"));
 
-                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), then_b, else_b);
+                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), then_bb, else_bb);
+
+                    LLVMPositionBuilderAtEnd(self.builder, then_bb);
+                    // TODO: this is Ast::BlckStmt. Need to get LLVMValueRef from then statements
+                    // somehow
+                    let ifs_val = self.gen_expr(&mb_ifs.clone().unwrap());
+                    if ifs_val.is_none() {
+                        let msg = format!("Error: codegen failed for ast {:?}", stmt);
+                        self.errors.push(ErrCodeGen::new(msg));
+                        return;
+                    }
                 }
             },
             Ast::BlckStmt(stmts) => {
