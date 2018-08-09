@@ -75,9 +75,9 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
 
     fn gen_stmt(&mut self, stmt: &Ast) {
         match stmt {
-            Ast::IfStmt(mb_cond, mb_ifs, mb_else_expr, mb_elses) => {
+            Ast::IfStmt(mb_if_cond, mb_then_stmts, mb_else_cond, mb_else_stmts) => {
                 unsafe {
-                    let cond_val = self.gen_expr(&mb_cond.clone().unwrap());
+                    let cond_val = self.gen_expr(&mb_if_cond.clone().unwrap());
                     if cond_val.is_none() {
                         let msg = format!("Error: codegen failed for ast {:?}", stmt);
                         self.errors.push(ErrCodeGen::new(msg));
@@ -94,20 +94,42 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                     // insert_bb is null without a parent function.
                     // TODO: Can we detect this so we can add an anon function if needed?
                     let mut function = LLVMGetBasicBlockParent(insert_bb);
-                    let mut then_bb = LLVMAppendBasicBlockInContext(self.context, function, c_str!("thenblck"));
-                    let mut else_bb = LLVMAppendBasicBlockInContext(self.context, function, c_str!("elseblck"));
+                    let mut then_bb = LLVMAppendBasicBlockInContext(self.context,
+                                                                    function,
+                                                                    c_str!("thenblck"));
+                    let mut else_bb = LLVMAppendBasicBlockInContext(self.context,
+                                                                    function,
+                                                                    c_str!("elseblck"));
+                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context,
+                                                                     function,
+                                                                     c_str!("mergeblck"));
 
                     LLVMBuildCondBr(self.builder, cond_val.unwrap(), then_bb, else_bb);
-
                     LLVMPositionBuilderAtEnd(self.builder, then_bb);
-                    // TODO: this is Ast::BlckStmt. Need to get LLVMValueRef from then statements
-                    // somehow
-                    let ifs_val = self.gen_expr(&mb_ifs.clone().unwrap());
-                    if ifs_val.is_none() {
-                        let msg = format!("Error: codegen failed for ast {:?}", stmt);
-                        self.errors.push(ErrCodeGen::new(msg));
-                        return;
-                    }
+
+                    let then_stmts = mb_then_stmts.clone().unwrap();
+                    self.gen_stmt(&then_stmts);
+                    // Branch from if block to final block
+                    LLVMBuildBr(self.builder, merge_bb);
+                    let then_end_bb = LLVMGetInsertBlock(self.builder);
+
+                    // Generate else block (if needed). If there is an else condition,
+                    // we need to generate code for that as well. If there is an else
+                    // block with no condition, generate it.
+                    LLVMPositionBuilderAtEnd(self.builder, else_bb);
+                    // TODO: check for None here
+                    // TODO: check for else expr here
+                    let else_stmts = mb_else_stmts.clone().unwrap();
+                    self.gen_stmt(&else_stmts);
+                    // Branch from else block to final block
+                    LLVMBuildBr(self.builder, merge_bb);
+                    let else_end_bb = LLVMGetInsertBlock(self.builder);
+
+                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                    let phi_bb = LLVMBuildPhi(self.builder, self.float_ty(), c_str!("phiblck"));
+                    // TODO: need to get slices of LLVMValueRef to add to phi nodes. We can't
+                    // just call gen_stmt, because we need to extract the values from gen_expr()
+                    LLVMAddIncoming(phi_bb, vec![].as_mut_slice(), vec![].as_mut_slice(), 2);
                 }
             },
             Ast::BlckStmt(stmts) => {
@@ -118,10 +140,12 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
             Ast::ExprStmt(maybe_ast) => {
                 unsafe {
                     let ast = maybe_ast.clone().unwrap();
-                    let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
-                    let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
-                    let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
-                    LLVMPositionBuilderAtEnd(self.builder, anon_bb);
+                    // TODO: Don't need to wrap this in an anonymous function. Probably easier to just
+                    // require at least a top level function from parsing?
+                    // let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
+                    // let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
+                    // let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
+                    // LLVMPositionBuilderAtEnd(self.builder, anon_bb);
 
                     let val = self.gen_expr(&ast);
                     match val {
