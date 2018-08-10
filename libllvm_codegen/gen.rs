@@ -11,8 +11,6 @@ use errors::ErrCodeGen;
 
 use valtab::ValTab;
 
-use std::ptr;
-
 const LLVM_FALSE: LLVMBool = 0;
 const LLVM_TRUE: LLVMBool = 1;
 
@@ -73,7 +71,11 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
         }
     }
 
-    fn gen_stmt(&mut self, stmt: &Ast) {
+    // If empty, nothing to return. Bit of a hack, should probably return a result
+    // instead of an empty vec (statements dont evaluate to anything, so there's never an
+    // LLVMValueRef returned). But in the case that we do have to generate an expression,
+    // we need to know which values we generated.
+    fn gen_stmt(&mut self, stmt: &Ast) -> Vec<LLVMValueRef> {
         match stmt {
             Ast::IfStmt(mb_if_cond, mb_then_stmts, mb_else_cond, mb_else_stmts) => {
                 unsafe {
@@ -81,18 +83,10 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                     if cond_val.is_none() {
                         let msg = format!("Error: codegen failed for ast {:?}", stmt);
                         self.errors.push(ErrCodeGen::new(msg));
-                        return;
+                        return Vec::new();
                     }
 
                     let insert_bb = LLVMGetInsertBlock(self.builder);
-                    // This can segfault if we don't have a function block we're building. For example,
-                    // if 5 < 10 { ... } will segfault, but
-                    // func main() num {
-                    //    if 5 < 10 { ... }
-                    // }
-                    // is ok
-                    // insert_bb is null without a parent function.
-                    // TODO: Can we detect this so we can add an anon function if needed?
                     let mut function = LLVMGetBasicBlockParent(insert_bb);
                     let mut then_bb = LLVMAppendBasicBlockInContext(self.context,
                                                                     function,
@@ -108,53 +102,68 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                     LLVMPositionBuilderAtEnd(self.builder, then_bb);
 
                     let then_stmts = mb_then_stmts.clone().unwrap();
-                    self.gen_stmt(&then_stmts);
-                    // Branch from if block to final block
+                    let mut then_expr_vals = self.gen_stmt(&then_stmts);
+
+                    // Branch from then block to final block
                     LLVMBuildBr(self.builder, merge_bb);
                     let then_end_bb = LLVMGetInsertBlock(self.builder);
 
                     // Generate else block (if needed). If there is an else condition,
                     // we need to generate code for that as well. If there is an else
                     // block with no condition, generate it.
-                    LLVMPositionBuilderAtEnd(self.builder, else_bb);
-                    // TODO: check for None here
-                    // TODO: check for else expr here
-                    let else_stmts = mb_else_stmts.clone().unwrap();
-                    self.gen_stmt(&else_stmts);
-                    // Branch from else block to final block
-                    LLVMBuildBr(self.builder, merge_bb);
-                    let else_end_bb = LLVMGetInsertBlock(self.builder);
+                    let has_else_br = mb_else_stmts.is_some();
+                    let mut else_expr_vals = Vec::new();
+                    let mut mb_else_end_bb = None;
+
+                    if has_else_br {
+                        LLVMPositionBuilderAtEnd(self.builder, else_bb);
+                        let else_stmts = mb_else_stmts.clone().unwrap();
+                        else_expr_vals = self.gen_stmt(&else_stmts);
+
+                        // Branch from else block to final block
+                        LLVMBuildBr(self.builder, merge_bb);
+                        mb_else_end_bb = Some(LLVMGetInsertBlock(self.builder));
+                    }
 
                     LLVMPositionBuilderAtEnd(self.builder, merge_bb);
                     let phi_bb = LLVMBuildPhi(self.builder, self.float_ty(), c_str!("phiblck"));
-                    // TODO: need to get slices of LLVMValueRef to add to phi nodes. We can't
-                    // just call gen_stmt, because we need to extract the values from gen_expr()
-                    LLVMAddIncoming(phi_bb, vec![].as_mut_slice(), vec![].as_mut_slice(), 2);
+                    LLVMAddIncoming(phi_bb, then_expr_vals.as_mut_ptr(), vec![then_end_bb].as_mut_ptr(), 1);
+
+                    if has_else_br {
+                        let else_end_bb = mb_else_end_bb.unwrap();
+                        LLVMAddIncoming(phi_bb, else_expr_vals.as_mut_ptr(), vec![else_end_bb].as_mut_ptr(), 1);
+                    }
+
+                    Vec::new()
                 }
             },
             Ast::BlckStmt(stmts) => {
+                let mut generated = Vec::new();
                 for stmt in stmts {
-                    self.gen_stmt(&stmt.clone().unwrap());
+                    let mb_gen = self.gen_stmt(&stmt.clone().unwrap());
+                    generated.extend(mb_gen);
                 }
+
+                generated
             },
             Ast::ExprStmt(maybe_ast) => {
-                unsafe {
-                    let ast = maybe_ast.clone().unwrap();
-                    // TODO: Don't need to wrap this in an anonymous function. Probably easier to just
-                    // require at least a top level function from parsing?
-                    // let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
-                    // let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
-                    // let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
-                    // LLVMPositionBuilderAtEnd(self.builder, anon_bb);
+                let ast = maybe_ast.clone().unwrap();
+                // TODO: Don't need to wrap this in an anonymous function. Probably easier to just
+                // require at least a top level function from parsing?
+                // let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
+                // let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
+                // let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
+                // LLVMPositionBuilderAtEnd(self.builder, anon_bb);
 
-                    let val = self.gen_expr(&ast);
-                    match val {
-                        Some(exprval) => { LLVMBuildRet(self.builder, exprval); },
-                        None => {
-                            let msg = format!("Error: codegen failed for ast {:?}", ast);
-                            self.errors.push(ErrCodeGen::new(msg));
-                        }
-                    };
+                let val = self.gen_expr(&ast);
+                match val {
+                    Some(exprval) => vec![exprval],
+                    None => {
+                        let msg = format!("Error: codegen failed for ast {:?}", ast);
+                        self.errors.push(ErrCodeGen::new(msg));
+
+                        Vec::new()
+                    }
                 }
             },
             Ast::FnDecl(ident_tkn, params, ret_ty_rec, body) => {
@@ -190,6 +199,8 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
                         _ => ()
                     }
                 }
+
+                Vec::new()
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt)
         }
@@ -326,10 +337,6 @@ impl<'t, 's, 'v> Gen<'t, 's, 'v> {
 
     fn str_ty(&self) -> LLVMTypeRef {
         unsafe { LLVMPointerType(self.i8_ty(), 0) }
-    }
-
-    fn void_ty(&self) -> LLVMTypeRef {
-        unsafe { LLVMVoidTypeInContext(self.context) }
     }
 
     fn float_ty(&self) -> LLVMTypeRef {
