@@ -156,9 +156,12 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     LLVMPositionBuilderAtEnd(self.builder, then_bb);
                     let mut then_expr_vals = self.gen_stmt(&mb_then_stmts.clone().unwrap());
                     LLVMBuildBr(self.builder, merge_bb);
+
                     let then_end_bb = LLVMGetInsertBlock(self.builder);
                     LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    LLVMAddIncoming(phi_bb, then_expr_vals.as_mut_ptr(), vec![then_end_bb].as_mut_ptr(), 1);
+                    if then_expr_vals.len() > 0 {
+                        LLVMAddIncoming(phi_bb, then_expr_vals.as_mut_ptr(), vec![then_end_bb].as_mut_ptr(), 1);
+                    }
 
                     // Generate blocks for any elif statements.
                     for (idx, stmt) in else_if_stmts.iter().enumerate() {
