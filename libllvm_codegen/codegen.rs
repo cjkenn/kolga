@@ -36,16 +36,18 @@ pub struct CodeGenerator<'t, 's, 'v> {
     /// Vector of potential errors to return.
     errors: Vec<ErrCodeGen>,
 
-    /// LLVM context
+    /// LLVM Context.
     context: LLVMContextRef,
 
-    /// LLVM Builder
+    /// LLVM Builder.
     builder: LLVMBuilderRef,
 
-    /// LLVM Module
+    /// LLVM Module. We use only a single module for single file programs.
     module: LLVMModuleRef
 }
 
+/// We implement Drop for the CodeGenerator to ensure that out LLVM structs are safely
+/// disposed of when the CodeGenerator goes out of scope.
 impl<'t, 's, 'v> Drop for CodeGenerator<'t, 's, 'v> {
     fn drop(&mut self) {
         unsafe {
@@ -57,6 +59,11 @@ impl<'t, 's, 'v> Drop for CodeGenerator<'t, 's, 'v> {
 }
 
 impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
+    /// Creates a new CodeGenerator, given a properly parsed AST, symbol table, and value table.
+    /// We assume that the symbol table already contains all the required variables in this module,
+    /// and that the value table is newly defined and should be empty.
+    /// This function also sets up all the required LLVM structures needed to generate the IR:
+    /// the context, the builder, and the module.
     pub fn new(ast: &'t Ast, symtab: &'s mut SymTab, valtab: &'v mut ValTab) -> CodeGenerator<'t, 's, 'v> {
         unsafe {
             let context = LLVMContextCreate();
@@ -72,6 +79,9 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         }
     }
 
+    /// Initial entry point for LLVM IR code generation. Loops through each statement in the
+    /// program and generates LLVM IR for each of them. The code is written to the module,
+    /// to be converted to assembly later.
     pub fn gen(&mut self) {
         match *self.ast {
             Ast::Prog(ref stmts) => {
@@ -87,7 +97,13 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         }
     }
 
-    // If empty, nothing to return. Bit of a hack, should probably return a result
+    /// Generate LLVM IR for a kolga statement. This handles all statement types, and will also
+    /// call through to self.gen_expr() when needed. This is a recursive function, and will walk
+    /// the AST for any nested statements or block statements.
+    ///
+    /// Returns a vector of LLVMValueRef's, which may be needed to generate PHI blocks or to make
+    /// checks after recursive calls return. If there is no generated values, returns empty vec.
+    // TODO: This is a bit of a hack, should probably return a result
     // instead of an empty vec (statements dont evaluate to anything, so there's never an
     // LLVMValueRef returned). But in the case that we do have to generate an expression,
     // we need to know which values we generated.
@@ -253,6 +269,43 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                     Vec::new()
                 }
+            },
+            Ast::WhileStmt(mb_cond_expr, mb_stmts) => {
+                unsafe {
+                    let insert_bb = LLVMGetInsertBlock(self.builder);
+                    let mut fn_val = LLVMGetBasicBlockParent(insert_bb);
+
+                    let mut entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
+                    let mut while_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("while"));
+                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+
+                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                    let phi_bb = LLVMBuildPhi(self.builder, self.float_ty(), c_str!("phi"));
+                    LLVMPositionBuilderAtEnd(self.builder, insert_bb);
+
+
+                    let cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
+                    if cond_val.is_none() {
+                        let msg = format!("Error: codegen failed for ast {:?}", stmt);
+                        self.errors.push(ErrCodeGen::new(msg));
+                        return Vec::new();
+                    }
+
+                    LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
+                    LLVMPositionBuilderAtEnd(self.builder, while_bb);
+
+                    let mut stmt_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
+                    // TODO: need to re-evaluate cond_val here. Need to store a var and mutate it,
+                    // then update the storage. This should come once we get to defining and mutating
+                    // local vars. For now, this is always an infinite loop!
+                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
+                    let mut while_end_bb = LLVMGetInsertBlock(self.builder);
+                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                    LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![while_end_bb].as_mut_ptr(), 1);
+                }
+
+                Vec::new()
             },
             Ast::BlckStmt(stmts) => {
                 let mut generated = Vec::new();
