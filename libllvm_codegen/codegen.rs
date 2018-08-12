@@ -318,13 +318,6 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
             },
             Ast::ExprStmt(maybe_ast) => {
                 let ast = maybe_ast.clone().unwrap();
-                // TODO: Don't need to wrap this in an anonymous function. Probably easier to just
-                // require at least a top level function from parsing?
-                // let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
-                // let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
-                // let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
-                // LLVMPositionBuilderAtEnd(self.builder, anon_bb);
-
                 let val = self.gen_expr(&ast);
                 match val {
                     Some(exprval) => vec![exprval],
@@ -376,13 +369,17 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         }
     }
 
+    /// Generate LLVM IR for expression type ASTs. This handles building comparisons and constant
+    /// ints and strings, as well as function call expressions.
+    /// This is a recursive function, and will walk the expression AST until we reach a point
+    /// to terminate on.
     fn gen_expr(&mut self, expr: &Ast) -> Option<LLVMValueRef> {
         match expr {
-            Ast::Primary(prim_ty_rec) => {
-                return self.gen_primary(&prim_ty_rec);
-            },
+            Ast::Primary(prim_ty_rec) => self.gen_primary(&prim_ty_rec),
             Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) |
             Ast::Logical(op_tkn, maybe_lhs, maybe_rhs) => {
+                // Recursively generate the LLVMValueRef's for the LHS and RHS. This is just
+                // a single call for each if they are primary expressions.
                 let mb_lhs_llvm_val = self.gen_expr(&maybe_lhs.clone().unwrap());
                 let mb_rhs_llvm_val = self.gen_expr(&maybe_rhs.clone().unwrap());
 
@@ -393,9 +390,14 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                 let lhs_llvm_val = mb_lhs_llvm_val.unwrap();
                 let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
 
+                // Convert the operator to an LLVM instruction once we have the
+                // LHS and RHS values.
                 self.llvm_val_from_op(&op_tkn.ty, lhs_llvm_val, rhs_llvm_val)
             },
             Ast::FnCall(mb_ident_tkn, params) => {
+                // Check if the function was defined in the IR. We should always have
+                // the function defined in the IR though, since we wouldn't pass the parsing
+                // phase if we tried to call an undefined function name.
                 let fn_name = mb_ident_tkn.clone().unwrap().get_name();
                 let llvm_fn = self.valtab.retrieve(&fn_name);
                 if llvm_fn.is_none() {
@@ -404,6 +406,9 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     return None;
                 }
 
+                // Recursively generate LLVMValueRef's for the function params, which
+                // might be non-primary expressions themselves. We store these in a vector,
+                // so we can pass it to the LLVM IR function call instruction.
                 let mut param_tys: Vec<LLVMValueRef> = Vec::new();
                 for param in params {
                     let llvm_val = self.gen_expr(param);
@@ -417,11 +422,11 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                 }
 
                 unsafe {
-                    return Some(LLVMBuildCall(self.builder,
-                                              llvm_fn.unwrap(),
-                                              param_tys.as_mut_ptr(),
-                                              param_tys.len() as u32,
-                                              c_str!("")));
+                    Some(LLVMBuildCall(self.builder,
+                                       llvm_fn.unwrap(),
+                                       param_tys.as_mut_ptr(),
+                                       param_tys.len() as u32,
+                                       c_str!("")))
                 }
 
             },
@@ -429,6 +434,9 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         }
     }
 
+    /// Generate LLVM IR for a primary expression. This returns an Option because
+    /// it's possible that we cant retrieve an identifier from the value table (if it's
+    /// undefined).
     fn gen_primary(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
             TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.float_ty(), *val)) },
@@ -442,6 +450,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         }
     }
 
+    /// Converts a TyRecord type to an LLVMTypeRef
     fn llvm_ty_from_ty_rec(&self, ty_rec: &TyRecord) -> LLVMTypeRef {
         match ty_rec.ty.clone().unwrap() {
             TyName::String => self.str_ty(),
@@ -452,6 +461,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         }
     }
 
+    /// Converts a vector of TyRecords into a vector of LLVMTypeRefs
     fn llvm_tys_from_ty_rec_arr(&self, ty_recs: &Vec<TyRecord>) -> Vec<LLVMTypeRef> {
         let mut llvm_tys = Vec::new();
         for ty_rec in ty_recs {
@@ -461,6 +471,11 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         llvm_tys
     }
 
+    /// Creates a new LLVMValueRef from a binary expression. The type of LLVM IR is determined by
+    /// the operator type passed in. We assume that the LHS and RHS values given here are fully
+    /// generated already. Comparison instructions are built from each function argument, if the
+    /// operator given is of the logical type.
+    /// We return None if the operator given is not supported.
     fn llvm_val_from_op(&self, op: &TknTy, lhs: LLVMValueRef, rhs: LLVMValueRef) -> Option<LLVMValueRef> {
         unsafe {
             match op {
