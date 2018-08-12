@@ -1,0 +1,42 @@
+; ModuleID = 'kolga'
+source_filename = "kolga"
+
+define float @if1() {
+if1:
+}
+
+define float @if2() {
+if2:
+}
+
+define float @if3() {
+if3:
+}
+
+define float @if4() {
+if4:
+}
+
+define float @main() {
+main:
+  br i1 true, label %then, label %elifcond0
+
+then:                                             ; preds = %main
+  %0 = call float @if1()
+  br label %merge
+
+elifcond0:                                        ; preds = %main
+  br i1 true, label %elifblck0, label %el
+
+elifblck0:                                        ; preds = %elifcond0
+  %1 = call float @if2()
+  br label %merge
+
+el:                                               ; preds = %elifcond0
+  %2 = call float @if3()
+  br label %merge
+
+merge:                                            ; preds = %el, %elifblck0, %then
+  %phi = phi float [ %0, %then ], [ %1, %elifblck0 ], [ %2, %el ]
+  %3 = call float @if4()
+}

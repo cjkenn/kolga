@@ -11,6 +11,8 @@ use errors::ErrCodeGen;
 
 use valtab::ValTab;
 
+use std::ptr;
+
 const LLVM_FALSE: LLVMBool = 0;
 const LLVM_TRUE: LLVMBool = 1;
 
@@ -91,9 +93,17 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
             },
             _ => ()
         }
+    }
 
+    pub fn dump_ir(&self) {
+        unsafe { LLVMDumpModule(self.module); }
+    }
+
+    pub fn print_ir(&self, filename: String) {
         unsafe {
-            LLVMDumpModule(self.module);
+            LLVMPrintModuleToFile(self.module,
+                                  filename.as_bytes().as_ptr() as *const i8,
+                                  ptr::null_mut());
         }
     }
 

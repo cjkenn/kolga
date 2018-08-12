@@ -1,0 +1,10 @@
+func if1() num {}
+func if2() num {}
+
+func main() num {
+     if 5 < 6 {
+     	if1();
+     }
+
+     if2();
+}

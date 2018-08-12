@@ -1,0 +1,16 @@
+func if1() num {}
+func if2() num {}
+func if3() num {}
+func if4() num {}
+
+func main() num {
+     if 5 < 6 {
+     	if1();
+     } elif 7 < 10 {
+        if2();
+     } else {
+        if3();
+     }
+
+     if4();
+}

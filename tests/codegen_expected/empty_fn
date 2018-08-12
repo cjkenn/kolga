@@ -1,0 +1,6 @@
+; ModuleID = 'kolga'
+source_filename = "kolga"
+
+define float @main() {
+main:
+}
