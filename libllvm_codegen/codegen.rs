@@ -102,12 +102,20 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     // from (insert_bb), and a block representing the then branch (then_bb), which
                     // is always present. We always keep an else block for conditional branching,
                     // and a merge block to branch to after we have evaluated all the code in the
-                    // if statement.
+                    // if statement. Blocks are manually reordered here as well, to account
+                    // for any nested if statements. If there is no nesting, these re-orders
+                    // effectively do nothing.
                     let insert_bb = LLVMGetInsertBlock(self.builder);
                     let mut fn_val = LLVMGetBasicBlockParent(insert_bb);
-                    let mut then_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("tmpthen"));
-                    let mut else_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("tmpel"));
-                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("tmpmerge"));
+
+                    let mut then_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("then"));
+                    LLVMMoveBasicBlockAfter(then_bb, insert_bb);
+
+                    let mut else_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("el"));
+                    LLVMMoveBasicBlockAfter(else_bb, then_bb);
+
+                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+                    LLVMMoveBasicBlockAfter(merge_bb, else_bb);
 
                     // Build any necessary blocks for elif conditions. This is a vector of conditional blocks
                     // that we use to decide branching instructions.
@@ -124,7 +132,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     // conditional. We immediately move it back to the start of the conditional so
                     // we're still in the correct position.
                     LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    let phi_bb = LLVMBuildPhi(self.builder, self.float_ty(), c_str!("tmpphi"));
+                    let phi_bb = LLVMBuildPhi(self.builder, self.float_ty(), c_str!("phi"));
                     LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
                     // Calculate the LLVMValueRef for the if conditional expression. We use this
@@ -164,6 +172,9 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     }
 
                     // Generate blocks for any elif statements.
+                    // This block is used to correctly position the else block, if any. We want the
+                    // else block to sit after the elifs, and not after the then block.
+                    let mut final_elif_bb = then_bb;
                     for (idx, stmt) in else_if_stmts.iter().enumerate() {
                         match stmt.clone().unwrap() {
                             Ast::ElifStmt(mb_cond, mb_stmts) => {
@@ -220,6 +231,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                                                 vec![elif_end_bb].as_mut_ptr(),
                                                 1);
                                 LLVMPositionBuilderAtEnd(self.builder, elif_code_bb);
+                                final_elif_bb = elif_code_bb;
                             },
                             _ => ()
                         }
@@ -227,7 +239,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                     // Generate code the the else block, if we have one.
                     if has_else {
-                        LLVMMoveBasicBlockAfter(else_bb, then_bb);
+                        LLVMMoveBasicBlockAfter(else_bb, final_elif_bb);
                         LLVMPositionBuilderAtEnd(self.builder, else_bb);
                         let mut else_expr_vals = self.gen_stmt(&mb_else_stmts.clone().unwrap());
 
