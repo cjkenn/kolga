@@ -34,8 +34,8 @@ pub enum Ast {
     // expr
     ExprStmt(Box<Option<Ast>>),
 
-    // Var type tkn, var name tkn, mutability
-    VarDecl(TyRecord, Token, bool),
+    // Var type tkn, var name tkn, mutability, symbol scope level
+    VarDecl(TyRecord, Token, bool, usize),
 
     // Type token, Ident token, mutability, value
     VarAssign(TyRecord, Token, bool, Box<Option<Ast>>),
@@ -49,14 +49,18 @@ pub enum Ast {
     // Operator token, rhs ast
     Unary(Token, Box<Option<Ast>>),
 
-    // Func ident, params, return type record, func body
-    FnDecl(Token, Vec<TyRecord>, TyRecord, Box<Option<Ast>>),
+    // Func ident, params, return type record, func body, symbol scope level
+    FnDecl(Token,
+           Vec<TyRecord>,
+           TyRecord,
+           Box<Option<Ast>>,
+           usize),
 
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),
 
-    // Class name, class methods, class props
-    ClassDecl(Token, Vec<Option<Ast>>, Vec<Option<Ast>>),
+    // Class name, class methods, class props, symbol scope level
+    ClassDecl(Token, Vec<Option<Ast>>, Vec<Option<Ast>>, usize),
 
     // Name of the class, function/property name
     ClassGet(Option<Token>, Option<Token>),

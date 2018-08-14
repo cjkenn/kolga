@@ -43,6 +43,8 @@ impl<'l, 's> Parser<'l, 's> {
 
     pub fn parse(&mut self) -> ParserResult {
         let mut stmts: Vec<Ast> = Vec::new();
+        // Open global scope in symbol table
+        self.symtab.open_scope();
 
         while self.currtkn.ty != TknTy::Eof {
             match self.parse_decl() {
@@ -191,6 +193,9 @@ impl<'l, 's> Parser<'l, 's> {
         let mut params = Vec::new();
         self.expect(TknTy::LeftParen);
 
+        // Open function level scope
+        self.symtab.open_scope();
+
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
                 let err_msg = format!("Function param count exceeded limit of {}", FN_PARAM_MAX_LEN);
@@ -205,7 +210,12 @@ impl<'l, 's> Parser<'l, 's> {
             let mut ty_rec = TyRecord::new_from_tkn(self.currtkn.clone());
             ty_rec.tkn = ident_tkn.clone();
 
-            params.push(ty_rec);
+            params.push(ty_rec.clone());
+
+            // Store param variable name in the symbol table for the function scope.
+            let param_sym = Sym::new(SymTy::Var, false, ty_rec, ident_tkn.clone(), None, None);
+            self.symtab.store(&ident_tkn.get_name(), param_sym);
+
             self.consume();
             if self.currtkn.ty == TknTy::RightParen {
                 break;
@@ -233,8 +243,11 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         let fn_ty_rec = TyRecord::new_from_tkn(fn_ret_ty_tkn.clone().unwrap());
-
         let fn_body = self.parse_block_stmt();
+
+        // After parsing the body, we close the function block scope.
+        self.symtab.close_scope();
+
         let fn_sym = Sym::new(SymTy::Func,
                               true,
                               fn_ty_rec.clone(),
@@ -664,7 +677,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         if fn_sym.is_none() {
             let tkn = fn_tkn.clone().unwrap();
-            let err_msg = format!("Undeclared symbol {:?} found",
+            let err_msg = format!("Function call: Undeclared symbol {:?} found",
                                   tkn.get_name());
             let error = ErrC::new(tkn.line, tkn.pos, err_msg);
             self.errors.push(error);
@@ -727,12 +740,12 @@ impl<'l, 's> Parser<'l, 's> {
                 }
 
                 let sym = mb_sym.unwrap();
-                if sym.assign_val.is_none() {
-                    let msg = format!("Cannot use un-assigned variable {} in operation", ident_name);
-                    self.err_from_tkn(msg);
-                    self.consume();
-                    return None;
-                }
+                // if sym.assign_val.is_none() {
+                //     let msg = format!("Cannot use un-assigned variable {} in operation", ident_name);
+                //     self.err_from_tkn(msg);
+                //     self.consume();
+                //     return None;
+                // }
 
                 let mut ty_rec = sym.ty_rec.clone();
                 ty_rec.tkn = self.currtkn.clone();
