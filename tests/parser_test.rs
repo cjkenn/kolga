@@ -6,13 +6,13 @@ use kolgac::lexer::Lexer;
 use kolgac::token::TknTy;
 use kolgac::parser::Parser;
 use kolgac::ast::Ast;
-use kolgac::symtab::SymTab;
+use kolgac::symtab::SymbolTable;
 use kolgac::type_record::TyName;
 
 #[test]
 fn test_parse_empty() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/empty").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     match *ast {
@@ -26,7 +26,7 @@ fn test_parse_empty() {
 #[test]
 fn test_parse_var_decl_mutable() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_decl_mutable").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let var_decl = &extract_head(ast)[0];
@@ -49,7 +49,7 @@ fn test_parse_var_decl_mutable() {
 #[test]
 fn test_parse_var_decl_imm() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_decl_imm").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let result = Parser::new(&mut lexer, &mut symtab).parse();
     assert!(result.error.len() >= 1);
 }
@@ -57,7 +57,7 @@ fn test_parse_var_decl_imm() {
 #[test]
 fn test_parse_var_assign_mutable() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_assign_mutable").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let var_assign = &extract_head(ast)[0];
@@ -91,7 +91,7 @@ fn test_parse_var_assign_mutable() {
 #[test]
 fn test_parse_var_assign_imm() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_assign_imm").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let var_assign = &extract_head(ast)[0];
@@ -125,7 +125,7 @@ fn test_parse_var_assign_imm() {
 #[test]
 fn test_parse_unary_expr() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/unary_expr").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let exprstmt = &extract_head(ast)[0];
@@ -152,7 +152,7 @@ fn test_parse_unary_expr() {
 #[test]
 fn test_parse_binary_expr() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/binary_expr").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let exprstmt = &extract_head(ast)[0];
@@ -186,7 +186,7 @@ fn test_parse_binary_expr() {
 #[test]
 fn test_logical_expr() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/logical_expr").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let exprstmt = &extract_head(ast)[0];
@@ -220,7 +220,7 @@ fn test_logical_expr() {
 #[test]
 fn test_logical_expr_w_keyword() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/logical_keyword_expr").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let exprstmt = &extract_head(ast)[0];
@@ -254,7 +254,7 @@ fn test_logical_expr_w_keyword() {
 #[test]
 fn test_func_decl() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/func_decl").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let func_decl = &extract_head(ast)[0];
@@ -288,7 +288,7 @@ fn test_func_decl() {
 #[test]
 fn test_func_decl_w_call() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/func_decl_w_call").unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let func_decl = &extract_head(ast.clone())[0];

@@ -3,7 +3,7 @@ use llvm_sys::prelude::*;
 use llvm_sys::core::*;
 
 use kolgac::ast::Ast;
-use kolgac::symtab::SymTab;
+use kolgac::symtab::SymbolTable;
 use kolgac::token::TknTy;
 use kolgac::type_record::{TyRecord, TyName};
 
@@ -30,7 +30,7 @@ pub struct CodeGenerator<'t, 's, 'v> {
     ast: &'t Ast,
 
     /// Symbol table. This reference should be the same one used by the parser.
-    symtab: &'s mut SymTab,
+    symtab: &'s mut SymbolTable,
 
     /// Value table stores LLVMValueRef's for lookup.
     valtab: &'v mut ValTab,
@@ -66,7 +66,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
     /// and that the value table is newly defined and should be empty.
     /// This function also sets up all the required LLVM structures needed to generate the IR:
     /// the context, the builder, and the module.
-    pub fn new(ast: &'t Ast, symtab: &'s mut SymTab, valtab: &'v mut ValTab) -> CodeGenerator<'t, 's, 'v> {
+    pub fn new(ast: &'t Ast, symtab: &'s mut SymbolTable, valtab: &'v mut ValTab) -> CodeGenerator<'t, 's, 'v> {
         unsafe {
             let context = LLVMContextCreate();
             CodeGenerator {

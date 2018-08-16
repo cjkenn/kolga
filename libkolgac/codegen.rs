@@ -1,6 +1,6 @@
 use ast::Ast;
 use token::{TknTy, Token};
-use symtab::SymTab;
+use symtab::SymbolTable;
 use vm::reg::RegPool;
 use vm::op::OpCode;
 
@@ -11,12 +11,12 @@ struct GenResult {
 
 pub struct CodeGen<'c, 's> {
     ast: &'c Ast,
-    symtab: &'s SymTab,
+    symtab: &'s SymbolTable,
     reg_pool: &'s mut RegPool
 }
 
 impl <'c, 's> CodeGen<'c, 's> {
-    pub fn new(ast: &'c Ast, symtab: &'s SymTab, regpool: &'s mut RegPool) -> CodeGen<'c, 's> {
+    pub fn new(ast: &'c Ast, symtab: &'s SymbolTable, regpool: &'s mut RegPool) -> CodeGen<'c, 's> {
         CodeGen {
             ast: ast,
             symtab: symtab,

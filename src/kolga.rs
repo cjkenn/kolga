@@ -7,7 +7,7 @@ use std::env;
 
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
-use kolgac::symtab::SymTab;
+use kolgac::symtab::SymbolTable;
 
 use types::check::TyCheck;
 
@@ -31,7 +31,7 @@ fn main() {
         }
     };
 
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let parse_result;
 
     // New scope for this so the borrow of the symbol table

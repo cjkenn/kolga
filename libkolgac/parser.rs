@@ -1,5 +1,5 @@
 use ast::Ast;
-use symtab::SymTab;
+use symtab::SymbolTable;
 use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
@@ -24,13 +24,13 @@ impl ParserResult {
 
 pub struct Parser<'l, 's> {
     lexer: &'l mut Lexer,
-    symtab: &'s mut SymTab,
+    symtab: &'s mut SymbolTable,
     errors: Vec<ErrC>,
     currtkn: Token
 }
 
 impl<'l, 's> Parser<'l, 's> {
-    pub fn new(lex: &'l mut Lexer, symt: &'s mut SymTab) -> Parser<'l, 's> {
+    pub fn new(lex: &'l mut Lexer, symt: &'s mut SymbolTable) -> Parser<'l, 's> {
         let firsttkn = lex.lex();
 
         Parser {
@@ -43,9 +43,6 @@ impl<'l, 's> Parser<'l, 's> {
 
     pub fn parse(&mut self) -> ParserResult {
         let mut stmts: Vec<Ast> = Vec::new();
-        // Open global scope in symbol table
-        self.symtab.open_scope();
-
         while self.currtkn.ty != TknTy::Eof {
             match self.parse_decl() {
                 Some(a) => stmts.push(a),
@@ -193,8 +190,8 @@ impl<'l, 's> Parser<'l, 's> {
         let mut params = Vec::new();
         self.expect(TknTy::LeftParen);
 
-        // Open function level scope
-        self.symtab.open_scope();
+        // Create function level scope
+        self.symtab.init_sc();
 
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
@@ -246,7 +243,7 @@ impl<'l, 's> Parser<'l, 's> {
         let fn_body = self.parse_block_stmt();
 
         // After parsing the body, we close the function block scope.
-        self.symtab.close_scope();
+        let _sc_idx = self.symtab.finalize_sc();
 
         let fn_sym = Sym::new(SymTy::Func,
                               true,

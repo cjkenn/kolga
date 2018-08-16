@@ -2,19 +2,19 @@ use std::rc::Rc;
 
 use kolgac::ast::Ast;
 use kolgac::token::{Token, TknTy};
-use kolgac::symtab::SymTab;
+use kolgac::symtab::SymbolTable;
 use kolgac::type_record::TyName;
 use kolgac::sym::Sym;
 use errors::ErrC;
 
 pub struct TyCheck<'t, 's> {
     ast: &'t Ast,
-    symtab: &'s mut SymTab,
+    symtab: &'s mut SymbolTable,
     errors: Vec<ErrC>
 }
 
 impl<'t, 's> TyCheck<'t, 's> {
-    pub fn new(ast: &'t Ast, symtab: &'s mut SymTab) -> TyCheck<'t, 's> {
+    pub fn new(ast: &'t Ast, symtab: &'s mut SymbolTable) -> TyCheck<'t, 's> {
         TyCheck {
             ast: ast,
             symtab: symtab,

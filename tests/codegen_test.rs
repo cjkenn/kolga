@@ -10,11 +10,11 @@ use llvm_codegen::valtab::ValTab;
 
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
-use kolgac::symtab::SymTab;
+use kolgac::symtab::SymbolTable;
 
 fn run(input_filename: &str, output_filename: &str, expected_filename: &str) {
     let mut lexer = Lexer::new(File::open(input_filename).unwrap());
-    let mut symtab = SymTab::new();
+    let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let mut valtab = ValTab::new();
