@@ -339,10 +339,10 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     }
                 }
             },
-            Ast::FnDecl(ident_tkn, params, ret_ty_rec, body) => {
+            Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl: _} => {
                 unsafe {
                     let fn_name = self.c_str_from_val(&ident_tkn.get_name());
-                    let fn_ty = self.llvm_ty_from_ty_rec(ret_ty_rec);
+                    let fn_ty = self.llvm_ty_from_ty_rec(ret_ty);
 
                     let mut param_tys = self.llvm_tys_from_ty_rec_arr(params);
                     let llvm_fn_ty = LLVMFunctionType(fn_ty,
@@ -357,7 +357,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     LLVMPositionBuilderAtEnd(self.builder, fn_val);
 
                     // TODO: this is hard to read
-                    match body.clone().unwrap() {
+                    match func_body.clone().unwrap() {
                         Ast::BlckStmt(stmts) => {
                             for stmt in stmts {
                                 match stmt.clone().unwrap() {

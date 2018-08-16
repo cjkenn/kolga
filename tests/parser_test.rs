@@ -260,7 +260,7 @@ fn test_func_decl() {
     let func_decl = &extract_head(ast)[0];
 
     match func_decl.clone() {
-        Ast::FnDecl(ident_tkn, params, ret_ty_rec, mb_func_body) => {
+        Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl: _} => {
             match ident_tkn.ty {
                 TknTy::Ident(name) => {
                     assert_eq!(name, "myFn");
@@ -269,9 +269,9 @@ fn test_func_decl() {
             }
 
             assert_eq!(params.len(), 1);
-            assert_eq!(ret_ty_rec.ty.unwrap(), TyName::Num);
+            assert_eq!(ret_ty.ty.unwrap(), TyName::Num);
 
-            let func_body = mb_func_body.clone().unwrap();
+            let func_body = func_body.clone().unwrap();
 
             match func_body {
                 Ast::BlckStmt(stmts) => {
@@ -294,7 +294,7 @@ fn test_func_decl_w_call() {
     let func_decl = &extract_head(ast.clone())[0];
 
     match func_decl.clone() {
-        Ast::FnDecl(ident_tkn, params, ret_ty_rec, mb_func_body) => {
+        Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl: _} => {
             match ident_tkn.ty {
                 TknTy::Ident(name) => {
                     assert_eq!(name, "myFn");
@@ -303,9 +303,9 @@ fn test_func_decl_w_call() {
             }
 
             assert_eq!(params.len(), 1);
-            assert_eq!(ret_ty_rec.ty.unwrap(), TyName::Num);
+            assert_eq!(ret_ty.ty.unwrap(), TyName::Num);
 
-            let func_body = mb_func_body.clone().unwrap();
+            let func_body = func_body.clone().unwrap();
 
             match func_body {
                 Ast::BlckStmt(stmts) => {

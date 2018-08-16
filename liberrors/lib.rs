@@ -15,7 +15,7 @@ impl ErrC {
     }
 
     pub fn emit(&self) {
-        println!("kolga: [Line {}:{}] {}", self.line, self.pos, self.text);
+        println!("kolgac: [Line {}:{}] {}", self.line, self.pos, self.text);
     }
 }
 

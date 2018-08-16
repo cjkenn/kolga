@@ -38,8 +38,9 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_stmt(&mut self, stmt: Ast) {
         match stmt {
-            Ast::VarDecl(_, _, _) => (), // ignore var declaration without assign (nothing to check)
-            Ast::VarAssign(_, _, _, _) => {
+            // ignore var declaration without assign (nothing to check)
+            Ast::VarDecl{ty_rec: _, ident_tkn: _, is_imm: _} => (),
+            Ast::VarAssign{ty_rec: _, ident_tkn: _, is_imm:_, value: _} => {
                 self.check_var_assign(stmt);
             },
             Ast::ExprStmt(ref maybe_ast) => {
@@ -95,11 +96,11 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone().unwrap());
                 }
             },
-            Ast::FnDecl(ident_tkn, _, ret_ty_rec, maybe_stmts) => {
-                let fn_ty = ret_ty_rec.ty.unwrap();
-                let stmts = maybe_stmts.unwrap();
+            Ast::FuncDecl{ident_tkn, params: _, ret_ty, func_body, scope_lvl} => {
+                let fn_ty = ret_ty.ty.unwrap();
+                let stmts = func_body.unwrap();
                 match stmts {
-                    Ast::BlckStmt(stmt_list) => self.check_fn_stmts(ident_tkn.clone(), fn_ty, stmt_list),
+                    Ast::BlckStmt(stmt_list) => self.check_fn_stmts(&ident_tkn, fn_ty, stmt_list, scope_lvl),
                     _ => self.check_stmt(stmts.clone())
                 };
             },
@@ -118,7 +119,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_fn_stmts(&mut self, fn_tkn: Token, fn_ret_ty: TyName, stmts: Vec<Option<Ast>>) {
+    fn check_fn_stmts(&mut self, fn_tkn: &Token, fn_ret_ty: TyName, stmts: Vec<Option<Ast>>, sc_lvl: usize) {
         for maybe_stmt in &stmts {
             let stmt = maybe_stmt.clone().unwrap();
             match stmt {
@@ -136,7 +137,7 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_expr(&mut self, expr: Ast) -> TyName {
         match expr {
-            Ast::VarAssign(_, _, _, _) => {
+            Ast::VarAssign{ty_rec: _, ident_tkn: _, is_imm: _, value: _} => {
                 self.check_var_assign(expr)
             },
             Ast::Unary(op_tkn, maybe_rhs) => {
@@ -247,10 +248,12 @@ impl<'t, 's> TyCheck<'t, 's> {
                 // TODO: this is O(n) and not efficient
                 for prop in props {
                     match prop.clone().unwrap() {
-                        Ast::VarDecl(ref ty_rec, ref tkn, _) if tkn.get_name() == prop_name => {
+                        Ast::VarDecl{ref ty_rec, ref ident_tkn, is_imm: _}
+                        if ident_tkn.get_name() == prop_name => {
                             prop_ty = Some(ty_rec.ty.clone().unwrap());
                         },
-                        Ast::VarAssign(ref ty_rec, ref tkn, _, _) if tkn.get_name() == prop_name  => {
+                        Ast::VarAssign{ref ty_rec, ref ident_tkn, is_imm: _, value: _}
+                        if ident_tkn.get_name() == prop_name  => {
                             prop_ty = Some(ty_rec.ty.clone().unwrap());
                         },
                         _ => ()
@@ -364,9 +367,9 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_var_assign(&mut self, stmt: Ast) -> TyName {
         match stmt {
-            Ast::VarAssign(var_ty_rec, ident_tkn, _imm, maybe_rhs) => {
-                let lhs_ty = var_ty_rec.ty.unwrap();
-                let rhs = maybe_rhs.unwrap();
+            Ast::VarAssign{ty_rec, ident_tkn, is_imm: _, value} => {
+                let lhs_ty = ty_rec.ty.unwrap();
+                let rhs = value.unwrap();
 
                 let rhs_ty = self.check_expr(rhs);
                 if lhs_ty != rhs_ty {
@@ -381,9 +384,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     }
 
     fn ty_mismatch(&self, tkn: &Token, lhs: &TyName, rhs: &TyName) -> ErrC {
-        let msg = format!("Type mismatch: Wanted {:?}, but found {:?}",
-                          lhs,
-                          rhs);
+        let msg = format!("Type mismatch: Wanted {:?}, but found {:?}", lhs, rhs);
         ErrC::new(tkn.line, tkn.pos, msg)
     }
 
@@ -404,13 +405,14 @@ impl<'t, 's> TyCheck<'t, 's> {
         ErrC::new(tkn.line, tkn.pos, msg)
     }
 
+    // TODO: pass in scope level to this function
     fn find_sym_ty(&mut self, ident_tkn: &Token) -> Option<TyName> {
         let name = ident_tkn.get_name();
-        let sym = self.symtab.retrieve(&name);
+        let sym = self.symtab.retrieve_from_finalized_sc(&name, 0);
         match sym {
             Some(symbol) => Some(symbol.ty_rec.ty.clone().unwrap()),
             None => {
-                let err_msg = format!("Undeclared symbol {:?} found", name);
+                let err_msg = format!("types: Undeclared variable symbol {:?} found", name);
                 self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));
                 None
             }
@@ -423,7 +425,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         match sym {
             Some(symbol) => Some(symbol),
             None => {
-                let err_msg = format!("Undeclared symbol {:?} found", name);
+                let err_msg = format!("types: Undeclared function symbol {:?} found", name);
                 self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));
                 None
             }

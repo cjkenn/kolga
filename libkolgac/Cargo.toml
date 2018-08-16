@@ -9,4 +9,3 @@ path = "lib.rs"
 
 [dependencies]
 errors = { path = "../liberrors" }
-vm = { path = "../libvm" }

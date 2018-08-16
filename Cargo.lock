@@ -23,7 +23,6 @@ dependencies = [
  "kolgac 0.1.0",
  "llvm_codegen 0.1.0",
  "types 0.1.0",
- "vm 0.1.0",
 ]
 
 [[package]]
@@ -31,7 +30,6 @@ name = "kolgac"
 version = "0.1.0"
 dependencies = [
  "errors 0.1.0",
- "vm 0.1.0",
 ]
 
 [[package]]
@@ -140,13 +138,6 @@ dependencies = [
 name = "utf8-ranges"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "vm"
-version = "0.1.0"
-dependencies = [
- "errors 0.1.0",
-]
 
 [[package]]
 name = "void"

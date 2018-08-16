@@ -34,11 +34,18 @@ pub enum Ast {
     // expr
     ExprStmt(Box<Option<Ast>>),
 
-    // Var type tkn, var name tkn, mutability, symbol scope level
-    VarDecl(TyRecord, Token, bool),
+    VarDecl {
+        ty_rec: TyRecord,
+        ident_tkn: Token,
+        is_imm: bool
+    },
 
-    // Type token, Ident token, mutability, value
-    VarAssign(TyRecord, Token, bool, Box<Option<Ast>>),
+    VarAssign {
+        ty_rec: TyRecord,
+        ident_tkn: Token,
+        is_imm: bool,
+        value: Box<Option<Ast>>
+    },
 
     // Operator token, lhs ast, rhs ast
     Logical(Token, Box<Option<Ast>>, Box<Option<Ast>>),
@@ -49,11 +56,13 @@ pub enum Ast {
     // Operator token, rhs ast
     Unary(Token, Box<Option<Ast>>),
 
-    // Func ident, params, return type record, func body, symbol scope level
-    FnDecl(Token,
-           Vec<TyRecord>,
-           TyRecord,
-           Box<Option<Ast>>),
+    FuncDecl {
+        ident_tkn: Token,
+        params: Vec<TyRecord>,
+        ret_ty: TyRecord,
+        func_body: Box<Option<Ast>>,
+        scope_lvl: usize
+    },
 
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),

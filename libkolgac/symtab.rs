@@ -30,7 +30,7 @@ impl SymbolTable {
     pub fn finalize_sc(&mut self) -> usize {
         // Store the current state of the table into a scope. We can
         // reference this scope at other times after parsing, such
-        // as when type checking.
+        // as during type checking.
         let mut final_sc: Scope = HashMap::new();
         for scope in &self.table {
             for (key, val) in scope.iter() {
@@ -53,7 +53,6 @@ impl SymbolTable {
     }
 
     pub fn store(&mut self, key: &str, sym: Sym) {
-        println!("key: {}, level: {}", key, self.curr_level);
         self.table[self.curr_level].insert(String::from(key), Rc::new(sym));
     }
 
@@ -72,8 +71,8 @@ impl SymbolTable {
         None
     }
 
-    pub fn retrieve_at_level(&self, key: &str, level: usize) -> Option<Rc<Sym>> {
-        match self.table[level].get(key) {
+    pub fn retrieve_from_finalized_sc(&self, key: &str, level: usize) -> Option<Rc<Sym>> {
+        match self.finalized[level].get(key) {
             Some(val) => Some(Rc::clone(&val)),
             None => None
         }

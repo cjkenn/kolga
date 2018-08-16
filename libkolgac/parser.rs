@@ -129,10 +129,12 @@ impl<'l, 's> Parser<'l, 's> {
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Some(Ast::VarAssign(ty_rec,
-                                    ident_tkn.unwrap(),
-                                    is_imm,
-                                    Box::new(var_val)))
+                Some(Ast::VarAssign{
+                    ty_rec: ty_rec,
+                    ident_tkn: ident_tkn.unwrap(),
+                    is_imm: is_imm,
+                    value: Box::new(var_val)
+                })
             },
             TknTy::Semicolon => {
                 if is_imm {
@@ -155,10 +157,13 @@ impl<'l, 's> Parser<'l, 's> {
 
                     let name = &ident_tkn.clone().unwrap().get_name();
                     self.symtab.store(name, cl_sym);
-                    return Some(Ast::VarAssign(cl_ty_rec,
-                                        ident_tkn.clone().unwrap(),
-                                        is_imm,
-                                        Box::new(cl_assign)));
+
+                    return Some(Ast::VarAssign{
+                        ty_rec: cl_ty_rec,
+                        ident_tkn: ident_tkn.clone().unwrap(),
+                        is_imm: is_imm,
+                        value: Box::new(cl_assign)
+                    });
                 }
 
                 let ty_rec = TyRecord::new_from_tkn(var_ty_tkn.unwrap());
@@ -172,7 +177,11 @@ impl<'l, 's> Parser<'l, 's> {
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Some(Ast::VarDecl(ty_rec, ident_tkn.unwrap(), is_imm))
+                Some(Ast::VarDecl{
+                    ty_rec: ty_rec,
+                    ident_tkn: ident_tkn.unwrap(),
+                    is_imm: is_imm
+                })
             },
             _ => {
                 let err_msg = format!("Invalid var declaration: {:?}", self.currtkn.ty);
@@ -243,7 +252,7 @@ impl<'l, 's> Parser<'l, 's> {
         let fn_body = self.parse_block_stmt();
 
         // After parsing the body, we close the function block scope.
-        let _sc_idx = self.symtab.finalize_sc();
+        let sc_idx = self.symtab.finalize_sc();
 
         let fn_sym = Sym::new(SymTy::Func,
                               true,
@@ -255,7 +264,13 @@ impl<'l, 's> Parser<'l, 's> {
         let name = &func_ident_tkn.get_name();
         self.symtab.store(name, fn_sym);
 
-        Some(Ast::FnDecl(func_ident_tkn, params, fn_ty_rec, Box::new(fn_body)))
+        Some(Ast::FuncDecl {
+            ident_tkn: func_ident_tkn,
+            params: params,
+            ret_ty: fn_ty_rec,
+            func_body: Box::new(fn_body),
+            scope_lvl: sc_idx
+        })
     }
 
     fn parse_class_decl(&mut self) -> Option<Ast> {
@@ -461,10 +476,12 @@ impl<'l, 's> Parser<'l, 's> {
                                     return None;
                                 }
 
-                                return Some(Ast::VarAssign(sym.ty_rec.clone(),
-                                                           sym.ident_tkn.clone(),
-                                                           sym.imm,
-                                                           Box::new(rhs)));
+                                return Some(Ast::VarAssign{
+                                    ty_rec: sym.ty_rec.clone(),
+                                    ident_tkn: sym.ident_tkn.clone(),
+                                    is_imm: sym.imm,
+                                    value: Box::new(rhs)
+                                });
                             },
                             _ => {
                                 let err_msg = format!("Token {:?} is invalid for assignment",
