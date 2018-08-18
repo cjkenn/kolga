@@ -317,7 +317,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                 Vec::new()
             },
-            Ast::BlckStmt(stmts) => {
+            Ast::BlckStmt{stmts, scope_lvl: _} => {
                 let mut generated = Vec::new();
                 for stmt in stmts {
                     let mb_gen = self.gen_stmt(&stmt.clone().unwrap());
@@ -358,7 +358,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                     // TODO: this is hard to read
                     match func_body.clone().unwrap() {
-                        Ast::BlckStmt(stmts) => {
+                        Ast::BlckStmt{stmts, scope_lvl: _} => {
                             for stmt in stmts {
                                 match stmt.clone().unwrap() {
                                     Ast::RetStmt(mb_expr) => {

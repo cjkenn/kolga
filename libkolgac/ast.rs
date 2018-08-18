@@ -5,8 +5,10 @@ use type_record::TyRecord;
 pub enum Ast {
     Prog(Vec<Ast>),
 
-    // List of statements/expression in a block
-    BlckStmt(Vec<Option<Ast>>),
+    BlckStmt {
+        stmts: Vec<Option<Ast>>,
+        scope_lvl: usize
+    },
 
     // Condition expr, if block stmt, else if exprs, else stmts
     IfStmt(Box<Option<Ast>>,

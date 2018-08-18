@@ -91,17 +91,19 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.check_stmt(stmts.clone().unwrap());
             },
-            Ast::BlckStmt(stmts) => {
+            Ast::BlckStmt{stmts, scope_lvl: _} => {
                 for stmt in &stmts {
                     self.check_stmt(stmt.clone().unwrap());
                 }
             },
             Ast::FuncDecl{ident_tkn, params: _, ret_ty, func_body, scope_lvl} => {
                 let fn_ty = ret_ty.ty.unwrap();
-                let stmts = func_body.unwrap();
-                match stmts {
-                    Ast::BlckStmt(stmt_list) => self.check_fn_stmts(&ident_tkn, fn_ty, stmt_list, scope_lvl),
-                    _ => self.check_stmt(stmts.clone())
+                let fn_stmts = func_body.unwrap();
+                match fn_stmts {
+                    Ast::BlckStmt{stmts, scope_lvl: _} => {
+                        self.check_fn_stmts(&ident_tkn, fn_ty, stmts, scope_lvl);
+                    },
+                    _ => self.check_stmt(fn_stmts.clone())
                 };
             },
             Ast::ClassDecl(_, methods, props) => {
@@ -408,7 +410,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     // TODO: pass in scope level to this function
     fn find_sym_ty(&mut self, ident_tkn: &Token) -> Option<TyName> {
         let name = ident_tkn.get_name();
-        let sym = self.symtab.retrieve_from_finalized_sc(&name, 0);
+        let sym = self.symtab.retrieve(&name);//_from_finalized_sc(&name, 0);
         match sym {
             Some(symbol) => Some(symbol.ty_rec.ty.clone().unwrap()),
             None => {

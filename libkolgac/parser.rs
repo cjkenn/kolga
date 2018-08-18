@@ -9,7 +9,10 @@ use errors::ErrC;
 const FN_PARAM_MAX_LEN: usize = 64;
 
 pub struct ParserResult {
+    /// The resulting AST from parsing
     pub ast: Option<Box<Ast>>,
+
+    /// Vector of any parser errors
     pub error: Vec<ErrC>
 }
 
@@ -23,6 +26,7 @@ impl ParserResult {
 }
 
 pub struct Parser<'l, 's> {
+    /// Reference to the lexer needed to get characters from the file
     lexer: &'l mut Lexer,
     symtab: &'s mut SymbolTable,
     errors: Vec<ErrC>,
@@ -41,14 +45,22 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
+    /// Main entry point to the recursive descent parser. Calling this method will parse the entire
+    /// file and return a result containing the AST and any parsing errors encountered.
+    /// The error vector should be checked after parsing, and any errors should
+    /// be handled before continuing to future compiler passes.
     pub fn parse(&mut self) -> ParserResult {
         let mut stmts: Vec<Ast> = Vec::new();
+
         while self.currtkn.ty != TknTy::Eof {
-            match self.parse_decl() {
+            match self.decl() {
                 Some(a) => stmts.push(a),
                 None => ()
             }
         }
+
+        // Finalize the global scope to access scopes in future passes.
+        self.symtab.finalize_global_sc();
 
         let head = Ast::Prog(stmts);
         ParserResult {
@@ -57,16 +69,18 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    fn parse_decl(&mut self) -> Option<Ast> {
+    /// Parses a declaration. In kolga we can declare variables, functions, and classes..
+    fn decl(&mut self) -> Option<Ast> {
         match self.currtkn.ty {
-            TknTy::Let => self.parse_var_decl(),
-            TknTy::Func => self.parse_func_decl(),
-            TknTy::Class => self.parse_class_decl(),
+            TknTy::Let => self.var_decl(),
+            TknTy::Func => self.func_decl(),
+            TknTy::Class => self.class_decl(),
             _ => self.parse_stmt()
         }
     }
 
-    fn parse_var_decl(&mut self) -> Option<Ast> {
+    /// Parses a variable declaration
+    fn var_decl(&mut self) -> Option<Ast> {
         self.expect(TknTy::Let);
 
         let is_imm = match self.currtkn.ty {
@@ -191,7 +205,8 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    fn parse_func_decl(&mut self) -> Option<Ast> {
+    /// Parses a function declaration in the provided scope level.
+    fn func_decl(&mut self) -> Option<Ast> {
         self.expect(TknTy::Func);
         let func_ident_tkn = self.currtkn.clone();
         self.consume();
@@ -230,6 +245,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         self.expect(TknTy::RightParen);
+        self.expect(TknTy::Tilde);
 
         let fn_ret_ty_tkn = match self.currtkn.ty {
             TknTy::String | TknTy::Num | TknTy::Bool => {
@@ -249,7 +265,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         let fn_ty_rec = TyRecord::new_from_tkn(fn_ret_ty_tkn.clone().unwrap());
-        let fn_body = self.parse_block_stmt();
+        let fn_body = self.block_stmt();
 
         // After parsing the body, we close the function block scope.
         let sc_idx = self.symtab.finalize_sc();
@@ -273,19 +289,22 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn parse_class_decl(&mut self) -> Option<Ast> {
+    /// Parses a class declaration
+    fn class_decl(&mut self) -> Option<Ast> {
         self.expect(TknTy::Class);
         let class_tkn = self.currtkn.clone();
         self.consume();
         self.expect(TknTy::LeftBrace);
+
+        // TODO: open another scope here
 
         let mut methods = Vec::new();
         let mut props = Vec::new();
 
         loop {
             match self.currtkn.ty {
-                TknTy::Let => props.push(self.parse_var_decl()),
-                TknTy::Func => methods.push(self.parse_func_decl()),
+                TknTy::Let => props.push(self.var_decl()),
+                TknTy::Func => methods.push(self.func_decl()),
                 TknTy::RightBrace => {
                     self.consume();
                     break;
@@ -317,22 +336,32 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::While => self.parse_while_stmt(),
             TknTy::For => self.parse_for_stmt(),
             TknTy::Return => self.parse_ret_stmt(),
-            TknTy::LeftBrace => self.parse_block_stmt(),
+            TknTy::LeftBrace => self.block_stmt(),
             _ => self.parse_expr_stmt()
         }
     }
 
-    fn parse_block_stmt(&mut self) -> Option<Ast> {
+    /// Parses a block statement, beginning with a '{' token. This creates a new scope,
+    /// parses any statements within the block, and closes the block scope at the end.
+    fn block_stmt(&mut self) -> Option<Ast> {
         self.expect(TknTy::LeftBrace);
         let mut stmts = Vec::new();
+        self.symtab.init_sc();
+
         loop {
             match self.currtkn.ty {
                 TknTy::RightBrace | TknTy::Eof => break,
-                _ => stmts.push(self.parse_decl())
+                _ => stmts.push(self.decl())
             };
         }
+
         self.expect(TknTy::RightBrace);
-        Some(Ast::BlckStmt(stmts))
+        let sc_lvl = self.symtab.finalize_sc();
+
+        Some(Ast::BlckStmt{
+            stmts: stmts,
+            scope_lvl: sc_lvl
+        })
     }
 
     fn parse_if_stmt(&mut self) -> Option<Ast> {
@@ -342,7 +371,7 @@ impl<'l, 's> Parser<'l, 's> {
             return None;
         }
 
-        let maybe_if_blck = self.parse_block_stmt();
+        let maybe_if_blck = self.block_stmt();
         let mut maybe_else_blck = None;
         let mut else_ifs = Vec::new();
         loop {
@@ -350,12 +379,12 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::Elif => {
                     self.consume();
                     let maybe_elif_ast = self.parse_expr();
-                    let maybe_elif_blck = self.parse_block_stmt();
+                    let maybe_elif_blck = self.block_stmt();
                     else_ifs.push(Some(Ast::ElifStmt(Box::new(maybe_elif_ast), Box::new(maybe_elif_blck))));
                 },
                 TknTy::Else => {
                     self.consume();
-                    maybe_else_blck = self.parse_block_stmt();
+                    maybe_else_blck = self.block_stmt();
                 },
                 _ => break
             };
@@ -375,7 +404,7 @@ impl<'l, 's> Parser<'l, 's> {
             return None;
         }
 
-        let while_stmts = self.parse_block_stmt();
+        let while_stmts = self.block_stmt();
         Some(Ast::WhileStmt(Box::new(maybe_while_cond), Box::new(while_stmts)))
     }
 
@@ -388,7 +417,7 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
             TknTy::Let => {
-                for_var_decl = self.parse_var_decl();
+                for_var_decl = self.var_decl();
             },
             _ => {
                 let err_msg = String::from("Invalid for statement: Must start with a var declaration");
@@ -410,7 +439,7 @@ impl<'l, 's> Parser<'l, 's> {
             }
         };
 
-        let for_stmt = self.parse_block_stmt();
+        let for_stmt = self.block_stmt();
 
         Some(Ast::ForStmt(Box::new(for_var_decl),
                           Box::new(for_var_cond),

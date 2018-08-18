@@ -17,8 +17,8 @@ impl SymbolTable {
         SymbolTable {
             curr_level: 0, // 0 is global scope, already initiliazed below
             table: vec![HashMap::new()],
-            finalized_level: 0,
-            finalized: Vec::new()
+            finalized_level: 0, // 0 is reserved for the global finalized scope
+            finalized: vec![HashMap::new()]
         }
     }
 
@@ -38,14 +38,23 @@ impl SymbolTable {
             }
         }
 
-        let final_level = self.finalized_level;
-        self.finalized.push(final_sc);
         self.finalized_level = self.finalized_level + 1;
+        self.finalized.push(final_sc);
+        let final_level = self.finalized_level;
 
         self.table.pop();
         self.curr_level = self.curr_level - 1;
 
         final_level
+    }
+
+    pub fn finalize_global_sc(&mut self) {
+        let mut global_sc: Scope = HashMap::new();
+        for (key, val) in self.table[0].iter() {
+            global_sc.insert(key.to_string(), Rc::clone(val));
+        }
+
+        self.finalized[0] = global_sc;
     }
 
     pub fn level(&self) -> usize {
