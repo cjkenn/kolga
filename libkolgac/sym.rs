@@ -4,6 +4,7 @@ use type_record::TyRecord;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SymTy {
+    Param,
     Var,
     Func,
     Class,

@@ -23,8 +23,8 @@ impl<'t, 's> TyCheck<'t, 's> {
     }
 
     pub fn check(&mut self) -> Vec<ErrC> {
-        match *self.ast {
-            Ast::Prog(ref stmts) => {
+        match self.ast {
+            Ast::Prog{stmts} => {
                 for stmt in stmts {
                     // TODO: shouldnt clone this, pass reference
                     self.check_stmt(stmt.clone());

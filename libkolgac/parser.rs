@@ -62,7 +62,7 @@ impl<'l, 's> Parser<'l, 's> {
         // Finalize the global scope to access scopes in future passes.
         self.symtab.finalize_global_sc();
 
-        let head = Ast::Prog(stmts);
+        let head = Ast::Prog{stmts: stmts};
         ParserResult {
             ast: Some(Box::new(head)),
             error: self.errors.clone()
@@ -75,7 +75,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::Let => self.var_decl(),
             TknTy::Func => self.func_decl(),
             TknTy::Class => self.class_decl(),
-            _ => self.parse_stmt()
+            _ => self.stmt()
         }
     }
 
@@ -205,7 +205,6 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    /// Parses a function declaration in the provided scope level.
     fn func_decl(&mut self) -> Option<Ast> {
         self.expect(TknTy::Func);
         let func_ident_tkn = self.currtkn.clone();
@@ -234,7 +233,7 @@ impl<'l, 's> Parser<'l, 's> {
             params.push(ty_rec.clone());
 
             // Store param variable name in the symbol table for the function scope.
-            let param_sym = Sym::new(SymTy::Var, false, ty_rec, ident_tkn.clone(), None, None);
+            let param_sym = Sym::new(SymTy::Param, false, ty_rec, ident_tkn.clone(), None, None);
             self.symtab.store(&ident_tkn.get_name(), param_sym);
 
             self.consume();
@@ -296,7 +295,7 @@ impl<'l, 's> Parser<'l, 's> {
         self.consume();
         self.expect(TknTy::LeftBrace);
 
-        // TODO: open another scope here
+        // TODO: open another scope here for class level declarations
 
         let mut methods = Vec::new();
         let mut props = Vec::new();
@@ -329,12 +328,13 @@ impl<'l, 's> Parser<'l, 's> {
         ast
     }
 
-
-    fn parse_stmt(&mut self) -> Option<Ast> {
+    /// Parses a statement. This function does not perform any scope management, which
+    /// is delegated to each statement type.
+    fn stmt(&mut self) -> Option<Ast> {
         match self.currtkn.ty {
-            TknTy::If => self.parse_if_stmt(),
-            TknTy::While => self.parse_while_stmt(),
-            TknTy::For => self.parse_for_stmt(),
+            TknTy::If => self.if_stmt(),
+            TknTy::While => self.while_stmt(),
+            TknTy::For => self.for_stmt(),
             TknTy::Return => self.parse_ret_stmt(),
             TknTy::LeftBrace => self.block_stmt(),
             _ => self.parse_expr_stmt()
@@ -364,7 +364,7 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn parse_if_stmt(&mut self) -> Option<Ast> {
+    fn if_stmt(&mut self) -> Option<Ast> {
         self.expect(TknTy::If);
         let maybe_if_cond = self.parse_expr();
         if maybe_if_cond.is_none() {
@@ -396,7 +396,7 @@ impl<'l, 's> Parser<'l, 's> {
                      Box::new(maybe_else_blck)))
     }
 
-    fn parse_while_stmt(&mut self) -> Option<Ast> {
+    fn while_stmt(&mut self) -> Option<Ast> {
         self.expect(TknTy::While);
         // TODO: skip expr for infinite loop when we have a break stmt
         let maybe_while_cond = self.parse_expr();
@@ -408,7 +408,7 @@ impl<'l, 's> Parser<'l, 's> {
         Some(Ast::WhileStmt(Box::new(maybe_while_cond), Box::new(while_stmts)))
     }
 
-    fn parse_for_stmt(&mut self) -> Option<Ast> {
+    fn for_stmt(&mut self) -> Option<Ast> {
         self.expect(TknTy::For);
         let mut for_var_decl = None;
         let mut for_var_cond = None;
@@ -783,12 +783,12 @@ impl<'l, 's> Parser<'l, 's> {
                 }
 
                 let sym = mb_sym.unwrap();
-                // if sym.assign_val.is_none() {
-                //     let msg = format!("Cannot use un-assigned variable {} in operation", ident_name);
-                //     self.err_from_tkn(msg);
-                //     self.consume();
-                //     return None;
-                // }
+                if sym.assign_val.is_none() && sym.sym_ty != SymTy::Param {
+                    let msg = format!("Cannot use un-assigned variable {} in operation", ident_name);
+                    self.err_from_tkn(msg);
+                    self.consume();
+                    return None;
+                }
 
                 let mut ty_rec = sym.ty_rec.clone();
                 ty_rec.tkn = self.currtkn.clone();

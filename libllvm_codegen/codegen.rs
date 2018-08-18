@@ -85,8 +85,8 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
     /// program and generates LLVM IR for each of them. The code is written to the module,
     /// to be converted to assembly later.
     pub fn gen(&mut self) {
-        match *self.ast {
-            Ast::Prog(ref stmts) => {
+        match self.ast {
+            Ast::Prog{stmts} => {
                 for stmt in stmts {
                     self.gen_stmt(stmt);
                 }

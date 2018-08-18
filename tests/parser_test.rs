@@ -10,13 +10,13 @@ use kolgac::symtab::SymbolTable;
 use kolgac::type_record::TyName;
 
 #[test]
-fn test_parse_empty() {
+fn parse_empty() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/empty").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     match *ast {
-        Ast::Prog(stmts) => {
+        Ast::Prog{stmts} => {
            assert_eq!(stmts.len(), 0)
         },
         _ => assert!(false, "Expected Ast::Prog, found {:?}", *ast)
@@ -24,22 +24,22 @@ fn test_parse_empty() {
 }
 
 #[test]
-fn test_parse_var_decl_mutable() {
+fn parse_var_decl_mutable() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_decl_mutable").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let var_decl = &extract_head(ast)[0];
-    match *var_decl {
-        Ast::VarDecl(ref varty_rec, ref ident, imm) => {
-            assert_eq!(varty_rec.ty, Some(TyName::Num));
-            assert_eq!(imm, false);
+    match var_decl {
+        Ast::VarDecl{ty_rec, ident_tkn, is_imm} => {
+            assert_eq!(ty_rec.ty, Some(TyName::Num));
+            assert_eq!(*is_imm, false);
 
-            match ident.ty {
+            match ident_tkn.ty {
                 TknTy::Ident(ref id) => {
                     assert_eq!(id, "x");
                 },
-                _ => assert!(false, "Expected Ident tkn, found {:?}", ident.ty)
+                _ => assert!(false, "Expected Ident tkn, found {:?}", ident_tkn.ty)
             }
         },
         _ => assert!(false, "Expected Ast::VarDecl, found {:?}", var_decl)
@@ -47,7 +47,7 @@ fn test_parse_var_decl_mutable() {
 }
 
 #[test]
-fn test_parse_var_decl_imm() {
+fn parse_var_decl_imm() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_decl_imm").unwrap());
     let mut symtab = SymbolTable::new();
     let result = Parser::new(&mut lexer, &mut symtab).parse();
@@ -55,25 +55,25 @@ fn test_parse_var_decl_imm() {
 }
 
 #[test]
-fn test_parse_var_assign_mutable() {
+fn parse_var_assign_mutable() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_assign_mutable").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let var_assign = &extract_head(ast)[0];
-    match *var_assign {
-        Ast::VarAssign(ref varty_rec, ref ident, imm, ref val_ast) => {
-            assert_eq!(varty_rec.ty, Some(TyName::Num));
-            assert_eq!(imm, false);
+    match var_assign {
+        Ast::VarAssign{ty_rec, ident_tkn, is_imm, value} => {
+            assert_eq!(ty_rec.ty, Some(TyName::Num));
+            assert_eq!(*is_imm, false);
 
-            match ident.ty {
+            match ident_tkn.ty {
                 TknTy::Ident(ref id) => {
                     assert_eq!(id, "x");
                 },
-                _ => expected_tkn("Ident", &ident.ty)
+                _ => expected_tkn("Ident", &ident_tkn.ty)
             }
 
-            let vast = val_ast.clone();
+            let vast = value.clone();
             match *vast {
                 Some(ast) => {
                     match ast {
@@ -89,25 +89,25 @@ fn test_parse_var_assign_mutable() {
 }
 
 #[test]
-fn test_parse_var_assign_imm() {
+fn parse_var_assign_imm() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/var_assign_imm").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let var_assign = &extract_head(ast)[0];
-    match *var_assign {
-        Ast::VarAssign(ref varty_rec, ref ident, imm, ref rhs) => {
-            assert_eq!(varty_rec.ty, Some(TyName::Num));
-            assert_eq!(imm, true);
+    match var_assign {
+        Ast::VarAssign{ty_rec, ident_tkn, is_imm, value} => {
+            assert_eq!(ty_rec.ty, Some(TyName::Num));
+            assert_eq!(*is_imm, true);
 
-            match ident.ty {
+            match ident_tkn.ty {
                 TknTy::Ident(ref id) => {
                     assert_eq!(id, "x");
                 },
-                _ => expected_tkn("Ident", &ident.ty)
+                _ => expected_tkn("Ident", &ident_tkn.ty)
             }
 
-            let vast = rhs.clone();
+            let vast = value.clone();
             match *vast {
                 Some(ast) => {
                     match ast {
@@ -274,7 +274,7 @@ fn test_func_decl() {
             let func_body = func_body.clone().unwrap();
 
             match func_body {
-                Ast::BlckStmt(stmts) => {
+                Ast::BlckStmt{stmts, scope_lvl:_} => {
                     assert_eq!(stmts.len(), 1);
                 },
                 _ => expected_ast("BlckStmt", &func_body)
@@ -308,7 +308,7 @@ fn test_func_decl_w_call() {
             let func_body = func_body.clone().unwrap();
 
             match func_body {
-                Ast::BlckStmt(stmts) => {
+                Ast::BlckStmt{stmts, scope_lvl: _} => {
                     assert_eq!(stmts.len(), 1);
                 },
                 _ => expected_ast("BlckStmt", &func_body)
@@ -342,7 +342,7 @@ fn test_func_decl_w_call() {
 
 fn extract_head(ast: Box<Ast>) -> Vec<Ast> {
     match *ast {
-        Ast::Prog(ref stmts) => stmts.clone(),
+        Ast::Prog{stmts} => stmts.clone(),
         _ => panic!("Cannot call extract_head on an ast not of type Ast::Prog")
     }
 }

@@ -3,7 +3,9 @@ use type_record::TyRecord;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
-    Prog(Vec<Ast>),
+    Prog {
+        stmts: Vec<Ast>
+    },
 
     BlckStmt {
         stmts: Vec<Option<Ast>>,
