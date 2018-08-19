@@ -22,10 +22,14 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
+    /// Initial entry point into the type checker. Loops through each statement in the
+    /// AST and type checks them. Returns a vector of errors encountered during type
+    /// checking.
     pub fn check(&mut self) -> Vec<ErrC> {
         match self.ast {
             Ast::Prog{stmts} => {
                 for stmt in stmts {
+                    // Pass in 0 for the global scope.
                     self.check_stmt(stmt.clone(), 0);
                 }
             },
@@ -35,6 +39,11 @@ impl<'t, 's> TyCheck<'t, 's> {
         self.errors.clone()
     }
 
+    /// Type checks a statement. This is a recursive function that continually walks the AST
+    /// until a leaf node. Takes in a statement AST and a scope level to look up symbols
+    /// in the symbol table. We expect the symbol table to be finalized at this point,
+    /// since parsing should be complete. Thus, the final_sc parameter represents the index
+    /// into the finalized_scopes vector in the symbol table.
     fn check_stmt(&mut self, stmt: Ast, final_sc: usize) {
         match stmt {
             // ignore var declaration without assign (nothing to check)
@@ -46,7 +55,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let ast = maybe_ast.clone().unwrap();
                 match ast {
                     Ast::FnCall(_, _) => {
-                        self.check_fn_params(ast);
+                        self.check_fn_params(ast, final_sc);
                         ()
                     },
                     _ => {
@@ -146,10 +155,10 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 if rhs.is_primary() {
                     let rhs_ty_rec = rhs.extract_primary_ty_rec();
-                    return self.eval_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
+                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
                 } else {
                     let rhs_ty = self.check_expr(rhs, final_sc);
-                    return self.eval_unary_ty(op_tkn.clone(), rhs_ty);
+                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty);
                 }
             },
             Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) |
@@ -159,7 +168,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let lhs_ty_name = self.check_expr(lhs, final_sc);
                 let rhs_ty_name = self.check_expr(rhs, final_sc);
 
-                self.eval_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
+                self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             },
             Ast::Primary(prim_ty_rec) => {
                 match prim_ty_rec.tkn.ty {
@@ -188,9 +197,11 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
+    /// Given a class declaration, retrieve the type of a property in the class. Because
+    /// a class does not maintain a mapping of properties (right now), we loop through all
+    /// available props until we find the name of the expected prop (the second param).
     fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name_tkn: &Token) -> TyName {
         let prop_name = prop_name_tkn.get_name();
-
         match class_decl_ast {
             Ast::ClassDecl(_, _, props) => {
                 let mut prop_ty = None;
@@ -219,10 +230,10 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_fn_params(&mut self, fn_call_ast: Ast) {
+    fn check_fn_params(&mut self, fn_call_ast: Ast, final_sc: usize) {
         match fn_call_ast {
             Ast::FnCall(name_tkn, params) => {
-                let fn_sym = self.find_fn_sym(&name_tkn.clone().unwrap());
+                let fn_sym = self.find_fn_sym(&name_tkn.clone().unwrap(), final_sc);
                 let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
 
                 let mut passed_in_param_tys = Vec::new();
@@ -245,7 +256,8 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn eval_unary_ty(&mut self, op_tkn: Token, rhs_ty: TyName) -> TyName {
+    /// Reduce a unary ast to the expected type to be returned by the expression.
+    fn reduce_unary_ty(&mut self, op_tkn: Token, rhs_ty: TyName) -> TyName {
         match op_tkn.ty {
             TknTy::Minus => {
                 if rhs_ty != TyName::Num {
@@ -265,9 +277,10 @@ impl<'t, 's> TyCheck<'t, 's> {
         };
     }
 
-    // Returns the expected type given the operator, even if there is an error.
-    // The expected type is one which we expect the given operator to evaluate to.
-    fn eval_bin_ty(&mut self, op_tkn: Token, lhs_ty: TyName, rhs_ty: TyName) -> TyName {
+    /// Reduce a binary ast so we can check the types in it. Returns the expected type
+    /// given the operator, even if there is an error. The expected type is one which we expect
+    /// the given operator to evaluate to.
+    fn reduce_bin_ty(&mut self, op_tkn: Token, lhs_ty: TyName, rhs_ty: TyName) -> TyName {
         match op_tkn.ty {
             TknTy::Plus | TknTy::Minus | TknTy::Star | TknTy::Slash => {
                 // We can only operate on types of the same kind
@@ -354,22 +367,9 @@ impl<'t, 's> TyCheck<'t, 's> {
         ErrC::new(tkn.line, tkn.pos, msg)
     }
 
-    fn find_sym_ty(&mut self, ident_tkn: &Token, scope_lvl: usize) -> Option<TyName> {
+    fn find_fn_sym(&mut self, ident_tkn: &Token, scope_lvl: usize) -> Option<Rc<Sym>> {
         let name = ident_tkn.get_name();
         let sym = self.symtab.retrieve_from_finalized_sc(&name, scope_lvl);
-        match sym {
-            Some(symbol) => Some(symbol.ty_rec.ty.clone().unwrap()),
-            None => {
-                let err_msg = format!("types: Undeclared variable symbol {:?} found", name);
-                self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));
-                None
-            }
-        }
-    }
-
-    fn find_fn_sym(&mut self, ident_tkn: &Token) -> Option<Rc<Sym>> {
-        let name = ident_tkn.get_name();
-        let sym = self.symtab.retrieve(&name);
         match sym {
             Some(symbol) => Some(symbol),
             None => {
