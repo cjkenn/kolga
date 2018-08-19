@@ -51,13 +51,13 @@ impl<'t, 's> TyCheck<'t, 's> {
                         ()
                     },
                     _ => {
-                        self.check_expr(ast);
+                        self.check_expr(ast, 0);
                         ()
                     }
                 };
             },
             Ast::IfStmt(expr_ast, maybe_stmt_ast, elif_stmts, maybe_el_stmts) => {
-                self.check_expr(expr_ast.clone().unwrap());
+                self.check_expr(expr_ast.clone().unwrap(), 0);
                 self.check_stmt(maybe_stmt_ast.clone().unwrap());
 
                 for stmt in &elif_stmts {
@@ -69,11 +69,11 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
             },
             Ast::WhileStmt(maybe_expr_ast, maybe_stmts) => {
-                self.check_expr(maybe_expr_ast.clone().unwrap());
+                self.check_expr(maybe_expr_ast.clone().unwrap(), 0);
                 self.check_stmt(maybe_stmts.clone().unwrap());
             },
             Ast::ElifStmt(maybe_expr_ast, maybe_stmt_ast) => {
-                self.check_expr(maybe_expr_ast.clone().unwrap());
+                self.check_expr(maybe_expr_ast.clone().unwrap(), 0);
                 self.check_stmt(maybe_stmt_ast.clone().unwrap());
             },
             Ast::ForStmt(decl_ast, cond_expr, incr_expr, stmts) => {
@@ -126,7 +126,7 @@ impl<'t, 's> TyCheck<'t, 's> {
             let stmt = maybe_stmt.clone().unwrap();
             match stmt {
                 Ast::RetStmt(maybe_expr) => {
-                    let rhs_ty = self.check_expr(maybe_expr.clone().unwrap());
+                    let rhs_ty = self.check_expr(maybe_expr.clone().unwrap(), sc_lvl);
                     if fn_ret_ty != rhs_ty {
                         let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
                         self.errors.push(err);
@@ -137,7 +137,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_expr(&mut self, expr: Ast) -> TyName {
+    fn check_expr(&mut self, expr: Ast, final_sc: usize) -> TyName {
         match expr {
             Ast::VarAssign{ty_rec: _, ident_tkn: _, is_imm: _, value: _} => {
                 self.check_var_assign(expr)
@@ -149,7 +149,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     let rhs_ty_rec = rhs.extract_primary_ty_rec();
                     return self.eval_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
                 } else {
-                    let rhs_ty = self.check_expr(rhs);
+                    let rhs_ty = self.check_expr(rhs, final_sc);
                     return self.eval_unary_ty(op_tkn.clone(), rhs_ty);
                 }
             },
@@ -157,67 +157,15 @@ impl<'t, 's> TyCheck<'t, 's> {
             Ast::Logical(op_tkn, maybe_lhs, maybe_rhs) => {
                 let lhs = maybe_lhs.unwrap();
                 let rhs = maybe_rhs.unwrap();
+                let lhs_ty_name = self.check_expr(lhs, final_sc);
+                let rhs_ty_name = self.check_expr(rhs, final_sc);
 
-                if lhs.is_primary() && rhs.is_primary() {
-                    let lhs_ty_rec = lhs.extract_primary_ty_rec();
-                    let rhs_ty_rec = rhs.extract_primary_ty_rec();
-
-                    let mut lhs_ty = lhs_ty_rec.ty.unwrap().clone();
-                    let mut rhs_ty = rhs_ty_rec.ty.unwrap().clone();
-
-                    if lhs_ty_rec.tkn.is_ident() {
-                        match self.find_sym_ty(&lhs_ty_rec.tkn) {
-                            Some(ty) => lhs_ty = ty,
-                            None => ()
-                        }
-                    }
-
-                    if rhs_ty_rec.tkn.is_ident() {
-                        match self.find_sym_ty(&rhs_ty_rec.tkn) {
-                            Some(ty) => rhs_ty = ty,
-                            None => ()
-                        }
-                    }
-
-                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
-                } else if lhs.is_primary() && !rhs.is_primary() {
-                    let lhs_ty_rec = lhs.extract_primary_ty_rec();
-
-                    let mut lhs_ty = lhs_ty_rec.ty.unwrap().clone();
-                    if lhs_ty_rec.tkn.is_ident() {
-                        match self.find_sym_ty(&lhs_ty_rec.tkn) {
-                            Some(ty) => lhs_ty = ty,
-                            None => ()
-                        }
-                    }
-
-                    let rhs_ty = self.check_expr(rhs);
-
-                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
-                } else if !lhs.is_primary() && rhs.is_primary() {
-                    let lhs_ty = self.check_expr(lhs);
-                    let rhs_ty_rec = rhs.extract_primary_ty_rec();
-
-                    let mut rhs_ty = rhs_ty_rec.ty.unwrap().clone();
-                    if rhs_ty_rec.tkn.is_ident() {
-                        match self.find_sym_ty(&rhs_ty_rec.tkn) {
-                            Some(ty) => rhs_ty = ty,
-                            None => ()
-                        }
-                    }
-
-                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
-                } else {
-                    let lhs_ty = self.check_expr(lhs);
-                    let rhs_ty = self.check_expr(rhs);
-
-                    return self.eval_bin_ty(op_tkn.clone(), lhs_ty, rhs_ty);
-                }
+                self.eval_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             },
             Ast::Primary(prim_ty_rec) => {
                 match prim_ty_rec.tkn.ty {
                     TknTy::Ident(ref name) => {
-                        let sym = self.symtab.retrieve(name).unwrap();
+                        let sym = self.symtab.retrieve_from_finalized_sc(name, final_sc).unwrap();
                         return sym.ty_rec.ty.clone().unwrap();
                     },
                     _ => {
@@ -227,7 +175,7 @@ impl<'t, 's> TyCheck<'t, 's> {
             },
             Ast::ClassDecl(name_tkn,_,_) => {
                 let sym = self.symtab.retrieve(&name_tkn.get_name()).unwrap();
-                return sym.ty_rec.ty.clone().unwrap();
+                sym.ty_rec.ty.clone().unwrap()
             },
             Ast::ClassGet(class_name_tkn, prop_tkn) => {
                 let class_sym = self.symtab.retrieve(&class_name_tkn.unwrap().get_name()).unwrap();
@@ -281,7 +229,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let mut passed_in_param_tys = Vec::new();
 
                 for ast in &params {
-                    passed_in_param_tys.push(self.check_expr(ast.clone()));
+                    passed_in_param_tys.push(self.check_expr(ast.clone(), 0));
                 }
 
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
@@ -373,7 +321,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let lhs_ty = ty_rec.ty.unwrap();
                 let rhs = value.unwrap();
 
-                let rhs_ty = self.check_expr(rhs);
+                let rhs_ty = self.check_expr(rhs, 0);
                 if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);
@@ -407,10 +355,9 @@ impl<'t, 's> TyCheck<'t, 's> {
         ErrC::new(tkn.line, tkn.pos, msg)
     }
 
-    // TODO: pass in scope level to this function
-    fn find_sym_ty(&mut self, ident_tkn: &Token) -> Option<TyName> {
+    fn find_sym_ty(&mut self, ident_tkn: &Token, scope_lvl: usize) -> Option<TyName> {
         let name = ident_tkn.get_name();
-        let sym = self.symtab.retrieve(&name);//_from_finalized_sc(&name, 0);
+        let sym = self.symtab.retrieve_from_finalized_sc(&name, scope_lvl);
         match sym {
             Some(symbol) => Some(symbol.ty_rec.ty.clone().unwrap()),
             None => {
