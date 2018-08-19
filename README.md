@@ -1,6 +1,6 @@
 # kolga
 
-kolga is an educational compiler with the following goals:
+kolga is an educational compiler (always WIP) with the following goals:
 
 1. Learn the LLVM API by using it to generate LLVM IR and machine code.
 2. Learn about type systems by building a type checker, type inference, and more complex ADT's.
