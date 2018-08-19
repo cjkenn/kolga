@@ -26,8 +26,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         match self.ast {
             Ast::Prog{stmts} => {
                 for stmt in stmts {
-                    // TODO: shouldnt clone this, pass reference
-                    self.check_stmt(stmt.clone());
+                    self.check_stmt(stmt.clone(), 0);
                 }
             },
             _ => ()
@@ -36,7 +35,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         self.errors.clone()
     }
 
-    fn check_stmt(&mut self, stmt: Ast) {
+    fn check_stmt(&mut self, stmt: Ast, final_sc: usize) {
         match stmt {
             // ignore var declaration without assign (nothing to check)
             Ast::VarDecl{ty_rec: _, ident_tkn: _, is_imm: _} => (),
@@ -51,68 +50,68 @@ impl<'t, 's> TyCheck<'t, 's> {
                         ()
                     },
                     _ => {
-                        self.check_expr(ast, 0);
+                        self.check_expr(ast, final_sc);
                         ()
                     }
                 };
             },
             Ast::IfStmt(expr_ast, maybe_stmt_ast, elif_stmts, maybe_el_stmts) => {
-                self.check_expr(expr_ast.clone().unwrap(), 0);
-                self.check_stmt(maybe_stmt_ast.clone().unwrap());
+                self.check_expr(expr_ast.clone().unwrap(), final_sc);
+                self.check_stmt(maybe_stmt_ast.clone().unwrap(), final_sc);
 
                 for stmt in &elif_stmts {
-                    self.check_stmt(stmt.clone().unwrap());
+                    self.check_stmt(stmt.clone().unwrap(), final_sc);
                 }
 
                 if maybe_el_stmts.is_some() {
-                    self.check_stmt(maybe_el_stmts.clone().unwrap());
+                    self.check_stmt(maybe_el_stmts.clone().unwrap(), final_sc);
                 }
             },
             Ast::WhileStmt(maybe_expr_ast, maybe_stmts) => {
-                self.check_expr(maybe_expr_ast.clone().unwrap(), 0);
-                self.check_stmt(maybe_stmts.clone().unwrap());
+                self.check_expr(maybe_expr_ast.clone().unwrap(), final_sc);
+                self.check_stmt(maybe_stmts.clone().unwrap(), final_sc);
             },
             Ast::ElifStmt(maybe_expr_ast, maybe_stmt_ast) => {
-                self.check_expr(maybe_expr_ast.clone().unwrap(), 0);
-                self.check_stmt(maybe_stmt_ast.clone().unwrap());
+                self.check_expr(maybe_expr_ast.clone().unwrap(), final_sc);
+                self.check_stmt(maybe_stmt_ast.clone().unwrap(), final_sc);
             },
             Ast::ForStmt(decl_ast, cond_expr, incr_expr, stmts) => {
                 if decl_ast.is_some() {
-                    self.check_stmt(decl_ast.clone().unwrap());
+                    self.check_stmt(decl_ast.clone().unwrap(), final_sc);
                 }
 
                 if cond_expr.is_some() {
-                    self.check_stmt(cond_expr.clone().unwrap());
+                    self.check_stmt(cond_expr.clone().unwrap(), final_sc);
                 }
 
                 if incr_expr.is_some() {
-                    self.check_stmt(incr_expr.clone().unwrap());
+                    self.check_stmt(incr_expr.clone().unwrap(), final_sc);
                 }
 
-                self.check_stmt(stmts.clone().unwrap());
+                self.check_stmt(stmts.clone().unwrap(), final_sc);
             },
-            Ast::BlckStmt{stmts, scope_lvl: _} => {
+            Ast::BlckStmt{stmts, scope_lvl} => {
                 for stmt in &stmts {
-                    self.check_stmt(stmt.clone().unwrap());
+                    self.check_stmt(stmt.clone().unwrap(), scope_lvl);
                 }
             },
             Ast::FuncDecl{ident_tkn, params: _, ret_ty, func_body, scope_lvl} => {
                 let fn_ty = ret_ty.ty.unwrap();
                 let fn_stmts = func_body.unwrap();
                 match fn_stmts {
-                    Ast::BlckStmt{stmts, scope_lvl: _} => {
-                        self.check_fn_stmts(&ident_tkn, fn_ty, stmts, scope_lvl);
+                    Ast::BlckStmt{stmts, scope_lvl: inner_sc} => {
+                        self.check_fn_stmts(&ident_tkn, fn_ty, stmts, inner_sc);
                     },
-                    _ => self.check_stmt(fn_stmts.clone())
+                    _ => self.check_stmt(fn_stmts.clone(), scope_lvl)
                 };
             },
             Ast::ClassDecl(_, methods, props) => {
                 for prop_stmt in props {
-                    self.check_stmt(prop_stmt.clone().unwrap());
+                    self.check_stmt(prop_stmt.clone().unwrap(), final_sc);
                 }
 
                 for stmt in &methods {
-                    self.check_stmt(stmt.clone().unwrap());
+                    self.check_stmt(stmt.clone().unwrap(), final_sc);
                 }
             },
             _ => {
@@ -132,7 +131,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         self.errors.push(err);
                     }
                 },
-                _ => self.check_stmt(stmt)
+                _ => self.check_stmt(stmt, sc_lvl)
             };
         }
     }
