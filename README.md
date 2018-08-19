@@ -5,7 +5,7 @@ kolga is an educational compiler with the following goals:
 1. Learn the LLVM API by using it to generate LLVM IR and machine code.
 2. Learn about type systems by building a type checker, type inference, and more complex ADT's.
 3. Support object oriented composability.
-4. Eventually, build some light concurrency primitives.
+4. Eventually (maybe), build some light concurrency primitives like coroutines.
 
 ### Requirements
 
