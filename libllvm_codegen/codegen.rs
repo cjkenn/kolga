@@ -367,10 +367,12 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     let mut llvm_params: *mut LLVMValueRef = Vec::with_capacity(param_tys.len()).as_mut_ptr();
                     LLVMGetParams(llvm_fn, llvm_params);
                     let param_value_vec = slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
-                    println!("{}", param_value_vec.len());
                     for (idx, param) in param_value_vec.iter().enumerate() {
                         let name = format!("{}{}", params[idx].tkn.get_name(), "\0");
                         LLVMSetValueName(*param, name.as_ptr() as *const i8);
+
+                        let alloca_instr = self.build_entry_bb_alloca(llvm_fn, params[idx].clone());
+                        LLVMBuildStore(self.builder, *param, alloca_instr);
                         self.valtab.store(&params[idx].tkn.get_name(), *param);
                     }
 
@@ -482,6 +484,24 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
             TknTy::False => unsafe { Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)) },
             TknTy::Ident(ref name) => self.valtab.retrieve(name),
             _ => unimplemented!("Tkn ty {:?} in unimplemented in codegen", ty_rec.tkn.ty)
+        }
+    }
+
+    /// Builds an alloca instruction at the beginning of a function so we can store
+    /// parameters on the function stack. This uses a new builder so the current builder
+    /// doesn't move positions. We would have to move it back to its original spot, which
+    /// makes this function more complex than it needs to be.
+    // TODO: assertions failures in this function
+    fn build_entry_bb_alloca(&mut self, func: LLVMValueRef, ty_rec: TyRecord) -> LLVMValueRef {
+        unsafe {
+            let builder = LLVMCreateBuilderInContext(self.context);
+            let entry_bb = LLVMGetEntryBasicBlock(func);
+            let entry_first_instr = LLVMGetFirstInstruction(entry_bb);
+            LLVMPositionBuilderBefore(builder, entry_first_instr);
+
+            let llvm_ty = self.llvm_ty_from_ty_rec(&ty_rec);
+            let name = format!("{}{}", ty_rec.tkn.get_name(), "\0").as_ptr() as *const i8;
+            LLVMBuildAlloca(builder, llvm_ty, name)
         }
     }
 
