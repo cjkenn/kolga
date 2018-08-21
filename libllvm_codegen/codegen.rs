@@ -8,10 +8,10 @@ use kolgac::token::TknTy;
 use kolgac::type_record::{TyRecord, TyName};
 
 use errors::ErrCodeGen;
-
 use valtab::ValTab;
 
 use std::ptr;
+use std::slice;
 
 const LLVM_FALSE: LLVMBool = 0;
 const LLVM_TRUE: LLVMBool = 1;
@@ -341,9 +341,15 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
             },
             Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl: _} => {
                 unsafe {
+                    self.valtab.init_sc();
+
                     let fn_name = self.c_str_from_val(&ident_tkn.get_name());
                     let fn_ty = self.llvm_ty_from_ty_rec(ret_ty);
 
+                    // Convert our params to an array of LLVMTypeRef's. We then pass these
+                    // types to the function to encode the types of our params. After we create
+                    // our function, we can add it to the builder and position it at
+                    // the end of the new basic block.
                     let mut param_tys = self.llvm_tys_from_ty_rec_arr(params);
                     let llvm_fn_ty = LLVMFunctionType(fn_ty,
                                                       param_tys.as_mut_ptr(),
@@ -351,12 +357,24 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                                                       LLVM_FALSE);
 
                     let llvm_fn = LLVMAddFunction(self.module, fn_name, llvm_fn_ty);
-                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
-
                     let fn_val = LLVMAppendBasicBlockInContext(self.context, llvm_fn, fn_name);
                     LLVMPositionBuilderAtEnd(self.builder, fn_val);
 
-                    // TODO: this is hard to read
+                    // Get the params from the function we created. This is a little weird since
+                    // we pass in an array of LLVMTypeRef's to the function, but we want
+                    // LLVMValueRef's to store in the symbol table and to give them names. We need
+                    // to get the params and loop through them again.
+                    let mut llvm_params: *mut LLVMValueRef = Vec::with_capacity(param_tys.len()).as_mut_ptr();
+                    LLVMGetParams(llvm_fn, llvm_params);
+                    let param_value_vec = slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
+                    println!("{}", param_value_vec.len());
+                    for (idx, param) in param_value_vec.iter().enumerate() {
+                        let name = format!("{}{}", params[idx].tkn.get_name(), "\0");
+                        LLVMSetValueName(*param, name.as_ptr() as *const i8);
+                        self.valtab.store(&params[idx].tkn.get_name(), *param);
+                    }
+
+                    // TODO: this is hard to read -_-
                     match func_body.clone().unwrap() {
                         Ast::BlckStmt{stmts, scope_lvl: _} => {
                             for stmt in stmts {
@@ -371,6 +389,13 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                         },
                         _ => ()
                     }
+
+                    // Close the function level scope, which will pop off any params and
+                    // variable declared here (we don't need these anymore, since we aren't
+                    // going to be making another pass over them later). Add the llvm function
+                    // to the value table so we can look it up later for a call.
+                    self.valtab.close_sc();
+                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
                 }
 
                 Vec::new()
