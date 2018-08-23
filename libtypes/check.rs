@@ -124,7 +124,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
             },
             _ => {
-                panic!("Unrecognized statement type found!")
+                panic!("{:?} Unrecognized statement type found!", stmt)
             }
         }
     }

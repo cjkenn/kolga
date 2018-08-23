@@ -158,7 +158,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     // conditional. We immediately move it back to the start of the conditional so
                     // we're still in the correct position.
                     LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    let phi_bb = LLVMBuildPhi(self.builder, self.float_ty(), c_str!("phi"));
+                    let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
                     LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
                     // Calculate the LLVMValueRef for the if conditional expression. We use this
@@ -290,7 +290,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
 
                     LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    let phi_bb = LLVMBuildPhi(self.builder, self.float_ty(), c_str!("phi"));
+                    let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
                     LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
 
@@ -345,6 +345,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                     let fn_name = self.c_str_from_val(&ident_tkn.get_name());
                     let fn_ty = self.llvm_ty_from_ty_rec(ret_ty);
+                    LLVMDumpType(fn_ty);
 
                     // Convert our params to an array of LLVMTypeRef's. We then pass these
                     // types to the function to encode the types of our params. After we create
@@ -476,14 +477,25 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
     /// undefined).
     fn gen_primary(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
-            TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.float_ty(), *val)) },
+            TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.double_ty(), *val)) },
             TknTy::Str(ref lit) => unsafe { Some(LLVMBuildGlobalStringPtr(self.builder,
                                                                           self.c_str_from_val(lit),
                                                                           c_str!("")))},
             TknTy::True => unsafe { Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)) },
             TknTy::False => unsafe { Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)) },
-            TknTy::Ident(ref name) => self.valtab.retrieve(name),
-            _ => unimplemented!("Tkn ty {:?} in unimplemented in codegen", ty_rec.tkn.ty)
+            TknTy::Ident(ref name) => {
+                unsafe {
+                    let value = self.valtab.retrieve(name);
+                    if value.is_none() {
+                        return None;
+                    }
+
+                    let c_name = format!("{}{}", name, "\0").as_ptr();
+                    // TODO: assertion failure here
+                    Some(LLVMBuildLoad(self.builder, value.unwrap(), c_name as *const i8))
+                }
+            },
+            _ => unimplemented!("Tkn ty {:?} is unimplemented in codegen", ty_rec.tkn.ty)
         }
     }
 
@@ -491,13 +503,12 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
     /// parameters on the function stack. This uses a new builder so the current builder
     /// doesn't move positions. We would have to move it back to its original spot, which
     /// makes this function more complex than it needs to be.
-    // TODO: assertions failures in this function
     fn build_entry_bb_alloca(&mut self, func: LLVMValueRef, ty_rec: TyRecord) -> LLVMValueRef {
         unsafe {
             let builder = LLVMCreateBuilderInContext(self.context);
             let entry_bb = LLVMGetEntryBasicBlock(func);
             let entry_first_instr = LLVMGetFirstInstruction(entry_bb);
-            LLVMPositionBuilderBefore(builder, entry_first_instr);
+            LLVMPositionBuilder(builder, entry_bb, entry_first_instr);
 
             let llvm_ty = self.llvm_ty_from_ty_rec(&ty_rec);
             let name = format!("{}{}", ty_rec.tkn.get_name(), "\0").as_ptr() as *const i8;
@@ -509,7 +520,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
     fn llvm_ty_from_ty_rec(&self, ty_rec: &TyRecord) -> LLVMTypeRef {
         match ty_rec.ty.clone().unwrap() {
             TyName::String => self.str_ty(),
-            TyName::Num => self.float_ty(),
+            TyName::Num => self.double_ty(),
             TyName::Bool => self.i8_ty(),
             // TODO: class types should be represented as structs in llvm probably
             TyName::Class(_) => unimplemented!("Class types not yet implemented for llvm types!")
@@ -579,8 +590,8 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
         unsafe { LLVMPointerType(self.i8_ty(), 0) }
     }
 
-    fn float_ty(&self) -> LLVMTypeRef {
-        unsafe { LLVMFloatTypeInContext(self.context) }
+    fn double_ty(&self) -> LLVMTypeRef {
+        unsafe { LLVMDoubleTypeInContext(self.context) }
     }
 
     fn i8_ty(&self) -> LLVMTypeRef {
