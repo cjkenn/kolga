@@ -374,7 +374,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                         let alloca_instr = self.build_entry_bb_alloca(llvm_fn, params[idx].clone());
                         LLVMBuildStore(self.builder, *param, alloca_instr);
-                        self.valtab.store(&params[idx].tkn.get_name(), *param);
+                        self.valtab.store(&params[idx].tkn.get_name(), alloca_instr);
                     }
 
                     // TODO: this is hard to read -_-
@@ -484,15 +484,14 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
             TknTy::True => unsafe { Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)) },
             TknTy::False => unsafe { Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)) },
             TknTy::Ident(ref name) => {
-                unsafe {
-                    let value = self.valtab.retrieve(name);
-                    if value.is_none() {
-                        return None;
-                    }
-
-                    let c_name = format!("{}{}", name, "\0").as_ptr();
-                    // TODO: assertion failure here
-                    Some(LLVMBuildLoad(self.builder, value.unwrap(), c_name as *const i8))
+                match self.valtab.retrieve(name) {
+                    Some(val) => {
+                        unsafe {
+                            let c_name = format!("{}{}", name, "\0").as_ptr();
+                            Some(LLVMBuildLoad(self.builder, val, c_name as *const i8))
+                        }
+                    },
+                    None => None
                 }
             },
             _ => unimplemented!("Tkn ty {:?} is unimplemented in codegen", ty_rec.tkn.ty)
