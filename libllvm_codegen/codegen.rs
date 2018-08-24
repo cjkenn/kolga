@@ -345,7 +345,6 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                     let fn_name = self.c_str_from_val(&ident_tkn.get_name());
                     let fn_ty = self.llvm_ty_from_ty_rec(ret_ty);
-                    LLVMDumpType(fn_ty);
 
                     // Convert our params to an array of LLVMTypeRef's. We then pass these
                     // types to the function to encode the types of our params. After we create
@@ -372,7 +371,9 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                         let name = format!("{}{}", params[idx].tkn.get_name(), "\0");
                         LLVMSetValueName(*param, name.as_ptr() as *const i8);
 
-                        let alloca_instr = self.build_entry_bb_alloca(llvm_fn, params[idx].clone());
+                        let alloca_instr = self.build_entry_bb_alloca(llvm_fn,
+                                                                      params[idx].clone(),
+                                                                      &params[idx].tkn.get_name());
                         LLVMBuildStore(self.builder, *param, alloca_instr);
                         self.valtab.store(&params[idx].tkn.get_name(), alloca_instr);
                     }
@@ -399,6 +400,25 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
                     // to the value table so we can look it up later for a call.
                     self.valtab.close_sc();
                     self.valtab.store(&ident_tkn.get_name(), llvm_fn);
+                }
+
+                Vec::new()
+            },
+            Ast::VarAssign{ty_rec, ident_tkn, is_imm: _, value} => {
+                unsafe {
+                    // TODO: this only works inside functions. We should get the scope
+                    // level from the ast, and then switch on that to determine if we have
+                    // a global var using LLVMAddGlobal
+                    let insert_bb = LLVMGetInsertBlock(self.builder);
+                    let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
+                    let alloca_instr = self.build_entry_bb_alloca(llvm_func,
+                                                                  ty_rec.clone(),
+                                                                  &ident_tkn.get_name());
+                    let raw_val = value.clone().unwrap();
+                    let val = self.gen_expr(&raw_val).unwrap();
+
+                    LLVMBuildStore(self.builder, val, alloca_instr);
+                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
                 }
 
                 Vec::new()
@@ -502,7 +522,7 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
     /// parameters on the function stack. This uses a new builder so the current builder
     /// doesn't move positions. We would have to move it back to its original spot, which
     /// makes this function more complex than it needs to be.
-    fn build_entry_bb_alloca(&mut self, func: LLVMValueRef, ty_rec: TyRecord) -> LLVMValueRef {
+    fn build_entry_bb_alloca(&mut self, func: LLVMValueRef, ty_rec: TyRecord, name: &str) -> LLVMValueRef {
         unsafe {
             let builder = LLVMCreateBuilderInContext(self.context);
             let entry_bb = LLVMGetEntryBasicBlock(func);
@@ -510,8 +530,8 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
             LLVMPositionBuilder(builder, entry_bb, entry_first_instr);
 
             let llvm_ty = self.llvm_ty_from_ty_rec(&ty_rec);
-            let name = format!("{}{}", ty_rec.tkn.get_name(), "\0").as_ptr() as *const i8;
-            LLVMBuildAlloca(builder, llvm_ty, name)
+            let c_name = format!("{}{}", name, "\0").as_ptr() as *const i8;
+            LLVMBuildAlloca(builder, llvm_ty, c_name)
         }
     }
 
