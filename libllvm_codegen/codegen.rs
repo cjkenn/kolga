@@ -338,7 +338,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 unsafe {
                     self.valtab.init_sc();
 
-                    let fn_name = self.c_str_from_val(&ident_tkn.get_name());
+                    let fn_name = self.c_str(&ident_tkn.get_name());
                     let fn_ty = self.llvm_ty_from_ty_rec(ret_ty);
 
                     // Convert our params to an array of LLVMTypeRef's. We then pass these
@@ -363,8 +363,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     LLVMGetParams(llvm_fn, llvm_params);
                     let param_value_vec = slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
                     for (idx, param) in param_value_vec.iter().enumerate() {
-                        let name = format!("{}{}", params[idx].tkn.get_name(), "\0");
-                        LLVMSetValueName(*param, name.as_ptr() as *const i8);
+                        let name = self.c_str(&params[idx].tkn.get_name());
+                        LLVMSetValueName(*param, name);
 
                         let alloca_instr = self.build_entry_bb_alloca(llvm_fn,
                                                                       params[idx].clone(),
@@ -403,9 +403,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 match is_global {
                     true => {
                         unsafe {
-                            let c_name = format!("{}{}", ident_tkn.get_name(), "\0").as_ptr() as *const i8;
+                            let c_name = self.c_str(&ident_tkn.get_name());
                             let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
-                            LLVMAddGlobal(self.module, llvm_ty, c_name);
+                            let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
+
+                            let val = self.gen_expr(&value.clone().unwrap()).unwrap();
+                            LLVMSetInitializer(global, val);
+                            self.valtab.store(&ident_tkn.get_name(), global);
                         }
                     },
                     false => {
@@ -426,7 +430,27 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 Vec::new()
             },
             Ast::VarDecl{ty_rec, ident_tkn, is_imm:_, is_global} => {
-               unimplemented!("TODO: implement vardecl");
+                match is_global {
+                    true => {
+                        unsafe {
+                            let c_name = self.c_str(&ident_tkn.get_name());
+                            let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
+                            let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
+                            self.valtab.store(&ident_tkn.get_name(), global);
+                        }
+                    },
+                    false => {
+                        unsafe {
+                            let insert_bb = LLVMGetInsertBlock(self.builder);
+                            let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
+                            let alloca_instr = self.build_entry_bb_alloca(llvm_func,
+                                                                          ty_rec.clone(),
+                                                                          &ident_tkn.get_name());
+                            self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                        }
+                    }
+                }
+                Vec::new()
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt)
         }
@@ -504,7 +528,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         match ty_rec.tkn.ty {
             TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.double_ty(), *val)) },
             TknTy::Str(ref lit) => unsafe { Some(LLVMBuildGlobalStringPtr(self.builder,
-                                                                          self.c_str_from_val(lit),
+                                                                          self.c_str(lit),
                                                                           c_str!("")))},
             TknTy::True => unsafe { Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)) },
             TknTy::False => unsafe { Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)) },
@@ -512,8 +536,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 match self.valtab.retrieve(name) {
                     Some(val) => {
                         unsafe {
-                            let c_name = format!("{}{}", name, "\0").as_ptr();
-                            Some(LLVMBuildLoad(self.builder, val, c_name as *const i8))
+                            let c_name = self.c_str(&name);
+                            Some(LLVMBuildLoad(self.builder, val, c_name))
                         }
                     },
                     None => None
@@ -535,7 +559,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             LLVMPositionBuilder(builder, entry_bb, entry_first_instr);
 
             let llvm_ty = self.llvm_ty_from_ty_rec(&ty_rec);
-            let c_name = format!("{}{}", name, "\0").as_ptr() as *const i8;
+            let c_name = self.c_str(name);
             LLVMBuildAlloca(builder, llvm_ty, c_name)
         }
     }
@@ -622,7 +646,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         unsafe { LLVMInt8TypeInContext(self.context) }
     }
 
-    fn c_str_from_val(&self, val: &str) -> *const i8 {
+    fn c_str(&self, val: &str) -> *const i8 {
         format!("{}{}", val, "\0").as_ptr() as *const i8
     }
 }
