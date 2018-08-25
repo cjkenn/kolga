@@ -481,6 +481,23 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // LHS and RHS values.
                 self.llvm_val_from_op(&op_tkn.ty, lhs_llvm_val, rhs_llvm_val)
             },
+            Ast::Unary(op_tkn, mb_rhs) => {
+                let mb_rhs_llvm_val = self.gen_expr(&mb_rhs.clone().unwrap());
+                if mb_rhs_llvm_val.is_none() {
+                    return None;
+                }
+
+                let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
+                match op_tkn.ty {
+                    TknTy::Minus => {
+                        unsafe { Some(LLVMBuildFNeg(self.builder, rhs_llvm_val, c_str!("tmpneg"))) }
+                    },
+                    TknTy::Bang => {
+                        unsafe { Some(LLVMBuildNot(self.builder, rhs_llvm_val, c_str!("tmpnot")))  }
+                    },
+                    _ => None
+                }
+            },
             Ast::FnCall(mb_ident_tkn, params) => {
                 // Check if the function was defined in the IR. We should always have
                 // the function defined in the IR though, since we wouldn't pass the parsing
