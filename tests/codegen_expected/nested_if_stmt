@@ -1,19 +1,19 @@
 ; ModuleID = 'kolga'
 source_filename = "kolga"
 
-define float @if1() {
+define double @if1() {
 if1:
 }
 
-define float @if2() {
+define double @if2() {
 if2:
 }
 
-define float @if3() {
+define double @if3() {
 if3:
 }
 
-define float @main() {
+define double @main() {
 main:
   br i1 true, label %then, label %merge
 
@@ -21,19 +21,19 @@ then:                                             ; preds = %main
   br i1 true, label %then1, label %merge3
 
 then1:                                            ; preds = %then
-  %0 = call float @if1()
+  %0 = call double @if1()
   br label %merge3
 
 el2:                                              ; No predecessors!
 
 merge3:                                           ; preds = %then1, %then
-  %phi4 = phi float [ %0, %then1 ]
-  %1 = call float @if2()
+  %phi4 = phi double [ %0, %then1 ]
+  %1 = call double @if2()
   br label %merge
 
 el:                                               ; No predecessors!
 
 merge:                                            ; preds = %merge3, %main
-  %phi = phi float [ %1, %merge3 ]
-  %2 = call float @if3()
+  %phi = phi double [ %1, %merge3 ]
+  %2 = call double @if3()
 }

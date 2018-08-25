@@ -18,7 +18,7 @@ fn run(input_filename: &str, output_filename: &str, expected_filename: &str) {
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
     let mut valtab = ValTab::new();
-    let mut codegen = CodeGenerator::new(&ast, &mut symtab, &mut valtab);
+    let mut codegen = CodeGenerator::new(&ast, &mut valtab);
     codegen.gen();
     codegen.print_ir(String::from(output_filename));
 
@@ -45,49 +45,49 @@ fn diff_files(filename1: String, filename2: String) {
 }
 
 #[test]
-fn empty_fn_decl() {
+fn codegen_empty_fn_decl() {
     run("./tests/codegen_input/empty_fn",
         "./tests/codegen_output_empty_fn",
         "./tests/codegen_expected/empty_fn");
 }
 
 #[test]
-fn fn_call() {
+fn codegen_fn_call() {
     run("./tests/codegen_input/fn_call",
         "./tests/codegen_output_fn_call",
         "./tests/codegen_expected/fn_call");
 }
 
 #[test]
-fn if_stmt() {
+fn codegen_if_stmt() {
     run("./tests/codegen_input/if_stmt",
         "./tests/codegen_output_if_stmt",
         "./tests/codegen_expected/if_stmt");
 }
 
 #[test]
-fn if_else_stmt() {
+fn codegen_if_else_stmt() {
     run("./tests/codegen_input/if_else_stmt",
         "./tests/codegen_output_if_else_stmt",
         "./tests/codegen_expected/if_else_stmt");
 }
 
 #[test]
-fn if_elif_stmt() {
+fn codegen_if_elif_stmt() {
     run("./tests/codegen_input/if_elif_stmt",
         "./tests/codegen_output_if_elif_stmt",
         "./tests/codegen_expected/if_elif_stmt");
 }
 
 #[test]
-fn if_elif_else_stmt() {
+fn codegen_if_elif_else_stmt() {
     run("./tests/codegen_input/if_elif_else_stmt",
         "./tests/codegen_output_if_elif_else_stmt",
         "./tests/codegen_expected/if_elif_else_stmt");
 }
 
 #[test]
-fn nested_if_stmt() {
+fn codegen_nested_if_stmt() {
     run("./tests/codegen_input/nested_if_stmt",
         "./tests/codegen_output_nested_if_stmt",
         "./tests/codegen_expected/nested_if_stmt");

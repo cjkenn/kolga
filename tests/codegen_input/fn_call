@@ -1,5 +1,5 @@
-func test() num {}
+func test()~num {}
 
-func main() num {
+func main()~num {
      test();
 }

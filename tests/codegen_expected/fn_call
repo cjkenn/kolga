@@ -1,11 +1,11 @@
 ; ModuleID = 'kolga'
 source_filename = "kolga"
 
-define float @test() {
+define double @test() {
 test:
 }
 
-define float @main() {
+define double @main() {
 main:
-  %0 = call float @test()
+  %0 = call double @test()
 }
