@@ -147,6 +147,7 @@ impl<'l, 's> Parser<'l, 's> {
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
+                    is_global: self.symtab.is_global(),
                     value: Box::new(var_val)
                 })
             },
@@ -176,6 +177,7 @@ impl<'l, 's> Parser<'l, 's> {
                         ty_rec: cl_ty_rec,
                         ident_tkn: ident_tkn.clone().unwrap(),
                         is_imm: is_imm,
+                        is_global: self.symtab.is_global(),
                         value: Box::new(cl_assign)
                     });
                 }
@@ -194,7 +196,8 @@ impl<'l, 's> Parser<'l, 's> {
                 Some(Ast::VarDecl{
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
-                    is_imm: is_imm
+                    is_imm: is_imm,
+                    is_global: self.symtab.is_global()
                 })
             },
             _ => {
@@ -509,6 +512,7 @@ impl<'l, 's> Parser<'l, 's> {
                                     ty_rec: sym.ty_rec.clone(),
                                     ident_tkn: sym.ident_tkn.clone(),
                                     is_imm: sym.imm,
+                                    is_global: self.symtab.is_global(),
                                     value: Box::new(rhs)
                                 });
                             },

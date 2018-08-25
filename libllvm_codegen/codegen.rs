@@ -3,7 +3,6 @@ use llvm_sys::prelude::*;
 use llvm_sys::core::*;
 
 use kolgac::ast::Ast;
-use kolgac::symtab::SymbolTable;
 use kolgac::token::TknTy;
 use kolgac::type_record::{TyRecord, TyName};
 
@@ -25,12 +24,9 @@ macro_rules! c_str {
 /// CodeGenerator handles the code generation for LLVM IR. Converts an AST to LLVM IR. We assume
 /// there are no parsing errors and that each node in the AST can be safely unwrapped. Each
 /// variable can be assumed to exist.
-pub struct CodeGenerator<'t, 's, 'v> {
+pub struct CodeGenerator<'t, 'v> {
     /// Parsed AST
     ast: &'t Ast,
-
-    /// Symbol table. This reference should be the same one used by the parser.
-    symtab: &'s mut SymbolTable,
 
     /// Value table stores LLVMValueRef's for lookup.
     valtab: &'v mut ValTab,
@@ -50,7 +46,7 @@ pub struct CodeGenerator<'t, 's, 'v> {
 
 /// We implement Drop for the CodeGenerator to ensure that out LLVM structs are safely
 /// disposed of when the CodeGenerator goes out of scope.
-impl<'t, 's, 'v> Drop for CodeGenerator<'t, 's, 'v> {
+impl<'t, 'v> Drop for CodeGenerator<'t, 'v> {
     fn drop(&mut self) {
         unsafe {
             LLVMDisposeBuilder(self.builder);
@@ -60,18 +56,17 @@ impl<'t, 's, 'v> Drop for CodeGenerator<'t, 's, 'v> {
     }
 }
 
-impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
+impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Creates a new CodeGenerator, given a properly parsed AST, symbol table, and value table.
     /// We assume that the symbol table already contains all the required variables in this module,
     /// and that the value table is newly defined and should be empty.
     /// This function also sets up all the required LLVM structures needed to generate the IR:
     /// the context, the builder, and the module.
-    pub fn new(ast: &'t Ast, symtab: &'s mut SymbolTable, valtab: &'v mut ValTab) -> CodeGenerator<'t, 's, 'v> {
+    pub fn new(ast: &'t Ast, valtab: &'v mut ValTab) -> CodeGenerator<'t, 'v> {
         unsafe {
             let context = LLVMContextCreate();
             CodeGenerator {
                 ast: ast,
-                symtab: symtab,
                 valtab: valtab,
                 errors: Vec::new(),
                 context: context,
@@ -404,24 +399,34 @@ impl<'t, 's, 'v> CodeGenerator<'t, 's, 'v> {
 
                 Vec::new()
             },
-            Ast::VarAssign{ty_rec, ident_tkn, is_imm: _, value} => {
-                unsafe {
-                    // TODO: this only works inside functions. We should get the scope
-                    // level from the ast, and then switch on that to determine if we have
-                    // a global var using LLVMAddGlobal
-                    let insert_bb = LLVMGetInsertBlock(self.builder);
-                    let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
-                    let alloca_instr = self.build_entry_bb_alloca(llvm_func,
-                                                                  ty_rec.clone(),
-                                                                  &ident_tkn.get_name());
-                    let raw_val = value.clone().unwrap();
-                    let val = self.gen_expr(&raw_val).unwrap();
+            Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global, value} => {
+                match is_global {
+                    true => {
+                        unsafe {
+                            let c_name = format!("{}{}", ident_tkn.get_name(), "\0").as_ptr() as *const i8;
+                            let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
+                            LLVMAddGlobal(self.module, llvm_ty, c_name);
+                        }
+                    },
+                    false => {
+                        unsafe {
+                            let insert_bb = LLVMGetInsertBlock(self.builder);
+                            let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
+                            let alloca_instr = self.build_entry_bb_alloca(llvm_func,
+                                                                          ty_rec.clone(),
+                                                                          &ident_tkn.get_name());
+                            let raw_val = value.clone().unwrap();
+                            let val = self.gen_expr(&raw_val).unwrap();
 
-                    LLVMBuildStore(self.builder, val, alloca_instr);
-                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                            LLVMBuildStore(self.builder, val, alloca_instr);
+                            self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                        }
+                    }
                 }
-
                 Vec::new()
+            },
+            Ast::VarDecl{ty_rec, ident_tkn, is_imm:_, is_global} => {
+               unimplemented!("TODO: implement vardecl");
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt)
         }

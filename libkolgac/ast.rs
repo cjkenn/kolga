@@ -41,13 +41,15 @@ pub enum Ast {
     VarDecl {
         ty_rec: TyRecord,
         ident_tkn: Token,
-        is_imm: bool
+        is_imm: bool,
+        is_global: bool
     },
 
     VarAssign {
         ty_rec: TyRecord,
         ident_tkn: Token,
         is_imm: bool,
+        is_global: bool,
         value: Box<Option<Ast>>
     },
 

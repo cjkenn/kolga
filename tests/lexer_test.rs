@@ -6,7 +6,7 @@ use kolgac::lexer::Lexer;
 use kolgac::token::TknTy;
 
 #[test]
-fn test_lex_empty() {
+fn lex_empty() {
     let file = File::open("./tests/lexer_input/empty").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -14,7 +14,7 @@ fn test_lex_empty() {
 }
 
 #[test]
-fn test_lex_unrecognized() {
+fn lex_unrecognized() {
     let file = File::open("./tests/lexer_input/unrecognized").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -22,7 +22,7 @@ fn test_lex_unrecognized() {
 }
 
 #[test]
-fn test_lex_string_lit() {
+fn lex_string_lit() {
     let file = File::open("./tests/lexer_input/stringlit").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -32,7 +32,7 @@ fn test_lex_string_lit() {
 }
 
 #[test]
-fn test_lex_integer_lit() {
+fn lex_integer_lit() {
     let file = File::open("./tests/lexer_input/integerlit").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -42,7 +42,7 @@ fn test_lex_integer_lit() {
 }
 
 #[test]
-fn test_lex_float_lit() {
+fn lex_float_lit() {
     let file = File::open("./tests/lexer_input/floatlit").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -52,7 +52,7 @@ fn test_lex_float_lit() {
 }
 
 #[test]
-fn test_lex_unterminated_str_lit() {
+fn lex_unterminated_str_lit() {
     let file = File::open("./tests/lexer_input/untermstringlit").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -60,7 +60,7 @@ fn test_lex_unterminated_str_lit() {
 }
 
 #[test]
-fn test_lex_ident() {
+fn lex_ident() {
     let file = File::open("./tests/lexer_input/ident").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -70,7 +70,7 @@ fn test_lex_ident() {
 }
 
 #[test]
-fn test_lex_ident_string_lit() {
+fn lex_ident_string_lit() {
     let file = File::open("./tests/lexer_input/identstringlit").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -85,7 +85,7 @@ fn test_lex_ident_string_lit() {
 }
 
 #[test]
-fn test_lex_comment() {
+fn lex_comment() {
     let file = File::open("./tests/lexer_input/comment").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();
@@ -93,7 +93,7 @@ fn test_lex_comment() {
 }
 
 #[test]
-fn test_lex_comment_w_line() {
+fn lex_comment_w_line() {
     let file = File::open("./tests/lexer_input/commentandident").unwrap();
     let mut lexer = Lexer::new(file);
     let tkn = lexer.lex();

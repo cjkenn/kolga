@@ -31,9 +31,10 @@ fn parse_var_decl_mutable() {
 
     let var_decl = &extract_head(ast)[0];
     match var_decl {
-        Ast::VarDecl{ty_rec, ident_tkn, is_imm} => {
+        Ast::VarDecl{ty_rec, ident_tkn, is_imm, is_global} => {
             assert_eq!(ty_rec.ty, Some(TyName::Num));
             assert_eq!(*is_imm, false);
+            assert_eq!(*is_global, true);
 
             match ident_tkn.ty {
                 TknTy::Ident(ref id) => {
@@ -62,9 +63,10 @@ fn parse_var_assign_mutable() {
 
     let var_assign = &extract_head(ast)[0];
     match var_assign {
-        Ast::VarAssign{ty_rec, ident_tkn, is_imm, value} => {
+        Ast::VarAssign{ty_rec, ident_tkn, is_imm, is_global, value} => {
             assert_eq!(ty_rec.ty, Some(TyName::Num));
             assert_eq!(*is_imm, false);
+            assert_eq!(*is_global, true);
 
             match ident_tkn.ty {
                 TknTy::Ident(ref id) => {
@@ -96,9 +98,10 @@ fn parse_var_assign_imm() {
 
     let var_assign = &extract_head(ast)[0];
     match var_assign {
-        Ast::VarAssign{ty_rec, ident_tkn, is_imm, value} => {
+        Ast::VarAssign{ty_rec, ident_tkn, is_imm, is_global, value} => {
             assert_eq!(ty_rec.ty, Some(TyName::Num));
             assert_eq!(*is_imm, true);
+            assert_eq!(*is_global, true);
 
             match ident_tkn.ty {
                 TknTy::Ident(ref id) => {
@@ -123,7 +126,7 @@ fn parse_var_assign_imm() {
 }
 
 #[test]
-fn test_parse_unary_expr() {
+fn parse_unary_expr() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/unary_expr").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
@@ -150,7 +153,7 @@ fn test_parse_unary_expr() {
 }
 
 #[test]
-fn test_parse_binary_expr() {
+fn parse_binary_expr() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/binary_expr").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
@@ -184,7 +187,7 @@ fn test_parse_binary_expr() {
 }
 
 #[test]
-fn test_logical_expr() {
+fn parse_logical_expr() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/logical_expr").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
@@ -218,7 +221,7 @@ fn test_logical_expr() {
 }
 
 #[test]
-fn test_logical_expr_w_keyword() {
+fn parse_logical_expr_w_keyword() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/logical_keyword_expr").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
@@ -252,7 +255,7 @@ fn test_logical_expr_w_keyword() {
 }
 
 #[test]
-fn test_func_decl() {
+fn parse_func_decl() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/func_decl").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
@@ -288,7 +291,7 @@ fn test_func_decl() {
 }
 
 #[test]
-fn test_func_decl_w_call() {
+fn parse_func_decl_w_call() {
     let mut lexer = Lexer::new(File::open("./tests/parser_input/func_decl_w_call").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();

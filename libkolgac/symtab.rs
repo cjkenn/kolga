@@ -57,6 +57,10 @@ impl SymbolTable {
         self.finalized[0] = global_sc;
     }
 
+    pub fn is_global(&self) -> bool {
+        self.curr_level == 0
+    }
+
     pub fn level(&self) -> usize {
         self.curr_level
     }
