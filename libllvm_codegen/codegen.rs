@@ -514,8 +514,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         unsafe { Some(LLVMBuildFNeg(self.builder, rhs_llvm_val, c_str!("tmpneg"))) }
                     },
                     TknTy::Bang => {
-                        // TODO: this isnt logical negation, but bitwise negation
-                        unsafe { Some(LLVMBuildNot(self.builder, rhs_llvm_val, c_str!("tmpnot")))  }
+                        unsafe {
+                            // There isn't any logical not instruction, so we use XOR to
+                            // flip the value (which is of type i8 now) from 0/1 to represent
+                            // the opposite boolean value.
+                            let xor_rhs = LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE);
+                            Some(LLVMBuildXor(self.builder, rhs_llvm_val, xor_rhs, c_str!("tmpnot")))
+                        }
                     },
                     _ => None
                 }
