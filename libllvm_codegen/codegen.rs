@@ -1,6 +1,7 @@
 use llvm_sys::LLVMRealPredicate;
 use llvm_sys::prelude::*;
 use llvm_sys::core::*;
+use llvm_sys::transforms::scalar::*;
 
 use kolgac::ast::Ast;
 use kolgac::token::TknTy;
@@ -41,10 +42,13 @@ pub struct CodeGenerator<'t, 'v> {
     builder: LLVMBuilderRef,
 
     /// LLVM Module. We use only a single module for single file programs.
-    module: LLVMModuleRef
+    module: LLVMModuleRef,
+
+    /// LLVM Function pass manager, for some optimization passes after codegen.
+    fpm: LLVMPassManagerRef
 }
 
-/// We implement Drop for the CodeGenerator to ensure that out LLVM structs are safely
+/// We implement Drop for the CodeGenerator to ensure that our LLVM structs are safely
 /// disposed of when the CodeGenerator goes out of scope.
 impl<'t, 'v> Drop for CodeGenerator<'t, 'v> {
     fn drop(&mut self) {
@@ -52,6 +56,7 @@ impl<'t, 'v> Drop for CodeGenerator<'t, 'v> {
             LLVMDisposeBuilder(self.builder);
             LLVMDisposeModule(self.module);
             LLVMContextDispose(self.context);
+            LLVMDisposePassManager(self.fpm);
         }
     }
 }
@@ -65,13 +70,15 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     pub fn new(ast: &'t Ast, valtab: &'v mut ValTab) -> CodeGenerator<'t, 'v> {
         unsafe {
             let context = LLVMContextCreate();
+            let module = LLVMModuleCreateWithNameInContext(c_str!("kolga"), context);
             CodeGenerator {
                 ast: ast,
                 valtab: valtab,
                 errors: Vec::new(),
                 context: context,
-                module: LLVMModuleCreateWithNameInContext(c_str!("kolga"), context),
-                builder: LLVMCreateBuilderInContext(context)
+                builder: LLVMCreateBuilderInContext(context),
+                module: module,
+                fpm: LLVMCreateFunctionPassManagerForModule(module)
             }
         }
     }
@@ -80,6 +87,18 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// program and generates LLVM IR for each of them. The code is written to the module,
     /// to be converted to assembly later.
     pub fn gen(&mut self) {
+        // Add passes to our pass manager here, and then initialize the fpm.
+        // All desired passes should be added here.
+        // TODO: this make compile times too high. should extract to something else
+        // so we can ignore it for dev cycles.
+        unsafe {
+            LLVMAddPromoteMemoryToRegisterPass(self.fpm);
+            LLVMAddInstructionCombiningPass(self.fpm);
+            LLVMAddReassociatePass(self.fpm);
+
+            LLVMInitializeFunctionPassManager(self.fpm);
+        }
+
         match self.ast {
             Ast::Prog{stmts} => {
                 for stmt in stmts {
@@ -389,6 +408,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         _ => ()
                     }
 
+                    LLVMRunFunctionPassManager(self.fpm, llvm_fn);
+
                     // Close the function level scope, which will pop off any params and
                     // variable declared here (we don't need these anymore, since we aren't
                     // going to be making another pass over them later). Add the llvm function
@@ -493,6 +514,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         unsafe { Some(LLVMBuildFNeg(self.builder, rhs_llvm_val, c_str!("tmpneg"))) }
                     },
                     TknTy::Bang => {
+                        // TODO: this isnt logical negation, but bitwise negation
                         unsafe { Some(LLVMBuildNot(self.builder, rhs_llvm_val, c_str!("tmpnot")))  }
                     },
                     _ => None
