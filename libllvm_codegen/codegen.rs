@@ -89,12 +89,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     pub fn gen(&mut self) {
         // Add passes to our pass manager here, and then initialize the fpm.
         // All desired passes should be added here.
-        // TODO: this make compile times too high. should extract to something else
-        // so we can ignore it for dev cycles.
         unsafe {
-            LLVMAddPromoteMemoryToRegisterPass(self.fpm);
-            LLVMAddInstructionCombiningPass(self.fpm);
-            LLVMAddReassociatePass(self.fpm);
+            // TODO: this makes compile times super high. should extract to something else
+            // so we can ignore it for dev cycles.
+            // LLVMAddPromoteMemoryToRegisterPass(self.fpm);
+            // LLVMAddInstructionCombiningPass(self.fpm);
+            // LLVMAddReassociatePass(self.fpm);
 
             LLVMInitializeFunctionPassManager(self.fpm);
         }
@@ -299,6 +299,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let insert_bb = LLVMGetInsertBlock(self.builder);
                     let mut fn_val = LLVMGetBasicBlockParent(insert_bb);
 
+                    // Set up our blocks
                     let mut entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
                     let mut while_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("while"));
                     let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
@@ -307,7 +308,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
                     LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
-
+                    // Evaluate the conditional expression
                     let cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
                     if cond_val.is_none() {
                         let msg = format!("Error: codegen failed for ast {:?}", stmt);
@@ -315,15 +316,19 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         return Vec::new();
                     }
 
+                    // Buld the conditional branch
                     LLVMPositionBuilderAtEnd(self.builder, entry_bb);
                     LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
                     LLVMPositionBuilderAtEnd(self.builder, while_bb);
 
                     let mut stmt_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
-                    // TODO: need to re-evaluate cond_val here. Need to store a var and mutate it,
-                    // then update the storage. This should come once we get to defining and mutating
-                    // local vars. For now, this is always an infinite loop!
-                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
+
+                    // Evaluate the conditional expression again. This will handle reading
+                    // the updated loop variable (if any) to properly branch out of the loop
+                    // if necessary. We build another conditional branch in the loop to handle
+                    // this.
+                    let updated_cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
+                    LLVMBuildCondBr(self.builder, updated_cond_val.unwrap(), while_bb, merge_bb);
                     let mut while_end_bb = LLVMGetInsertBlock(self.builder);
                     LLVMPositionBuilderAtEnd(self.builder, merge_bb);
                     LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![while_end_bb].as_mut_ptr(), 1);
@@ -560,6 +565,21 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                        c_str!("")))
                 }
 
+            },
+            Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
+                // This is a variable re-assign, not a new declaration and assign. Thus,
+                // we look up the alloca instruction from the value table, and build
+                // a new store instruction for it. We don't need to update the value table
+                // (I don't THINK we need to), because we still want to manipulate the old
+                // alloca instruction.
+                unsafe {
+                    let curr_alloca_instr = self.valtab.retrieve(&ident_tkn.get_name()).unwrap();
+                    let raw_val = value.clone().unwrap();
+                    let val = self.gen_expr(&raw_val).unwrap();
+
+                    LLVMBuildStore(self.builder, val, curr_alloca_instr);
+                    Some(val)
+                }
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
         }

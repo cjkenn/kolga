@@ -49,7 +49,7 @@ impl<'t, 's> TyCheck<'t, 's> {
             // ignore var declaration without assign (nothing to check)
             Ast::VarDecl{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_} => (),
             Ast::VarAssign{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
-                self.check_var_assign(stmt);
+                self.check_var_assign(stmt, final_sc);
             },
             Ast::ExprStmt(ref maybe_ast) => {
                 let ast = maybe_ast.clone().unwrap();
@@ -148,7 +148,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn check_expr(&mut self, expr: Ast, final_sc: usize) -> TyName {
         match expr {
             Ast::VarAssign{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
-                self.check_var_assign(expr)
+                self.check_var_assign(expr, final_sc)
             },
             Ast::Unary(op_tkn, maybe_rhs) => {
                 let rhs = maybe_rhs.unwrap();
@@ -327,13 +327,14 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_var_assign(&mut self, stmt: Ast) -> TyName {
+    fn check_var_assign(&mut self, stmt: Ast, scope_lvl: usize) -> TyName {
         match stmt {
             Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
                 let lhs_ty = ty_rec.ty.unwrap();
                 let rhs = value.unwrap();
 
-                let rhs_ty = self.check_expr(rhs, 0);
+                // TODO: this shouldnt be 0 finalized scope
+                let rhs_ty = self.check_expr(rhs, scope_lvl);
                 if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);

@@ -69,7 +69,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    /// Parses a declaration. In kolga we can declare variables, functions, and classes..
+    /// Parses a declaration. In kolga we can declare variables, functions, and classes.
     fn decl(&mut self) -> Option<Ast> {
         match self.currtkn.ty {
             TknTy::Let => self.var_decl(),
