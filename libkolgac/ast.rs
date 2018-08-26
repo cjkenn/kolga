@@ -25,12 +25,12 @@ pub enum Ast {
     // Condition expr, stmts
     WhileStmt(Box<Option<Ast>>, Box<Option<Ast>>),
 
-    // Var decl, condition expr, incr/decr expr, stmts
-    ForStmt(Box<Option<Ast>>,
-            Box<Option<Ast>>,
-            Box<Option<Ast>>,
-            Box<Option<Ast>>
-    ),
+    ForStmt{
+        for_var_decl: Box<Option<Ast>>,
+        for_cond_expr: Box<Option<Ast>>,
+        for_step_expr: Box<Option<Ast>>,
+        stmts: Box<Option<Ast>>
+    },
 
     // Return expr, if any
     RetStmt(Box<Option<Ast>>),

@@ -19,7 +19,7 @@ fn run(input_filename: &str, output_filename: &str, expected_filename: &str) {
 
     let mut valtab = ValTab::new();
     let mut codegen = CodeGenerator::new(&ast, &mut valtab);
-    codegen.gen();
+    codegen.gen_ir();
     codegen.print_ir(String::from(output_filename));
 
     diff_files(String::from(output_filename), String::from(expected_filename));

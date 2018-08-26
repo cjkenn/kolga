@@ -84,17 +84,17 @@ impl<'t, 's> TyCheck<'t, 's> {
                 self.check_expr(maybe_expr_ast.clone().unwrap(), final_sc);
                 self.check_stmt(maybe_stmt_ast.clone().unwrap(), final_sc);
             },
-            Ast::ForStmt(decl_ast, cond_expr, incr_expr, stmts) => {
-                if decl_ast.is_some() {
-                    self.check_stmt(decl_ast.clone().unwrap(), final_sc);
+            Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
+                if for_var_decl.is_some() {
+                    self.check_stmt(for_var_decl.clone().unwrap(), final_sc);
                 }
 
-                if cond_expr.is_some() {
-                    self.check_stmt(cond_expr.clone().unwrap(), final_sc);
+                if for_cond_expr.is_some() {
+                    self.check_stmt(for_cond_expr.clone().unwrap(), final_sc);
                 }
 
-                if incr_expr.is_some() {
-                    self.check_stmt(incr_expr.clone().unwrap(), final_sc);
+                if for_step_expr.is_some() {
+                    self.check_stmt(for_step_expr.clone().unwrap(), final_sc);
                 }
 
                 self.check_stmt(stmts.clone().unwrap(), final_sc);

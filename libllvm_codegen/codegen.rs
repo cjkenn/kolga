@@ -112,44 +112,48 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     }
 
     pub fn gen_obj(&mut self) {
-        unsafe {
-            let triple = LLVMGetDefaultTargetTriple();
+        // TODO: compile times :(
 
-            LLVM_InitializeAllTargetInfos();
-            LLVM_InitializeAllTargets();
-            LLVM_InitializeAllTargetMCs();
-            LLVM_InitializeAllAsmParsers();
-            LLVM_InitializeAllAsmPrinters();
+        // unsafe {
+        //     let triple = LLVMGetDefaultTargetTriple();
 
-            let target = ptr::null_mut();
-            let err_msg = ptr::null_mut();
-            LLVMGetTargetFromTriple(triple, target, err_msg);
-            // TODO: err check
+        //     LLVM_InitializeAllTargetInfos();
+        //     LLVM_InitializeAllTargets();
+        //     LLVM_InitializeAllTargetMCs();
+        //     LLVM_InitializeAllAsmParsers();
+        //     LLVM_InitializeAllAsmPrinters();
 
-            let cpu = c_str!("generic");
-            let features = c_str!("");
-            let target_machine = LLVMCreateTargetMachine(*target,
-                                                         triple,
-                                                         cpu,
-                                                         features,
-                                                         LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
-                                                         LLVMRelocMode::LLVMRelocDefault,
-                                                         LLVMCodeModel::LLVMCodeModelDefault);
+        //     let target = ptr::null_mut();
+        //     let err_msg = ptr::null_mut();
+        //     LLVMGetTargetFromTriple(triple, target, err_msg);
+        //     // TODO: err check
+
+        //     let cpu = c_str!("generic");
+        //     let features = c_str!("");
+        //     let target_machine = LLVMCreateTargetMachine(*target,
+        //                                                  triple,
+        //                                                  cpu,
+        //                                                  features,
+        //                                                  LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
+        //                                                  LLVMRelocMode::LLVMRelocDefault,
+        //                                                  LLVMCodeModel::LLVMCodeModelDefault);
 
 
-            let mut gen_obj_error = c_str!("error generating objext file") as *mut i8;
-            LLVMTargetMachineEmitToFile(target_machine,
-                                        self.module,
-                                        c_str!("my_module") as *mut i8,
-                                        LLVMCodeGenFileType::LLVMObjectFile,
-                                        &mut gen_obj_error);
-        }
+        //     let mut gen_obj_error = c_str!("error generating objext file") as *mut i8;
+        //     LLVMTargetMachineEmitToFile(target_machine,
+        //                                 self.module,
+        //                                 c_str!("my_module") as *mut i8,
+        //                                 LLVMCodeGenFileType::LLVMObjectFile,
+        //                                 &mut gen_obj_error);
+        // }
     }
 
+    /// Dumps the current module's IR to stdout.
     pub fn dump_ir(&self) {
         unsafe { LLVMDumpModule(self.module); }
     }
 
+    /// Saves the current module's IR to a file.
     pub fn print_ir(&self, filename: String) {
         unsafe {
             LLVMPrintModuleToFile(self.module,
@@ -369,6 +373,42 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let mut while_end_bb = LLVMGetInsertBlock(self.builder);
                     LLVMPositionBuilderAtEnd(self.builder, merge_bb);
                     LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![while_end_bb].as_mut_ptr(), 1);
+                }
+
+                Vec::new()
+            },
+            Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
+                unsafe {
+                    let insert_bb = LLVMGetInsertBlock(self.builder);
+                    let mut fn_val = LLVMGetBasicBlockParent(insert_bb);
+
+                    let mut entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
+                    let mut for_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("for"));
+                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+
+                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                    let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
+                    LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+
+                    // Codegen the var declaration and save the loop counter variable. We do this
+                    // first to store the loop var and to make sure it's allocated.
+                    self.gen_stmt(&for_var_decl.clone().unwrap());
+                    LLVMBuildBr(self.builder, for_bb);
+                    LLVMPositionBuilderAtEnd(self.builder, for_bb);
+
+                    // Codegen the for loop body
+                    let mut stmt_vals = self.gen_stmt(&stmts.clone().unwrap());
+
+                    // Codegen the loop step counter
+                    self.gen_stmt(&for_step_expr.clone().unwrap());
+
+                    // Codegen the conditional for exit the loop
+                    let cond_val = self.gen_stmt(&for_cond_expr.clone().unwrap())[0];
+                    LLVMBuildCondBr(self.builder, cond_val, for_bb, merge_bb);
+
+                    let mut for_end_bb = LLVMGetInsertBlock(self.builder);
+                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                    LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![for_end_bb].as_mut_ptr(), 1);
                 }
 
                 Vec::new()

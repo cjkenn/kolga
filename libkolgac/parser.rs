@@ -129,7 +129,7 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty {
             TknTy::Eq => {
                 self.consume();
-                let var_val = self.parse_expr();
+                let var_val = self.expr();
                 self.expect(TknTy::Semicolon);
 
                 let ty_rec = TyRecord::new_from_tkn(var_ty_tkn.unwrap());
@@ -338,9 +338,9 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::If => self.if_stmt(),
             TknTy::While => self.while_stmt(),
             TknTy::For => self.for_stmt(),
-            TknTy::Return => self.parse_ret_stmt(),
+            TknTy::Return => self.ret_stmt(),
             TknTy::LeftBrace => self.block_stmt(),
-            _ => self.parse_expr_stmt()
+            _ => self.expr_stmt()
         }
     }
 
@@ -367,9 +367,11 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
+    /// Parse an if statement, including else and elif blocks. These are stored in the
+    /// IfStmt Ast type.
     fn if_stmt(&mut self) -> Option<Ast> {
         self.expect(TknTy::If);
-        let maybe_if_cond = self.parse_expr();
+        let maybe_if_cond = self.expr();
         if maybe_if_cond.is_none() {
             return None;
         }
@@ -381,7 +383,7 @@ impl<'l, 's> Parser<'l, 's> {
             match self.currtkn.ty {
                 TknTy::Elif => {
                     self.consume();
-                    let maybe_elif_ast = self.parse_expr();
+                    let maybe_elif_ast = self.expr();
                     let maybe_elif_blck = self.block_stmt();
                     else_ifs.push(Some(Ast::ElifStmt(Box::new(maybe_elif_ast), Box::new(maybe_elif_blck))));
                 },
@@ -402,7 +404,7 @@ impl<'l, 's> Parser<'l, 's> {
     fn while_stmt(&mut self) -> Option<Ast> {
         self.expect(TknTy::While);
         // TODO: skip expr for infinite loop when we have a break stmt
-        let maybe_while_cond = self.parse_expr();
+        let maybe_while_cond = self.expr();
         if maybe_while_cond.is_none() {
             return None;
         }
@@ -431,27 +433,28 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
             _ => {
-                for_var_cond = self.parse_expr_stmt();
+                for_var_cond = self.expr_stmt();
             }
         };
 
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
             _ => {
-                for_incr_expr = self.parse_expr_stmt();
+                for_incr_expr = self.expr_stmt();
             }
         };
 
         let for_stmt = self.block_stmt();
 
-        Some(Ast::ForStmt(Box::new(for_var_decl),
-                          Box::new(for_var_cond),
-                          Box::new(for_incr_expr),
-                          Box::new(for_stmt)))
-
+        Some(Ast::ForStmt{
+            for_var_decl: Box::new(for_var_decl),
+            for_cond_expr: Box::new(for_var_cond),
+            for_step_expr: Box::new(for_incr_expr),
+            stmts: Box::new(for_stmt)
+        })
     }
 
-    fn parse_ret_stmt(&mut self) -> Option<Ast> {
+    fn ret_stmt(&mut self) -> Option<Ast> {
         self.expect(TknTy::Return);
         match self.currtkn.ty {
             TknTy::Semicolon => {
@@ -459,25 +462,25 @@ impl<'l, 's> Parser<'l, 's> {
                 Some(Ast::RetStmt(Box::new(None)))
             },
             _ => {
-                let maybe_ret_expr = self.parse_expr();
+                let maybe_ret_expr = self.expr();
                 self.expect(TknTy::Semicolon);
                 Some(Ast::RetStmt(Box::new(maybe_ret_expr)))
             }
         }
     }
 
-    fn parse_expr_stmt(&mut self) -> Option<Ast> {
-        let maybe_expr = self.parse_expr();
+    fn expr_stmt(&mut self) -> Option<Ast> {
+        let maybe_expr = self.expr();
         self.expect(TknTy::Semicolon);
         Some(Ast::ExprStmt(Box::new(maybe_expr)))
     }
 
-    fn parse_expr(&mut self) -> Option<Ast> {
-        self.parse_assign_expr()
+    fn expr(&mut self) -> Option<Ast> {
+        self.assign_expr()
     }
 
-    fn parse_assign_expr(&mut self) -> Option<Ast> {
-        let maybe_ast = self.parse_logicor_expr();
+    fn assign_expr(&mut self) -> Option<Ast> {
+        let maybe_ast = self.logicor_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -486,7 +489,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::Eq => {
                 let op = self.currtkn.clone();
                 self.consume();
-                let rhs = self.parse_assign_expr();
+                let rhs = self.assign_expr();
 
                 match maybe_ast.clone().unwrap() {
                     Ast::Primary(tyrec) => {
@@ -540,8 +543,8 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_logicor_expr(&mut self) -> Option<Ast> {
-        let mut maybe_ast = self.parse_logicand_expr();
+    fn logicor_expr(&mut self) -> Option<Ast> {
+        let mut maybe_ast = self.logicand_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -551,7 +554,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::PipePipe | TknTy::Or => {
                     let op = self.currtkn.clone();
                     self.consume();
-                    let rhs = self.parse_logicand_expr();
+                    let rhs = self.logicand_expr();
                     maybe_ast = Some(Ast::Logical(op, Box::new(maybe_ast), Box::new(rhs)));
                 },
                 _ => break
@@ -561,8 +564,8 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_logicand_expr(&mut self) -> Option<Ast> {
-        let mut maybe_ast = self.parse_eq_expr();
+    fn logicand_expr(&mut self) -> Option<Ast> {
+        let mut maybe_ast = self.eq_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -572,7 +575,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::AmpAmp | TknTy::And => {
                     let op = self.currtkn.clone();
                     self.consume();
-                    let rhs = self.parse_eq_expr();
+                    let rhs = self.eq_expr();
                     maybe_ast = Some(Ast::Logical(op, Box::new(maybe_ast), Box::new(rhs)));
                 },
                 _ => break
@@ -582,8 +585,8 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_eq_expr(&mut self) -> Option<Ast> {
-        let mut maybe_ast = self.parse_cmp_expr();
+    fn eq_expr(&mut self) -> Option<Ast> {
+        let mut maybe_ast = self.cmp_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -593,7 +596,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::BangEq | TknTy::EqEq => {
                     let op = self.currtkn.clone();
                     self.consume();
-                    let rhs = self.parse_cmp_expr();
+                    let rhs = self.cmp_expr();
                     maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)));
                 },
                 _ => break
@@ -603,8 +606,8 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_cmp_expr(&mut self) -> Option<Ast> {
-        let mut maybe_ast = self.parse_addsub_expr();
+    fn cmp_expr(&mut self) -> Option<Ast> {
+        let mut maybe_ast = self.addsub_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -614,7 +617,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::Lt | TknTy::LtEq | TknTy::Gt | TknTy::GtEq => {
                     let op = self.currtkn.clone();
                     self.consume();
-                    let rhs = self.parse_addsub_expr();
+                    let rhs = self.addsub_expr();
                     maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)));
                 },
                 _ => break
@@ -624,8 +627,8 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_addsub_expr(&mut self) -> Option<Ast> {
-        let mut maybe_ast = self.parse_muldiv_expr();
+    fn addsub_expr(&mut self) -> Option<Ast> {
+        let mut maybe_ast = self.muldiv_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -635,7 +638,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::Plus | TknTy::Minus => {
                     let op = self.currtkn.clone();
                     self.consume();
-                    let rhs = self.parse_muldiv_expr();
+                    let rhs = self.muldiv_expr();
                     maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)));
                 },
                 _ => break
@@ -645,8 +648,8 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_muldiv_expr(&mut self) -> Option<Ast> {
-        let mut maybe_ast = self.parse_unr_expr();
+    fn muldiv_expr(&mut self) -> Option<Ast> {
+        let mut maybe_ast = self.unary_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -656,7 +659,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::Star | TknTy::Slash => {
                     let op = self.currtkn.clone();
                     self.consume();
-                    let rhs = self.parse_unr_expr();
+                    let rhs = self.unary_expr();
                     maybe_ast = Some(Ast::Binary(op, Box::new(maybe_ast), Box::new(rhs)))
                 },
                 _ => break
@@ -666,20 +669,20 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_unr_expr(&mut self) -> Option<Ast> {
+    fn unary_expr(&mut self) -> Option<Ast> {
         match self.currtkn.ty {
             TknTy::Bang | TknTy::Minus => {
                 let op = self.currtkn.clone();
                 self.consume();
-                let rhs = self.parse_unr_expr();
+                let rhs = self.unary_expr();
                 return Some(Ast::Unary(op, Box::new(rhs)));
             },
-            _ => self.parse_fncall_expr()
+            _ => self.fncall_expr()
         }
     }
 
-    fn parse_fncall_expr(&mut self) -> Option<Ast> {
-        let mut maybe_ast = self.parse_primary_expr();
+    fn fncall_expr(&mut self) -> Option<Ast> {
+        let mut maybe_ast = self.primary_expr();
         if maybe_ast.is_none() {
             return None;
         }
@@ -692,7 +695,7 @@ impl<'l, 's> Parser<'l, 's> {
         // TODO: loop this?
         match self.currtkn.ty {
             TknTy::LeftParen => {
-                maybe_ast = self.parse_fnparams_expr(func_name_tkn);
+                maybe_ast = self.fnparams_expr(func_name_tkn);
             },
             TknTy::Period => {
                 // calling a method on a class or getting a property
@@ -700,7 +703,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let name = self.match_ident_tkn();
                 match self.currtkn.ty {
                     TknTy::LeftParen => {
-                        let fn_ast = self.parse_fnparams_expr(name.clone());
+                        let fn_ast = self.fnparams_expr(name.clone());
                         let params = fn_ast.unwrap().extract_params();
                         maybe_ast = Some(Ast::ClassFnCall(func_name_tkn.clone().unwrap(),
                                                           name.unwrap().clone(),
@@ -717,7 +720,7 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn parse_fnparams_expr(&mut self, fn_tkn: Option<Token>) -> Option<Ast> {
+    fn fnparams_expr(&mut self, fn_tkn: Option<Token>) -> Option<Ast> {
         self.expect(TknTy::LeftParen);
 
         let fn_sym = self.symtab.retrieve(&fn_tkn.clone().unwrap().get_name());
@@ -738,7 +741,7 @@ impl<'l, 's> Parser<'l, 's> {
                 return None;
             }
 
-            match self.parse_expr() {
+            match self.expr() {
                 Some(a) => params.push(a),
                 None => ()
             };
@@ -752,7 +755,6 @@ impl<'l, 's> Parser<'l, 's> {
         self.expect(TknTy::RightParen);
 
         let expected_params = fn_sym.clone().unwrap().fn_params.clone().unwrap();
-
         if expected_params.len() != params.len() {
             // TODO: could pass in a list here and print the list instead of the counts
             let err_msg = format!("Incorrect function parameters: Expected {} arguments, but found {}.",
@@ -766,7 +768,7 @@ impl<'l, 's> Parser<'l, 's> {
         Some(Ast::FnCall(fn_tkn, params))
     }
 
-    fn parse_primary_expr(&mut self) -> Option<Ast> {
+    fn primary_expr(&mut self) -> Option<Ast> {
         match self.currtkn.ty.clone() {
             TknTy::Str(_) |
             TknTy::Val(_) |
@@ -802,7 +804,7 @@ impl<'l, 's> Parser<'l, 's> {
             },
             TknTy::LeftParen => {
                 self.consume();
-                let ast = self.parse_expr();
+                let ast = self.expr();
                 self.expect(TknTy::RightParen);
                 ast
             },
