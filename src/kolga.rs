@@ -68,6 +68,6 @@ fn main() {
 
     let mut valtab = ValTab::new();
     let mut llvm_codegen = CodeGenerator::new(&ast, &mut valtab);
-    llvm_codegen.gen();
+    llvm_codegen.gen_ir();
     llvm_codegen.dump_ir();
 }

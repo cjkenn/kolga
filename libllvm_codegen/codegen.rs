@@ -2,6 +2,8 @@ use llvm_sys::LLVMRealPredicate;
 use llvm_sys::prelude::*;
 use llvm_sys::core::*;
 use llvm_sys::transforms::scalar::*;
+use llvm_sys::target::*;
+use llvm_sys::target_machine::*;
 
 use kolgac::ast::Ast;
 use kolgac::token::TknTy;
@@ -86,7 +88,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Initial entry point for LLVM IR code generation. Loops through each statement in the
     /// program and generates LLVM IR for each of them. The code is written to the module,
     /// to be converted to assembly later.
-    pub fn gen(&mut self) {
+    pub fn gen_ir(&mut self) {
         // Add passes to our pass manager here, and then initialize the fpm.
         // All desired passes should be added here.
         unsafe {
@@ -106,6 +108,41 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             },
             _ => ()
+        }
+    }
+
+    pub fn gen_obj(&mut self) {
+        unsafe {
+            let triple = LLVMGetDefaultTargetTriple();
+
+            LLVM_InitializeAllTargetInfos();
+            LLVM_InitializeAllTargets();
+            LLVM_InitializeAllTargetMCs();
+            LLVM_InitializeAllAsmParsers();
+            LLVM_InitializeAllAsmPrinters();
+
+            let target = ptr::null_mut();
+            let err_msg = ptr::null_mut();
+            LLVMGetTargetFromTriple(triple, target, err_msg);
+            // TODO: err check
+
+            let cpu = c_str!("generic");
+            let features = c_str!("");
+            let target_machine = LLVMCreateTargetMachine(*target,
+                                                         triple,
+                                                         cpu,
+                                                         features,
+                                                         LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
+                                                         LLVMRelocMode::LLVMRelocDefault,
+                                                         LLVMCodeModel::LLVMCodeModelDefault);
+
+
+            let mut gen_obj_error = c_str!("error generating objext file") as *mut i8;
+            LLVMTargetMachineEmitToFile(target_machine,
+                                        self.module,
+                                        c_str!("my_module") as *mut i8,
+                                        LLVMCodeGenFileType::LLVMObjectFile,
+                                        &mut gen_obj_error);
         }
     }
 
@@ -566,7 +603,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
 
             },
-            Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
+            Ast::VarAssign{ty_rec:_, ident_tkn, is_imm:_, is_global:_, value} => {
                 // This is a variable re-assign, not a new declaration and assign. Thus,
                 // we look up the alloca instruction from the value table, and build
                 // a new store instruction for it. We don't need to update the value table
