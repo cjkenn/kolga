@@ -100,5 +100,51 @@ fn lex_comment_w_line() {
     assert_eq!(tkn.ty, TknTy::Ident(String::from("ident")));
     assert_eq!(tkn.line, 2);
     assert_eq!(tkn.pos, 0);
+}
 
+#[test]
+fn peek_tkn_same_line() {
+    let file = File::open("./tests/lexer_input/ident").unwrap();
+    let mut lexer = Lexer::new(file);
+    let tkn = lexer.peek_tkn();
+    assert_eq!(tkn.ty, TknTy::Ident(String::from("ident")));
+    assert_eq!(tkn.line, 1);
+    assert_eq!(tkn.pos, 0);
+
+    let tkn2 = lexer.lex();
+    assert_eq!(tkn, tkn2);
+}
+
+#[test]
+fn peek_tkn_multiple_peeks() {
+    let file = File::open("./tests/lexer_input/ident").unwrap();
+    let mut lexer = Lexer::new(file);
+    let tkn = lexer.peek_tkn();
+    assert_eq!(tkn.ty, TknTy::Ident(String::from("ident")));
+    assert_eq!(tkn.line, 1);
+    assert_eq!(tkn.pos, 0);
+
+    let tkn2 = lexer.peek_tkn();
+    assert_eq!(tkn, tkn2);
+}
+
+#[test]
+fn peek_tkn_two_lines() {
+    let file = File::open("./tests/lexer_input/peek_tkn_two_lines").unwrap();
+    let mut lexer = Lexer::new(file);
+    let tkn = lexer.peek_tkn();
+    assert_eq!(tkn.ty, TknTy::Ident(String::from("ident")));
+    assert_eq!(tkn.line, 1);
+    assert_eq!(tkn.pos, 0);
+
+    let tkn2 = lexer.lex();
+    assert_eq!(tkn, tkn2);
+
+    let tkn3 = lexer.peek_tkn();
+    assert_eq!(tkn3.ty, TknTy::Str(String::from("string")));
+    assert_eq!(tkn3.line, 2);
+    assert_eq!(tkn3.pos, 0);
+
+    let tkn4 = lexer.lex();
+    assert_eq!(tkn3, tkn4);
 }

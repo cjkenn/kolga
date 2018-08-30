@@ -790,10 +790,15 @@ impl<'l, 's> Parser<'l, 's> {
 
                 let sym = mb_sym.unwrap();
                 if sym.assign_val.is_none() && sym.sym_ty != SymTy::Param {
-                    let msg = format!("Cannot use un-assigned variable {} in operation", ident_name);
-                    self.err_from_tkn(msg);
-                    self.consume();
-                    return None;
+                    let next_tkn = self.lexer.peek_tkn();
+                    // If the following token is '=', we don't need to report an error
+                    // for unitialized var (we are initializing it here).
+                    if next_tkn.ty != TknTy::Eq {
+                        let msg = format!("Cannot use un-assigned variable {}", ident_name);
+                        self.err_from_tkn(msg);
+                        self.consume();
+                        return None;
+                    }
                 }
 
                 let mut ty_rec = sym.ty_rec.clone();

@@ -1,4 +1,4 @@
-use std::io::{BufReader, BufRead};
+use std::io::{BufReader, BufRead, Seek, SeekFrom};
 use std::fs::File;
 use std::collections::HashMap;
 
@@ -23,14 +23,17 @@ pub struct Lexer {
     buffer: Vec<char>,
 
     /// Reserved words mapping
-    reserved: HashMap<String, TknTy>
+    reserved: HashMap<String, TknTy>,
+
+    /// Number of cumulative bytes read by the reader in this lexer
+    bytes_read: usize
 }
 
 impl Lexer {
     pub fn new(infile: File) -> Lexer {
         let mut reader = BufReader::new(infile);
         let mut buf = String::new();
-        reader.read_line(&mut buf).ok();
+        let init_bytes = reader.read_line(&mut buf).expect("reading from buffer won't fail");
 
         let buffer: Vec<char> = buf.chars().collect();
         let currch = if buffer.len() == 0 {
@@ -72,7 +75,8 @@ impl Lexer {
             pos: 0,
             reader: reader,
             buffer: buffer,
-            reserved: r
+            reserved: r,
+            bytes_read: init_bytes
         }
     }
 
@@ -194,6 +198,32 @@ impl Lexer {
                 self.eof_tkn()
             }
         }
+    }
+
+    /// Look ahead to the next token, and then reest the buffer and rewind
+    /// the reader for future calls to lex().
+    pub fn peek_tkn(&mut self) -> Token {
+        // Copy the current state of the lexer
+        let start_curr = self.curr;
+        let start_pos = self.pos;
+        let start_line = self.linenum;
+        let start_buffer = self.buffer.clone();
+        let start_bytes_read = self.bytes_read;
+
+        let tkn = self.lex();
+
+        // Rewind the reader to its place before we performed
+        // reads in the lex() call
+        let seek_bytes = (self.bytes_read - start_bytes_read) as i64;
+        self.reader.seek(SeekFrom::Current(-seek_bytes));
+
+        // Reset the state of the lexer to what it was before the peek
+        self.curr = start_curr;
+        self.pos = start_pos;
+        self.linenum = start_line;
+        self.buffer = start_buffer;
+
+        tkn
     }
 
     /// Lex a string literal. We expect to have a " character when this
@@ -349,8 +379,9 @@ impl Lexer {
     /// Read the next line of the input file into the buffer.
     fn next_line(&mut self) {
         let mut buf = String::new();
-        self.reader.read_line(&mut buf).ok();
+        let line_bytes = self.reader.read_line(&mut buf).expect("file reader should not fail");
         self.buffer = buf.chars().collect();
+        self.bytes_read = self.bytes_read + line_bytes;
 
         self.pos = 0;
         self.linenum = self.linenum + 1;
