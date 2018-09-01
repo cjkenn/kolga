@@ -13,6 +13,7 @@ use types::check::TyCheck;
 
 use llvm_codegen::codegen::CodeGenerator;
 use llvm_codegen::valtab::ValTab;
+use llvm_codegen::objgen::ObjGenerator;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -70,5 +71,7 @@ fn main() {
     let mut llvm_codegen = CodeGenerator::new(&ast, &mut valtab);
     llvm_codegen.gen_ir();
     llvm_codegen.dump_ir();
-    llvm_codegen.gen_obj();
+
+    let mut obj_writer = ObjGenerator::new(llvm_codegen.get_mod());
+    obj_writer.emit(filename);
 }

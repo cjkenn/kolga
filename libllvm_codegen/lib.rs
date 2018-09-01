@@ -2,5 +2,13 @@ extern crate llvm_sys;
 extern crate kolgac;
 extern crate errors;
 
+macro_rules! c_str {
+    ($s:expr) => (
+        concat!($s, "\0").as_ptr() as *const i8
+    );
+}
+
 pub mod codegen;
 pub mod valtab;
+pub mod fpm;
+pub mod objgen;

@@ -1,9 +1,6 @@
 use llvm_sys::LLVMRealPredicate;
 use llvm_sys::prelude::*;
 use llvm_sys::core::*;
-use llvm_sys::transforms::scalar::*;
-use llvm_sys::target::*;
-use llvm_sys::target_machine::*;
 
 use kolgac::ast::Ast;
 use kolgac::token::TknTy;
@@ -11,18 +8,13 @@ use kolgac::type_record::{TyRecord, TyName};
 
 use errors::ErrCodeGen;
 use valtab::ValTab;
+use fpm::FPM;
 
 use std::ptr;
 use std::slice;
 
 const LLVM_FALSE: LLVMBool = 0;
 const LLVM_TRUE: LLVMBool = 1;
-
-macro_rules! c_str {
-    ($s:expr) => (
-        concat!($s, "\0").as_ptr() as *const i8
-    );
-}
 
 /// CodeGenerator handles the code generation for LLVM IR. Converts an AST to LLVM IR. We assume
 /// there are no parsing errors and that each node in the AST can be safely unwrapped. Each
@@ -46,8 +38,8 @@ pub struct CodeGenerator<'t, 'v> {
     /// LLVM Module. We use only a single module for single file programs.
     module: LLVMModuleRef,
 
-    /// LLVM Function pass manager, for some optimization passes after codegen.
-    fpm: LLVMPassManagerRef
+    /// LLVM Function pass manager, for some optimization passes after function codegen.
+    fpm: FPM
 }
 
 /// We implement Drop for the CodeGenerator to ensure that our LLVM structs are safely
@@ -58,7 +50,6 @@ impl<'t, 'v> Drop for CodeGenerator<'t, 'v> {
             LLVMDisposeBuilder(self.builder);
             LLVMDisposeModule(self.module);
             LLVMContextDispose(self.context);
-            LLVMDisposePassManager(self.fpm);
         }
     }
 }
@@ -80,7 +71,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 context: context,
                 builder: LLVMCreateBuilderInContext(context),
                 module: module,
-                fpm: LLVMCreateFunctionPassManagerForModule(module)
+                fpm: FPM::new(module)
             }
         }
     }
@@ -89,18 +80,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// program and generates LLVM IR for each of them. The code is written to the module,
     /// to be converted to assembly later.
     pub fn gen_ir(&mut self) {
-        // Add passes to our pass manager here, and then initialize the fpm.
-        // All desired passes should be added here.
-        unsafe {
-            // TODO: this makes compile times super high. should extract to something else
-            // so we can ignore it for dev cycles.
-            // LLVMAddPromoteMemoryToRegisterPass(self.fpm);
-            // LLVMAddInstructionCombiningPass(self.fpm);
-            // LLVMAddReassociatePass(self.fpm);
-
-            LLVMInitializeFunctionPassManager(self.fpm);
-        }
-
         match self.ast {
             Ast::Prog{stmts} => {
                 for stmt in stmts {
@@ -109,43 +88,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             },
             _ => ()
         }
-    }
-
-    pub fn gen_obj(&mut self) {
-        // TODO: compile times :(
-
-        // unsafe {
-        //     let triple = LLVMGetDefaultTargetTriple();
-
-        //     LLVM_InitializeAllTargetInfos();
-        //     LLVM_InitializeAllTargets();
-        //     LLVM_InitializeAllTargetMCs();
-        //     LLVM_InitializeAllAsmParsers();
-        //     LLVM_InitializeAllAsmPrinters();
-
-        //     let target = ptr::null_mut();
-        //     let err_msg = ptr::null_mut();
-        //     LLVMGetTargetFromTriple(triple, target, err_msg);
-        //     // TODO: err check
-
-        //     let cpu = c_str!("generic");
-        //     let features = c_str!("");
-        //     let target_machine = LLVMCreateTargetMachine(*target,
-        //                                                  triple,
-        //                                                  cpu,
-        //                                                  features,
-        //                                                  LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
-        //                                                  LLVMRelocMode::LLVMRelocDefault,
-        //                                                  LLVMCodeModel::LLVMCodeModelDefault);
-
-
-        //     let mut gen_obj_error = c_str!("error generating objext file") as *mut i8;
-        //     LLVMTargetMachineEmitToFile(target_machine,
-        //                                 self.module,
-        //                                 c_str!("my_module") as *mut i8,
-        //                                 LLVMCodeGenFileType::LLVMObjectFile,
-        //                                 &mut gen_obj_error);
-        // }
     }
 
     /// Dumps the current module's IR to stdout.
@@ -160,6 +102,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                   filename.as_bytes().as_ptr() as *const i8,
                                   ptr::null_mut());
         }
+    }
+
+    pub fn get_mod(&self) -> LLVMModuleRef {
+        self.module
     }
 
     /// Generate LLVM IR for a kolga statement. This handles all statement types, and will also
@@ -498,7 +444,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         _ => ()
                     }
 
-                    LLVMRunFunctionPassManager(self.fpm, llvm_fn);
+                    // Run the function pass through our manager
+                    self.fpm.run(llvm_fn);
 
                     // Close the function level scope, which will pop off any params and
                     // variable declared here (we don't need these anymore, since we aren't
@@ -521,7 +468,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             let val = self.gen_expr(&value.clone().unwrap()).unwrap();
                             LLVMSetInitializer(global, val);
                             self.valtab.store(&ident_tkn.get_name(), global);
-                            return vec![global];
+                            vec![global]
                         }
                     },
                     false => {
@@ -536,11 +483,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                             LLVMBuildStore(self.builder, val, alloca_instr);
                             self.valtab.store(&ident_tkn.get_name(), alloca_instr);
-                            return vec![alloca_instr];
+                            vec![alloca_instr]
                         }
                     }
                 }
-                Vec::new()
             },
             Ast::VarDecl{ty_rec, ident_tkn, is_imm:_, is_global} => {
                 match is_global {
