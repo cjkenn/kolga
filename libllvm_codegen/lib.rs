@@ -10,5 +10,6 @@ macro_rules! c_str {
 
 pub mod codegen;
 pub mod valtab;
+pub mod classtab;
 pub mod fpm;
 pub mod objgen;

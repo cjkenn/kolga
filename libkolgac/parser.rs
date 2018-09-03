@@ -319,7 +319,12 @@ impl<'l, 's> Parser<'l, 's> {
             }
         }
 
-        let ast = Some(Ast::ClassDecl(class_tkn.clone(), methods, props));
+        let ast = Some(Ast::ClassDecl {
+            ident_tkn: class_tkn.clone(),
+            methods: methods,
+            props: props
+        });
+
         let sym = Sym::new(SymTy::Class,
                            true,
                            TyRecord::new_from_tkn(class_tkn.clone()),

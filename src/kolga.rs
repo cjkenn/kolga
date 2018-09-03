@@ -13,7 +13,6 @@ use types::check::TyCheck;
 
 use llvm_codegen::codegen::CodeGenerator;
 use llvm_codegen::valtab::ValTab;
-use llvm_codegen::objgen::ObjGenerator;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -55,6 +54,7 @@ fn main() {
     }
 
     let ast = parse_result.ast.unwrap();
+    println!("{:?}", ast);
 
     // We can be assured that all ast values are Some, since None is only returned
     // if there are parsing errors
@@ -71,7 +71,4 @@ fn main() {
     let mut llvm_codegen = CodeGenerator::new(&ast, &mut valtab);
     llvm_codegen.gen_ir();
     llvm_codegen.dump_ir();
-
-    let mut obj_writer = ObjGenerator::new(llvm_codegen.get_mod());
-    obj_writer.emit(filename);
 }

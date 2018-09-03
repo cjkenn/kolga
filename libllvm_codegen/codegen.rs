@@ -8,7 +8,8 @@ use kolgac::type_record::{TyRecord, TyName};
 
 use errors::ErrCodeGen;
 use valtab::ValTab;
-use fpm::FPM;
+use classtab::ClassTab;
+//use fpm::FPM;
 
 use std::ptr;
 use std::slice;
@@ -26,6 +27,9 @@ pub struct CodeGenerator<'t, 'v> {
     /// Value table stores LLVMValueRef's for lookup.
     valtab: &'v mut ValTab,
 
+    /// Class table stores LLVmStructTypes so we can look them up before allocating.
+    classtab: ClassTab,
+
     /// Vector of potential errors to return.
     errors: Vec<ErrCodeGen>,
 
@@ -38,8 +42,8 @@ pub struct CodeGenerator<'t, 'v> {
     /// LLVM Module. We use only a single module for single file programs.
     module: LLVMModuleRef,
 
-    /// LLVM Function pass manager, for some optimization passes after function codegen.
-    fpm: FPM
+    // /// LLVM Function pass manager, for some optimization passes after function codegen.
+    //fpm: FPM
 }
 
 /// We implement Drop for the CodeGenerator to ensure that our LLVM structs are safely
@@ -67,11 +71,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             CodeGenerator {
                 ast: ast,
                 valtab: valtab,
+                classtab: ClassTab::new(),
                 errors: Vec::new(),
                 context: context,
                 builder: LLVMCreateBuilderInContext(context),
-                module: module,
-                fpm: FPM::new(module)
+                module: module
+                //fpm: FPM::new(module)
             }
         }
     }
@@ -445,7 +450,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
 
                     // Run the function pass through our manager
-                    self.fpm.run(llvm_fn);
+                    //self.fpm.run(llvm_fn);
 
                     // Close the function level scope, which will pop off any params and
                     // variable declared here (we don't need these anymore, since we aren't
@@ -509,6 +514,26 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         }
                     }
                 }
+                Vec::new()
+            },
+            Ast::ClassDecl{ident_tkn, methods, props} => {
+                unsafe {
+                    let mut prop_tys = vec![self.i8_ty()];
+                    // for pr in props {
+                    //     let llvm_val = self.gen_expr(&pr.clone().unwrap());
+                    //     prop_tys.push(LLVMTypeOf(llvm_val.unwrap()));
+                    // }
+
+                    let name = ident_tkn.get_name();
+                    let llvm_struct = LLVMStructCreateNamed(self.context, self.c_str(&name));
+                    LLVMStructSetBody(llvm_struct, prop_tys.as_mut_ptr(), prop_tys.len() as u32, LLVM_FALSE);
+
+                    // Store the struct type in a special class table, so we can look it up
+                    // later when we want to allocate one. This is not the same as a the value table,
+                    // as it doesn't represent an allocated value, just the type info for the class.
+                    self.classtab.store(&name, llvm_struct);
+                }
+
                 Vec::new()
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt)
@@ -605,6 +630,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // a new store instruction for it. We don't need to update the value table
                 // (I don't THINK we need to), because we still want to manipulate the old
                 // alloca instruction.
+                // TODO: what if this isn't a re-assign?
                 unsafe {
                     let curr_alloca_instr = self.valtab.retrieve(&ident_tkn.get_name()).unwrap();
                     let raw_val = value.clone().unwrap();
@@ -614,6 +640,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     Some(val)
                 }
             },
+            // TODO: class decl should not be here
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
         }
     }
@@ -667,8 +694,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             TyName::String => self.str_ty(),
             TyName::Num => self.double_ty(),
             TyName::Bool => self.i8_ty(),
-            // TODO: class types should be represented as structs in llvm probably
-            TyName::Class(_) => unimplemented!("Class types not yet implemented for llvm types!")
+            TyName::Class(name) => {
+                // Retrieve the class type from the class table.
+                // TODO: error checking here
+                self.classtab.retrieve(&name).unwrap()
+            }
         }
     }
 

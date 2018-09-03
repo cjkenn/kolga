@@ -73,8 +73,11 @@ pub enum Ast {
     // Func name, params
     FnCall(Option<Token>, Vec<Ast>),
 
-    // Class name, class methods, class props, symbol scope level
-    ClassDecl(Token, Vec<Option<Ast>>, Vec<Option<Ast>>),
+    ClassDecl {
+        ident_tkn: Token,
+        methods: Vec<Option<Ast>>,
+        props: Vec<Option<Ast>>
+    },
 
     // Name of the class, function/property name
     ClassGet(Option<Token>, Option<Token>),
