@@ -299,6 +299,7 @@ impl<'l, 's> Parser<'l, 's> {
         self.expect(TknTy::LeftBrace);
 
         // TODO: open another scope here for class level declarations
+        // TODO: class decl needs a finalized scope in the ast
 
         let mut methods = Vec::new();
         let mut props = Vec::new();

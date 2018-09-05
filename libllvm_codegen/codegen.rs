@@ -483,12 +483,23 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             let alloca_instr = self.build_entry_bb_alloca(llvm_func,
                                                                           ty_rec.clone(),
                                                                           &ident_tkn.get_name());
-                            let raw_val = value.clone().unwrap();
-                            let val = self.gen_expr(&raw_val).unwrap();
 
-                            LLVMBuildStore(self.builder, val, alloca_instr);
-                            self.valtab.store(&ident_tkn.get_name(), alloca_instr);
-                            vec![alloca_instr]
+                            let raw_val = value.clone().unwrap();
+                            // We don't need to store anything for class types, since they
+                            // are already built into structs in the class declaration. The class
+                            // here should already be a struct type (if we tried to create a class
+                            // before declaring it we would no pass parsing).
+                            match raw_val {
+                                Ast::ClassDecl{ident_tkn:_, methods:_, props:_} => {
+                                    vec![alloca_instr]
+                                },
+                                _ => {
+                                    let val = self.gen_expr(&raw_val).unwrap();
+                                    LLVMBuildStore(self.builder, val, alloca_instr);
+                                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                                    vec![alloca_instr]
+                                }
+                            }
                         }
                     }
                 }
@@ -501,6 +512,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                             let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
                             self.valtab.store(&ident_tkn.get_name(), global);
+                            vec![global]
                         }
                     },
                     false => {
@@ -511,18 +523,20 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                                                           ty_rec.clone(),
                                                                           &ident_tkn.get_name());
                             self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                            vec![alloca_instr]
                         }
                     }
                 }
-                Vec::new()
             },
             Ast::ClassDecl{ident_tkn, methods, props} => {
                 unsafe {
-                    let mut prop_tys = vec![self.i8_ty()];
-                    // for pr in props {
-                    //     let llvm_val = self.gen_expr(&pr.clone().unwrap());
-                    //     prop_tys.push(LLVMTypeOf(llvm_val.unwrap()));
-                    // }
+                    let mut prop_tys = Vec::new();
+                    for pr in props {
+                        let llvm_val = self.gen_stmt(&pr.clone().unwrap())[0];
+                        prop_tys.push(LLVMTypeOf(llvm_val));
+                    }
+
+                    // TODO: class methods
 
                     let name = ident_tkn.get_name();
                     let llvm_struct = LLVMStructCreateNamed(self.context, self.c_str(&name));
@@ -640,7 +654,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     Some(val)
                 }
             },
-            // TODO: class decl should not be here
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
         }
     }

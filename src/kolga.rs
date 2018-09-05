@@ -54,7 +54,6 @@ fn main() {
     }
 
     let ast = parse_result.ast.unwrap();
-    println!("{:?}", ast);
 
     // We can be assured that all ast values are Some, since None is only returned
     // if there are parsing errors
