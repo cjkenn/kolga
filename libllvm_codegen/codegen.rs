@@ -291,86 +291,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             },
             Ast::WhileStmt(mb_cond_expr, mb_stmts) => {
-                let mut return_stmt_vec = Vec::new();
-                unsafe {
-                    let insert_bb = LLVMGetInsertBlock(self.builder);
-                    let mut fn_val = LLVMGetBasicBlockParent(insert_bb);
-
-                    // Set up our blocks
-                    let mut entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
-                    let mut while_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("while"));
-                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
-
-                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
-                    LLVMPositionBuilderAtEnd(self.builder, insert_bb);
-
-                    // Evaluate the conditional expression
-                    let cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
-                    if cond_val.is_none() {
-                        let msg = format!("Error: codegen failed for ast {:?}", stmt);
-                        self.errors.push(ErrCodeGen::new(msg));
-                        return Vec::new();
-                    }
-
-                    // Buld the conditional branch
-                    LLVMPositionBuilderAtEnd(self.builder, entry_bb);
-                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
-                    LLVMPositionBuilderAtEnd(self.builder, while_bb);
-
-                    let mut stmt_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
-                    return_stmt_vec.extend(stmt_vals.clone());
-
-                    // Evaluate the conditional expression again. This will handle reading
-                    // the updated loop variable (if any) to properly branch out of the loop
-                    // if necessary. We build another conditional branch in the loop to handle
-                    // this.
-                    let updated_cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
-                    LLVMBuildCondBr(self.builder, updated_cond_val.unwrap(), while_bb, merge_bb);
-                    let mut while_end_bb = LLVMGetInsertBlock(self.builder);
-                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![while_end_bb].as_mut_ptr(), 1);
-                }
-
-                return_stmt_vec
+                self.while_stmt(mb_cond_expr, mb_stmts)
             },
             Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
-                let mut return_stmt_vec = Vec::new();
-                unsafe {
-                    let insert_bb = LLVMGetInsertBlock(self.builder);
-                    let mut fn_val = LLVMGetBasicBlockParent(insert_bb);
-
-                    let mut entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
-                    let mut for_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("for"));
-                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
-
-                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
-                    LLVMPositionBuilderAtEnd(self.builder, entry_bb);
-
-                    // Codegen the var declaration and save the loop counter variable. We do this
-                    // first to store the loop var and to make sure it's allocated.
-                    self.gen_stmt(&for_var_decl.clone().unwrap());
-                    LLVMBuildBr(self.builder, for_bb);
-                    LLVMPositionBuilderAtEnd(self.builder, for_bb);
-
-                    // Codegen the for loop body
-                    let mut stmt_vals = self.gen_stmt(&stmts.clone().unwrap());
-                    return_stmt_vec.extend(stmt_vals.clone());
-
-                    // Codegen the loop step counter
-                    self.gen_stmt(&for_step_expr.clone().unwrap());
-
-                    // Codegen the conditional for exit the loop
-                    let cond_val = self.gen_stmt(&for_cond_expr.clone().unwrap())[0];
-                    LLVMBuildCondBr(self.builder, cond_val, for_bb, merge_bb);
-
-                    let mut for_end_bb = LLVMGetInsertBlock(self.builder);
-                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![for_end_bb].as_mut_ptr(), 1);
-                }
-
-                return_stmt_vec
+                self.for_stmt(for_var_decl, for_cond_expr, for_step_expr, stmts)
             },
             Ast::BlckStmt{stmts, scope_lvl: _} => {
                 let mut generated = Vec::new();
@@ -687,6 +611,99 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             },
             _ => unimplemented!("Tkn ty {:?} is unimplemented in codegen", ty_rec.tkn.ty)
         }
+    }
+
+    fn while_stmt(&mut self, mb_cond_expr: &Box<Option<Ast>>,
+                  mb_stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
+        let mut return_stmt_vec = Vec::new();
+        unsafe {
+            let insert_bb = LLVMGetInsertBlock(self.builder);
+            let fn_val = LLVMGetBasicBlockParent(insert_bb);
+
+            // Set up our blocks
+            let entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
+            let while_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("while"));
+            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+
+            LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
+            LLVMPositionBuilderAtEnd(self.builder, insert_bb);
+
+            // Evaluate the conditional expression
+            let cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
+            if cond_val.is_none() {
+                let msg = format!("Error: codegen failed for ast");
+                self.errors.push(ErrCodeGen::new(msg));
+                return Vec::new();
+            }
+
+            // Buld the conditional branch
+            LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+            LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
+            LLVMPositionBuilderAtEnd(self.builder, while_bb);
+
+            let mut stmt_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
+            return_stmt_vec.extend(stmt_vals.clone());
+
+            // Evaluate the conditional expression again. This will handle reading
+            // the updated loop variable (if any) to properly branch out of the loop
+            // if necessary. We build another conditional branch in the loop to handle
+            // this.
+            let updated_cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
+            LLVMBuildCondBr(self.builder, updated_cond_val.unwrap(), while_bb, merge_bb);
+            let while_end_bb = LLVMGetInsertBlock(self.builder);
+            LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![while_end_bb].as_mut_ptr(), 1);
+        }
+
+        return_stmt_vec
+    }
+
+    /// Generates LLVM IR for a for loop statement, and returns a vector of values
+    /// that are created during that code gen. If there are no values, the vector is
+    /// empty.
+    fn for_stmt(&mut self,
+                for_var_decl: &Box<Option<Ast>>,
+                for_cond_expr: &Box<Option<Ast>>,
+                for_step_expr: &Box<Option<Ast>>,
+                stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
+        let mut return_stmt_vec = Vec::new();
+
+        unsafe {
+            let insert_bb = LLVMGetInsertBlock(self.builder);
+            let fn_val = LLVMGetBasicBlockParent(insert_bb);
+
+            let entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
+            let for_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("for"));
+            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+
+            LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
+            LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+
+            // Codegen the var declaration and save the loop counter variable. We do this
+            // first to store the loop var and to make sure it's allocated.
+            self.gen_stmt(&for_var_decl.clone().unwrap());
+            LLVMBuildBr(self.builder, for_bb);
+            LLVMPositionBuilderAtEnd(self.builder, for_bb);
+
+            // Codegen the for loop body
+            let mut stmt_vals = self.gen_stmt(&stmts.clone().unwrap());
+            return_stmt_vec.extend(stmt_vals.clone());
+
+            // Codegen the loop step counter
+            self.gen_stmt(&for_step_expr.clone().unwrap());
+
+            // Codegen the conditional for exit the loop
+            let cond_val = self.gen_stmt(&for_cond_expr.clone().unwrap())[0];
+            LLVMBuildCondBr(self.builder, cond_val, for_bb, merge_bb);
+
+            let for_end_bb = LLVMGetInsertBlock(self.builder);
+            LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            LLVMAddIncoming(phi_bb, stmt_vals.as_mut_ptr(), vec![for_end_bb].as_mut_ptr(), 1);
+        }
+
+        return_stmt_vec
     }
 
     /// Builds an alloca instruction at the beginning of a function so we can store
