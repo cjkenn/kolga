@@ -613,6 +613,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         }
     }
 
+    /// Generates LLVM IR for a while loop statement, and returns a vector of values
+    /// that are created during that code gen. If there are no values, the vector is
+    /// empty.
     fn while_stmt(&mut self, mb_cond_expr: &Box<Option<Ast>>,
                   mb_stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
         let mut return_stmt_vec = Vec::new();
