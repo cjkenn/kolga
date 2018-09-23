@@ -125,177 +125,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     // we need to know which values we generated.
     fn gen_stmt(&mut self, stmt: &Ast) -> Vec<LLVMValueRef> {
         match stmt {
-            Ast::IfStmt(mb_if_cond, mb_then_stmts, else_if_stmts, mb_else_stmts) => {
-                let mut return_stmt_vec = Vec::new();
-                unsafe {
-                    let has_elif = else_if_stmts.len() > 0;
-                    let has_else = mb_else_stmts.is_some();
-
-                    // Set up our required blocks. We need an initial block to start building
-                    // from (insert_bb), and a block representing the then branch (then_bb), which
-                    // is always present. We always keep an else block for conditional branching,
-                    // and a merge block to branch to after we have evaluated all the code in the
-                    // if statement. Blocks are manually reordered here as well, to account
-                    // for any nested if statements. If there is no nesting, these re-orders
-                    // effectively do nothing.
-                    let insert_bb = LLVMGetInsertBlock(self.builder);
-                    let mut fn_val = LLVMGetBasicBlockParent(insert_bb);
-
-                    let mut then_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("then"));
-                    LLVMMoveBasicBlockAfter(then_bb, insert_bb);
-
-                    let mut else_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("el"));
-                    LLVMMoveBasicBlockAfter(else_bb, then_bb);
-
-                    let mut merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
-                    LLVMMoveBasicBlockAfter(merge_bb, else_bb);
-
-                    // Build any necessary blocks for elif conditions. This is a vector of conditional blocks
-                    // that we use to decide branching instructions.
-                    let mut elif_bb_vec = Vec::new();
-                    for i in 0..else_if_stmts.len() {
-                        let name = format!("{}{}{}", "elifcond", i, "\0");
-                        let mut tmp_bb = LLVMAppendBasicBlockInContext(self.context,
-                                                                       fn_val,
-                                                                       name.as_bytes().as_ptr() as *const i8);
-                        elif_bb_vec.push(tmp_bb);
-                    }
-
-                    // Move position to end of merge block to create our phi block at the end of the
-                    // conditional. We immediately move it back to the start of the conditional so
-                    // we're still in the correct position.
-                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
-                    LLVMPositionBuilderAtEnd(self.builder, insert_bb);
-
-                    // Calculate the LLVMValueRef for the if conditional expression. We use this
-                    // to build a conditional branch from the then block to the else block, if needed.
-                    let cond_val = self.gen_expr(&mb_if_cond.clone().unwrap());
-                    if cond_val.is_none() {
-                        let msg = format!("Error: codegen failed for ast {:?}", stmt);
-                        self.errors.push(ErrCodeGen::new(msg));
-                        return Vec::new();
-                    }
-
-                    // Build the conditional branch from the then block to the next required block. If we
-                    // have any else ifs, we branch to the first else if conditional block, otherwise
-                    // we check if there is an else block. If so, we branch there. If not, we branch to the
-                    // merge block.
-                    LLVMPositionBuilderAtEnd(self.builder, insert_bb);
-                    let else_cond_br = match has_elif {
-                        true => elif_bb_vec[0],
-                        false => {
-                            match has_else {
-                                true => else_bb,
-                                false => merge_bb
-                            }
-                        }
-                    };
-                    LLVMBuildCondBr(self.builder, cond_val.unwrap(), then_bb, else_cond_br);
-
-                    // Build then block values and branch to merge block from inside the then block.
-                    LLVMPositionBuilderAtEnd(self.builder, then_bb);
-                    let mut then_expr_vals = self.gen_stmt(&mb_then_stmts.clone().unwrap());
-                    return_stmt_vec.extend(then_expr_vals.clone());
-                    LLVMBuildBr(self.builder, merge_bb);
-
-                    let then_end_bb = LLVMGetInsertBlock(self.builder);
-                    LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    if then_expr_vals.len() > 0 {
-                        LLVMAddIncoming(phi_bb, then_expr_vals.as_mut_ptr(), vec![then_end_bb].as_mut_ptr(), 1);
-                    }
-
-                    // Generate blocks for any elif statements.
-                    // This block is used to correctly position the else block, if any. We want the
-                    // else block to sit after the elifs, and not after the then block.
-                    let mut final_elif_bb = then_bb;
-                    for (idx, stmt) in else_if_stmts.iter().enumerate() {
-                        match stmt.clone().unwrap() {
-                            Ast::ElifStmt(mb_cond, mb_stmts) => {
-                                // Get the conditional block from the vector made above. Create a seperate
-                                // block to the elif code to live in, that we can branch to from the
-                                // elif conditioanl block.
-                                let mut elif_cond_bb = elif_bb_vec[idx];
-                                LLVMPositionBuilderAtEnd(self.builder, elif_cond_bb);
-                                LLVMMoveBasicBlockAfter(elif_cond_bb, else_bb);
-                                let name = format!("{}{}{}", "elifblck", idx, "\0");
-                                let mut elif_code_bb = LLVMAppendBasicBlockInContext(
-                                    self.context,
-                                    fn_val,
-                                    name.as_ptr() as *const i8);
-
-                                LLVMMoveBasicBlockAfter(elif_code_bb, elif_cond_bb);
-
-                                let elif_cond_val = self.gen_expr(&mb_cond.clone().unwrap());
-                                if elif_cond_val.is_none() {
-                                    let msg = format!("Error: codegen failed for ast {:?}", stmt);
-                                    self.errors.push(ErrCodeGen::new(msg));
-                                    continue;
-                                }
-
-                                // If we're in the last elif block, we want to branch to the else block.
-                                // If there's no else block, we branch to the merge block. If we're not
-                                // in the last elif block,  we branch to the next elif conditional block
-                                // in the elif block vector.
-                                LLVMPositionBuilderAtEnd(self.builder, elif_cond_bb);
-                                let else_cond_br = match idx == else_if_stmts.len()-1 {
-                                    true => {
-                                        match has_else {
-                                            true => else_bb,
-                                            false => merge_bb
-                                        }
-                                    },
-                                    false => elif_bb_vec[idx+1]
-                                };
-
-                                LLVMBuildCondBr(self.builder,
-                                                elif_cond_val.unwrap(),
-                                                elif_code_bb,
-                                                else_cond_br);
-                                LLVMPositionBuilderAtEnd(self.builder, elif_code_bb);
-
-                                // Evaluate the elif block statements and branch to the merge block
-                                // from inside the elif block.
-                                let mut elif_expr_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
-                                return_stmt_vec.extend(elif_expr_vals.clone());
-                                LLVMBuildBr(self.builder, merge_bb);
-                                let mut elif_end_bb = LLVMGetInsertBlock(self.builder);
-                                LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                                LLVMAddIncoming(phi_bb,
-                                                elif_expr_vals.as_mut_ptr(),
-                                                vec![elif_end_bb].as_mut_ptr(),
-                                                1);
-                                LLVMPositionBuilderAtEnd(self.builder, elif_code_bb);
-                                final_elif_bb = elif_code_bb;
-                            },
-                            _ => ()
-                        }
-                    }
-
-                    // Generate code the the else block, if we have one.
-                    if has_else {
-                        LLVMMoveBasicBlockAfter(else_bb, final_elif_bb);
-                        LLVMPositionBuilderAtEnd(self.builder, else_bb);
-                        let mut else_expr_vals = self.gen_stmt(&mb_else_stmts.clone().unwrap());
-                        return_stmt_vec.extend(else_expr_vals.clone());
-
-                        LLVMBuildBr(self.builder, merge_bb);
-                        let mut else_end_bb = LLVMGetInsertBlock(self.builder);
-                        LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                        LLVMAddIncoming(phi_bb, else_expr_vals.as_mut_ptr(), vec![else_end_bb].as_mut_ptr(), 1);
-                    } else {
-                        LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-                    }
-
-                    return_stmt_vec
-                }
-            },
-            Ast::WhileStmt(mb_cond_expr, mb_stmts) => {
-                self.while_stmt(mb_cond_expr, mb_stmts)
-            },
-            Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
-                self.for_stmt(for_var_decl, for_cond_expr, for_step_expr, stmts)
-            },
             Ast::BlckStmt{stmts, scope_lvl: _} => {
                 let mut generated = Vec::new();
                 for stmt in stmts {
@@ -317,6 +146,15 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         Vec::new()
                     }
                 }
+            },
+            Ast::IfStmt(mb_if_cond, mb_then_stmts, else_if_stmts, mb_else_stmts) => {
+                self.if_stmt(mb_if_cond, mb_then_stmts, else_if_stmts, mb_else_stmts)
+            },
+            Ast::WhileStmt(mb_cond_expr, mb_stmts) => {
+                self.while_stmt(mb_cond_expr, mb_stmts)
+            },
+            Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
+                self.for_stmt(for_var_decl, for_cond_expr, for_step_expr, stmts)
             },
             Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl: _} => {
                 unsafe {
@@ -610,6 +448,179 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             },
             _ => unimplemented!("Tkn ty {:?} is unimplemented in codegen", ty_rec.tkn.ty)
+        }
+    }
+
+    /// Generate LLVM IR for an if statement. This handles elif and else conditions as well.
+    /// Returns a vector of LLVM values that are created during generation. If there are no
+    /// values created, returns an empty vector.
+    fn if_stmt(&mut self,
+               mb_if_cond: &Box<Option<Ast>>,
+               mb_then_stmts: &Box<Option<Ast>>,
+               else_if_stmts: &Vec<Option<Ast>>,
+               mb_else_stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
+        let mut return_stmt_vec = Vec::new();
+        unsafe {
+            let has_elif = else_if_stmts.len() > 0;
+            let has_else = mb_else_stmts.is_some();
+
+            // Set up our required blocks. We need an initial block to start building
+            // from (insert_bb), and a block representing the then branch (then_bb), which
+            // is always present. We always keep an else block for conditional branching,
+            // and a merge block to branch to after we have evaluated all the code in the
+            // if statement. Blocks are manually reordered here as well, to account
+            // for any nested if statements. If there is no nesting, these re-orders
+            // effectively do nothing.
+            let insert_bb = LLVMGetInsertBlock(self.builder);
+            let fn_val = LLVMGetBasicBlockParent(insert_bb);
+
+            let then_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("then"));
+            LLVMMoveBasicBlockAfter(then_bb, insert_bb);
+
+            let else_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("el"));
+            LLVMMoveBasicBlockAfter(else_bb, then_bb);
+
+            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+            LLVMMoveBasicBlockAfter(merge_bb, else_bb);
+
+            // Build any necessary blocks for elif conditions. This is a vector of conditional blocks
+            // that we use to decide branching instructions.
+            let mut elif_bb_vec = Vec::new();
+            for i in 0..else_if_stmts.len() {
+                let name = format!("{}{}{}", "elifcond", i, "\0");
+                let mut tmp_bb = LLVMAppendBasicBlockInContext(self.context,
+                                                               fn_val,
+                                                               name.as_bytes().as_ptr() as *const i8);
+                elif_bb_vec.push(tmp_bb);
+            }
+
+            // Move position to end of merge block to create our phi block at the end of the
+            // conditional. We immediately move it back to the start of the conditional so
+            // we're still in the correct position.
+            LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
+            LLVMPositionBuilderAtEnd(self.builder, insert_bb);
+
+            // Calculate the LLVMValueRef for the if conditional expression. We use this
+            // to build a conditional branch from the then block to the else block, if needed.
+            let cond_val = self.gen_expr(&mb_if_cond.clone().unwrap());
+            if cond_val.is_none() {
+                let msg = format!("Error: codegen failed for ast");
+                self.errors.push(ErrCodeGen::new(msg));
+                return Vec::new();
+            }
+
+            // Build the conditional branch from the then block to the next required block. If we
+            // have any else ifs, we branch to the first else if conditional block, otherwise
+            // we check if there is an else block. If so, we branch there. If not, we branch to the
+            // merge block.
+            LLVMPositionBuilderAtEnd(self.builder, insert_bb);
+            let else_cond_br = match has_elif {
+                true => elif_bb_vec[0],
+                false => {
+                    match has_else {
+                        true => else_bb,
+                        false => merge_bb
+                    }
+                }
+            };
+            LLVMBuildCondBr(self.builder, cond_val.unwrap(), then_bb, else_cond_br);
+
+            // Build then block values and branch to merge block from inside the then block.
+            LLVMPositionBuilderAtEnd(self.builder, then_bb);
+            let mut then_expr_vals = self.gen_stmt(&mb_then_stmts.clone().unwrap());
+            return_stmt_vec.extend(then_expr_vals.clone());
+            LLVMBuildBr(self.builder, merge_bb);
+
+            let then_end_bb = LLVMGetInsertBlock(self.builder);
+            LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            if then_expr_vals.len() > 0 {
+                LLVMAddIncoming(phi_bb, then_expr_vals.as_mut_ptr(), vec![then_end_bb].as_mut_ptr(), 1);
+            }
+
+            // Generate blocks for any elif statements.
+            // This block is used to correctly position the else block, if any. We want the
+            // else block to sit after the elifs, and not after the then block.
+            let mut final_elif_bb = then_bb;
+            for (idx, stmt) in else_if_stmts.iter().enumerate() {
+                match stmt.clone().unwrap() {
+                    Ast::ElifStmt(mb_cond, mb_stmts) => {
+                        // Get the conditional block from the vector made above. Create a seperate
+                        // block to the elif code to live in, that we can branch to from the
+                        // elif conditioanl block.
+                        let mut elif_cond_bb = elif_bb_vec[idx];
+                        LLVMPositionBuilderAtEnd(self.builder, elif_cond_bb);
+                        LLVMMoveBasicBlockAfter(elif_cond_bb, else_bb);
+                        let name = format!("{}{}{}", "elifblck", idx, "\0");
+                        let mut elif_code_bb = LLVMAppendBasicBlockInContext(
+                            self.context,
+                            fn_val,
+                            name.as_ptr() as *const i8);
+
+                        LLVMMoveBasicBlockAfter(elif_code_bb, elif_cond_bb);
+
+                        let elif_cond_val = self.gen_expr(&mb_cond.clone().unwrap());
+                        if elif_cond_val.is_none() {
+                            let msg = format!("Error: codegen failed for ast {:?}", stmt);
+                            self.errors.push(ErrCodeGen::new(msg));
+                            continue;
+                        }
+
+                        // If we're in the last elif block, we want to branch to the else block.
+                        // If there's no else block, we branch to the merge block. If we're not
+                        // in the last elif block,  we branch to the next elif conditional block
+                        // in the elif block vector.
+                        LLVMPositionBuilderAtEnd(self.builder, elif_cond_bb);
+                        let else_cond_br = match idx == else_if_stmts.len()-1 {
+                            true => {
+                                match has_else {
+                                    true => else_bb,
+                                    false => merge_bb
+                                }
+                            },
+                            false => elif_bb_vec[idx+1]
+                        };
+
+                        LLVMBuildCondBr(self.builder,
+                                        elif_cond_val.unwrap(),
+                                        elif_code_bb,
+                                        else_cond_br);
+                        LLVMPositionBuilderAtEnd(self.builder, elif_code_bb);
+
+                        // Evaluate the elif block statements and branch to the merge block
+                        // from inside the elif block.
+                        let mut elif_expr_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
+                        return_stmt_vec.extend(elif_expr_vals.clone());
+                        LLVMBuildBr(self.builder, merge_bb);
+                        let mut elif_end_bb = LLVMGetInsertBlock(self.builder);
+                        LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                        LLVMAddIncoming(phi_bb,
+                                        elif_expr_vals.as_mut_ptr(),
+                                        vec![elif_end_bb].as_mut_ptr(),
+                                        1);
+                        LLVMPositionBuilderAtEnd(self.builder, elif_code_bb);
+                        final_elif_bb = elif_code_bb;
+                    },
+                    _ => ()
+                }
+            }
+
+            // Generate code the the else block, if we have one.
+            if has_else {
+                LLVMMoveBasicBlockAfter(else_bb, final_elif_bb);
+                LLVMPositionBuilderAtEnd(self.builder, else_bb);
+                let mut else_expr_vals = self.gen_stmt(&mb_else_stmts.clone().unwrap());
+                return_stmt_vec.extend(else_expr_vals.clone());
+
+                LLVMBuildBr(self.builder, merge_bb);
+                let else_end_bb = LLVMGetInsertBlock(self.builder);
+                LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                LLVMAddIncoming(phi_bb, else_expr_vals.as_mut_ptr(), vec![else_end_bb].as_mut_ptr(), 1);
+            } else {
+                LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            }
+
+            return_stmt_vec
         }
     }
 
