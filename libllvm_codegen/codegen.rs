@@ -488,9 +488,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             // We don't need to store anything for class types, since they
                             // are already built into structs in the class declaration. The class
                             // here should already be a struct type (if we tried to create a class
-                            // before declaring it we would no pass parsing).
+                            // before declaring it we would not pass parsing).
                             match raw_val {
-                                Ast::ClassDecl{ident_tkn:_, methods:_, props:_} => {
+                                Ast::ClassDecl{ident_tkn:_, methods:_, props:_, scope_lvl:_} => {
                                     vec![alloca_instr]
                                 },
                                 _ => {
@@ -517,6 +517,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     },
                     false => {
                         unsafe {
+                            // TODO: inside a class decl, there is no insert block!
                             let insert_bb = LLVMGetInsertBlock(self.builder);
                             let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
                             let alloca_instr = self.build_entry_bb_alloca(llvm_func,
@@ -528,10 +529,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             },
-            Ast::ClassDecl{ident_tkn, methods, props} => {
+            Ast::ClassDecl{ident_tkn, methods, props, scope_lvl:_} => {
                 unsafe {
                     let mut prop_tys = Vec::new();
                     for pr in props {
+                        // TODO: we dont necessarily want to call gen_stmt, because
+                        // class props arent allocated on any stack (as we would want
+                        // to do inside a function). We need to lay out class
+                        // declarations separately.
                         let llvm_val = self.gen_stmt(&pr.clone().unwrap())[0];
                         prop_tys.push(LLVMTypeOf(llvm_val));
                     }

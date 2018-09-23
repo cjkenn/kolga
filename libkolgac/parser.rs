@@ -298,9 +298,8 @@ impl<'l, 's> Parser<'l, 's> {
         self.consume();
         self.expect(TknTy::LeftBrace);
 
-        // TODO: open another scope here for class level declarations
-        // TODO: class decl needs a finalized scope in the ast
-
+        // Initialize a new scope for the class methods + props
+        self.symtab.init_sc();
         let mut methods = Vec::new();
         let mut props = Vec::new();
 
@@ -320,12 +319,18 @@ impl<'l, 's> Parser<'l, 's> {
             }
         }
 
+        let final_sc_lvl = self.symtab.finalize_sc();
+
         let ast = Some(Ast::ClassDecl {
             ident_tkn: class_tkn.clone(),
             methods: methods,
-            props: props
+            props: props,
+            scope_lvl: final_sc_lvl
         });
 
+        // This should be stored in the starting level of the symbol table, not the
+        // scope opened to store the class methods/props (which is why we close the
+        // current scope before this call to store()).
         let sym = Sym::new(SymTy::Class,
                            true,
                            TyRecord::new_from_tkn(class_tkn.clone()),

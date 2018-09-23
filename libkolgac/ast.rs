@@ -76,7 +76,8 @@ pub enum Ast {
     ClassDecl {
         ident_tkn: Token,
         methods: Vec<Option<Ast>>,
-        props: Vec<Option<Ast>>
+        props: Vec<Option<Ast>>,
+        scope_lvl: usize
     },
 
     // Name of the class, function/property name

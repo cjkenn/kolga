@@ -114,7 +114,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     _ => self.check_stmt(fn_stmts.clone(), scope_lvl)
                 };
             },
-            Ast::ClassDecl{ident_tkn:_, methods, props} => {
+            Ast::ClassDecl{ident_tkn:_, methods, props, scope_lvl:_} => {
                 for prop_stmt in props {
                     self.check_stmt(prop_stmt.clone().unwrap(), final_sc);
                 }
@@ -181,7 +181,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             },
-            Ast::ClassDecl{ident_tkn, methods:_, props:_} => {
+            Ast::ClassDecl{ident_tkn, methods:_, props:_, scope_lvl:_} => {
                 let sym = self.symtab.retrieve(&ident_tkn.get_name()).unwrap();
                 sym.ty_rec.ty.clone().unwrap()
             },
@@ -203,7 +203,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name_tkn: &Token) -> TyName {
         let prop_name = prop_name_tkn.get_name();
         match class_decl_ast {
-            Ast::ClassDecl{ident_tkn:_, methods:_, props} => {
+            Ast::ClassDecl{ident_tkn:_, methods:_, props, scope_lvl:_} => {
                 let mut prop_ty = None;
                 // TODO: this is O(n) and not efficient (should store props in a map)
                 for prop in props {
