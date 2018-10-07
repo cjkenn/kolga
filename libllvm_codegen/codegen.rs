@@ -85,13 +85,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// program and generates LLVM IR for each of them. The code is written to the module,
     /// to be converted to assembly later.
     pub fn gen_ir(&mut self) {
-        unsafe {
-            let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
-            let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
-            let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
-            LLVMPositionBuilderAtEnd(self.builder, anon_bb);
-        }
-
         match self.ast {
             Ast::Prog{stmts} => {
                 for stmt in stmts {
@@ -234,17 +227,29 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global, value} => {
                 match is_global {
                     true => {
-                        unsafe {
-                            let c_name = self.c_str(&ident_tkn.get_name());
-                            let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
-                            let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
+                        let c_name = self.c_str(&ident_tkn.get_name());
+                        match value.clone().unwrap() {
+                            Ast::ClassDecl{ident_tkn, methods:_, props:_, scope_lvl:_} => {
+                                let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
+                                if llvm_ty.is_none() {
+                                    panic!("Unkown class found");
+                                }
+                                unsafe {
+                                    let global = LLVMAddGlobal(self.module, llvm_ty.unwrap(), c_name);
+                                    vec![global]
+                                }
+                            },
+                            _ => {
+                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
+                                unsafe {
+                                    let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
 
-                            // TODO: global class allocation doesn't work here, because
-                            // classes are initialized with alloca, which isn't available here.
-                            let val = self.gen_expr(&value.clone().unwrap()).unwrap();
-                            LLVMSetInitializer(global, val);
-                            self.valtab.store(&ident_tkn.get_name(), global);
-                            vec![global]
+                                    let val = self.gen_expr(&value.clone().unwrap()).unwrap();
+                                    LLVMSetInitializer(global, val);
+                                    self.valtab.store(&ident_tkn.get_name(), global);
+                                    vec![global]
+                                }
+                            }
                         }
                     },
                     false => {
