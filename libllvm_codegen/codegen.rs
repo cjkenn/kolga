@@ -85,6 +85,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// program and generates LLVM IR for each of them. The code is written to the module,
     /// to be converted to assembly later.
     pub fn gen_ir(&mut self) {
+        unsafe {
+            let anon_fn_ty = LLVMFunctionType(self.void_ty(), ptr::null_mut(), 0, LLVM_FALSE);
+            let anon_fn = LLVMAddFunction(self.module, c_str!("_anon"), anon_fn_ty);
+            let anon_bb = LLVMAppendBasicBlockInContext(self.context, anon_fn, c_str!("_anon"));
+            LLVMPositionBuilderAtEnd(self.builder, anon_bb);
+        }
+
         match self.ast {
             Ast::Prog{stmts} => {
                 for stmt in stmts {
@@ -232,6 +239,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                             let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
 
+                            // TODO: global class allocation doesn't work here, because
+                            // classes are initialized with alloca, which isn't available here.
                             let val = self.gen_expr(&value.clone().unwrap()).unwrap();
                             LLVMSetInitializer(global, val);
                             self.valtab.store(&ident_tkn.get_name(), global);
@@ -279,7 +288,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     },
                     false => {
                         unsafe {
-                            // TODO: inside a class decl, there is no insert block!
                             let insert_bb = LLVMGetInsertBlock(self.builder);
                             let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
                             let alloca_instr = self.build_entry_bb_alloca(llvm_func,
@@ -295,12 +303,18 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 unsafe {
                     let mut prop_tys = Vec::new();
                     for pr in props {
-                        // TODO: we dont necessarily want to call gen_stmt, because
-                        // class props arent allocated on any stack (as we would want
-                        // to do inside a function). We need to lay out class
-                        // declarations separately.
-                        let llvm_val = self.gen_stmt(&pr.clone().unwrap())[0];
-                        prop_tys.push(LLVMTypeOf(llvm_val));
+                        // Here we just want to lay out the props,
+                        // we don't actually want to allocate them until we
+                        // create an object of this class.
+                        // So, we want the llvm type of the props, but we
+                        // don't want to generate any code for them yet.
+                        match &pr.clone().unwrap() {
+                            Ast::VarDecl{ty_rec, ident_tkn:_, is_imm:_, is_global:_} => {
+                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
+                                prop_tys.push(llvm_ty);
+                            },
+                            _ => ()
+                        }
                     }
 
                     // TODO: class methods
@@ -419,6 +433,22 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                     LLVMBuildStore(self.builder, val, curr_alloca_instr);
                     Some(val)
+                }
+            },
+            // Class declarations ast types can be used as rvalues when creating a class.
+            Ast::ClassDecl{ident_tkn, methods, props, scope_lvl} => {
+                let name = ident_tkn.get_name();
+                let llvm_struct_ty = self.classtab.retrieve(&name);
+                match llvm_struct_ty {
+                    Some(ty_ref) => {
+                        let c_name = self.c_str(&name);
+                        unsafe {
+                            LLVMDumpType(ty_ref);
+                            let llvm_val = LLVMBuildAlloca(self.builder, ty_ref, c_str!("x"));
+                            return Some(llvm_val);
+                        }
+                    },
+                    None => panic!("unknown class found")
                 }
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
@@ -808,6 +838,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 _ => None
             }
         }
+    }
+
+    fn void_ty(&self) -> LLVMTypeRef {
+        unsafe { LLVMVoidTypeInContext(self.context) }
     }
 
     fn str_ty(&self) -> LLVMTypeRef {
