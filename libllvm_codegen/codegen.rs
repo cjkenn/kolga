@@ -322,16 +322,50 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         }
                     }
 
-                    // TODO: class methods
-
-                    let name = ident_tkn.get_name();
-                    let llvm_struct = LLVMStructCreateNamed(self.context, self.c_str(&name));
+                    let class_name = ident_tkn.get_name();
+                    let llvm_struct = LLVMStructCreateNamed(self.context, self.c_str(&class_name));
                     LLVMStructSetBody(llvm_struct, prop_tys.as_mut_ptr(), prop_tys.len() as u32, LLVM_FALSE);
 
                     // Store the struct type in a special class table, so we can look it up
                     // later when we want to allocate one. This is not the same as a the value table,
                     // as it doesn't represent an allocated value, just the type info for the class.
-                    self.classtab.store(&name, llvm_struct);
+                    // Note: This must be stored before we process the class method declarations,
+                    // because they need to look up the class name from the symbol table in order
+                    // to insert the class as a 'self' param.
+                    self.classtab.store(&class_name, llvm_struct);
+
+                    // Methods are generated like any other method, but with a pointer to
+                    // the enclosing class as the first parameter ('self'). This pointer can be
+                    // used to access class variables and other class methods
+                    // These don't "belong" to the class in the llvm ir, but just
+                    // live anywhere in the output
+                    let class_tkn = ident_tkn.clone();
+                    for mtod in methods {
+                        match mtod.clone().unwrap() {
+                            Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl} => {
+                                // We need to add the class declaration type to the list of params so we obtain
+                                // a pointer to it inside the method body.
+                                let fake_class_param = TyRecord {
+                                    ty: Some(TyName::Class(class_name.clone())),
+                                    tkn: class_tkn.clone()
+                                };
+
+                                let mut new_params = params.clone();
+                                new_params.insert(0, fake_class_param);
+
+                                let new_method = Ast::FuncDecl{
+                                    ident_tkn: ident_tkn.clone(),
+                                    params: new_params,
+                                    ret_ty: ret_ty.clone(),
+                                    func_body: func_body.clone(),
+                                    scope_lvl: scope_lvl
+                                };
+
+                                self.gen_stmt(&new_method);
+                            },
+                            _ => ()
+                        }
+                    }
                 }
 
                 Vec::new()
@@ -862,6 +896,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     }
 
     fn c_str(&self, val: &str) -> *const i8 {
+        // TODO: use CString here? why doesnt it work?
         format!("{}{}", val, "\0").as_ptr() as *const i8
     }
 }
