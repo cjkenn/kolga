@@ -59,6 +59,7 @@ pub enum TknTy {
     Or,
     And,
     Null,
+    Void,
 
     Eof
 }
@@ -173,6 +174,7 @@ impl fmt::Debug for TknTy {
             TknTy::Or => "or".to_string(),
             TknTy::And => "and".to_string(),
             TknTy::Null => "null".to_string(),
+            TknTy::Void => "void".to_string(),
             TknTy::Eof => "EOF".to_string()
         };
 
@@ -199,7 +201,8 @@ impl Token {
     pub fn is_ty(&self) -> bool {
         self.ty == TknTy::Num ||
             self.ty == TknTy::String ||
-            self.ty == TknTy::Bool
+            self.ty == TknTy::Bool ||
+            self.ty == TknTy::Void
     }
 
     pub fn get_name(&self) -> String {

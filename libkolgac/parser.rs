@@ -100,6 +100,13 @@ impl<'l, 's> Parser<'l, 's> {
         let mut is_class_type = false;
 
         let var_ty_tkn = if self.currtkn.is_ty() {
+            // But Void isn't a valid type for a variable, just a function that returns nothing
+            if self.currtkn.ty == TknTy::Void {
+                let err_msg = String::from("'void' is not a valid type for a variable");
+                self.err_from_tkn(err_msg);
+                return None;
+            }
+
             let tkn = Some(self.currtkn.clone());
             self.consume();
             tkn
@@ -249,13 +256,13 @@ impl<'l, 's> Parser<'l, 's> {
         self.expect(TknTy::RightParen);
         self.expect(TknTy::Tilde);
 
-        let fn_ret_ty_tkn = match self.currtkn.ty {
-            TknTy::String | TknTy::Num | TknTy::Bool => {
+        let fn_ret_ty_tkn = match self.currtkn.is_ty() {
+            true => {
                 let tkn = self.currtkn.clone();
                 self.consume();
                 Some(tkn)
             },
-            _ => {
+            false => {
                 let err_msg = format!("Token is not a valid type: {:?}", self.currtkn.ty);
                 self.err_from_tkn(err_msg);
                 None

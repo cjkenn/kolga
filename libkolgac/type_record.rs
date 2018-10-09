@@ -5,6 +5,7 @@ pub enum TyName {
     String,
     Num,
     Bool,
+    Void,
     Class(String)
 }
 
@@ -41,7 +42,8 @@ impl TyRecord {
             TknTy::True | TknTy::False => Some(TyName::Bool),
             TknTy::Minus => Some(TyName::Num),
             TknTy::Bang => Some(TyName::Bool),
-            TknTy::Ident(ref idnt) => Some(TyName::Class(idnt.clone())),
+            TknTy::Void => Some(TyName::Void),
+            TknTy::Ident(ref ident) => Some(TyName::Class(ident.clone())),
             _ => None
         };
 

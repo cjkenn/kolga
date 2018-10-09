@@ -130,18 +130,36 @@ impl<'t, 's> TyCheck<'t, 's> {
     }
 
     fn check_fn_stmts(&mut self, fn_tkn: &Token, fn_ret_ty: TyName, stmts: Vec<Option<Ast>>, sc_lvl: usize) {
+        let mut has_ret_stmt = false;
+
         for maybe_stmt in &stmts {
             let stmt = maybe_stmt.clone().unwrap();
             match stmt {
                 Ast::RetStmt(maybe_expr) => {
-                    let rhs_ty = self.check_expr(maybe_expr.clone().unwrap(), sc_lvl);
-                    if fn_ret_ty != rhs_ty {
-                        let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
-                        self.errors.push(err);
+                    has_ret_stmt = true;
+                    if maybe_expr.is_none() {
+                        if fn_ret_ty != TyName::Void {
+                            let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &TyName::Void);
+                            self.errors.push(err);
+                        }
+                    } else {
+                        let rhs_ty = self.check_expr(maybe_expr.clone().unwrap(), sc_lvl);
+                        if fn_ret_ty != rhs_ty {
+                            let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
+                            self.errors.push(err);
+                        }
                     }
                 },
                 _ => self.check_stmt(stmt, sc_lvl)
             };
+        }
+
+        if fn_ret_ty != TyName::Void && !has_ret_stmt {
+            let err = format!("Function {:?} expects a return type of {:?}, but no return statement found",
+                              fn_tkn.get_name(),
+                              fn_ret_ty);
+            let errc = ErrC::new(fn_tkn.line, fn_tkn.pos, err);
+            self.errors.push(errc);
         }
     }
 

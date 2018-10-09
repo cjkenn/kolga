@@ -66,7 +66,8 @@ impl Lexer {
                 (String::from("false"), TknTy::False),
                 (String::from("or"), TknTy::Or),
                 (String::from("and"), TknTy::And),
-                (String::from("null"), TknTy::Null)
+                (String::from("null"), TknTy::Null),
+                (String::from("void"), TknTy::Void)
             ].iter().cloned().collect();
 
         Lexer {

@@ -201,8 +201,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             for stmt in stmts {
                                 match stmt.clone().unwrap() {
                                     Ast::RetStmt(mb_expr) => {
-                                        let llvm_val = self.gen_expr(&mb_expr.clone().unwrap());
-                                        LLVMBuildRet(self.builder, llvm_val.unwrap());
+                                        if mb_expr.is_none() {
+                                            LLVMBuildRet(self.builder, ptr::null_mut());
+                                        } else {
+                                            let llvm_val = self.gen_expr(&mb_expr.clone().unwrap());
+                                            LLVMBuildRet(self.builder, llvm_val.unwrap());
+                                        }
                                     },
                                     _ => { self.gen_stmt(&stmt.clone().unwrap()); }
                                 }
@@ -812,6 +816,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             TyName::String => self.str_ty(),
             TyName::Num => self.double_ty(),
             TyName::Bool => self.i8_ty(),
+            TyName::Void => self.void_ty(),
             TyName::Class(name) => {
                 // Retrieve the class type from the class table.
                 // TODO: error checking here
