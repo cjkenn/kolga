@@ -5,6 +5,7 @@ use lexer::Lexer;
 use token::{Token, TknTy};
 use type_record::TyRecord;
 use errors::ErrC;
+use std::rc::Rc;
 
 const FN_PARAM_MAX_LEN: usize = 64;
 
@@ -273,21 +274,35 @@ impl<'l, 's> Parser<'l, 's> {
             return None;
         }
 
+        // Create and store the function sym before we parse the body and
+        // set an actual value. This is so that when parsing the body, if we
+        // encounter a recursive call, we won't report an error for trying
+        // to call an undefined function.
         let fn_ty_rec = TyRecord::new_from_tkn(fn_ret_ty_tkn.clone().unwrap());
-        let fn_body = self.block_stmt();
-
-        // After parsing the body, we close the function block scope.
-        let sc_idx = self.symtab.finalize_sc();
-
         let fn_sym = Sym::new(SymTy::Func,
+                              true,
+                              fn_ty_rec.clone(),
+                              func_ident_tkn.clone(),
+                              None,
+                              Some(params.clone()));
+
+        let name = &func_ident_tkn.get_name();
+        self.symtab.store(name, fn_sym);
+
+        // Now we parse the function body, update the symbol and store it with
+        // the updated body.
+        let fn_body = self.block_stmt();
+        let new_sym = Sym::new(SymTy::Func,
                               true,
                               fn_ty_rec.clone(),
                               func_ident_tkn.clone(),
                               fn_body.clone(),
                               Some(params.clone()));
 
-        let name = &func_ident_tkn.get_name();
-        self.symtab.store(name, fn_sym);
+        self.symtab.store(name, new_sym);
+
+        // After parsing the body, we close the function block scope.
+        let sc_idx = self.symtab.finalize_sc();
 
         Some(Ast::FuncDecl {
             ident_tkn: func_ident_tkn,
@@ -807,7 +822,12 @@ impl<'l, 's> Parser<'l, 's> {
                 }
 
                 let sym = mb_sym.unwrap();
-                if sym.assign_val.is_none() && sym.sym_ty != SymTy::Param {
+                // If was have no assign value, but we are looking at a param
+                // or function decl sym, we can return the sym. But no assign value on
+                // any other type requires a check that we are assigning to it, otherwise
+                // we are trying to access an udnefined variable.
+                // Func is here to support recursive calls.
+                if sym.assign_val.is_none() && (sym.sym_ty != SymTy::Param && sym.sym_ty != SymTy::Func) {
                     let next_tkn = self.lexer.peek_tkn();
                     // If the following token is '=', we don't need to report an error
                     // for unitialized var (we are initializing it here).

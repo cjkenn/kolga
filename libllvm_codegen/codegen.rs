@@ -31,7 +31,7 @@ pub struct CodeGenerator<'t, 'v> {
     classtab: ClassTab,
 
     /// Vector of potential errors to return.
-    errors: Vec<ErrCodeGen>,
+    pub errors: Vec<ErrCodeGen>,
 
     /// LLVM Context.
     context: LLVMContextRef,
@@ -195,6 +195,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         self.valtab.store(&params[idx].tkn.get_name(), alloca_instr);
                     }
 
+                    // Store the function symbol inside the value table before parsing the
+                    // body, so we can accept recursive calls.
+                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
+
                     // TODO: this is hard to read -_-
                     match func_body.clone().unwrap() {
                         Ast::BlckStmt{stmts, scope_lvl: _} => {
@@ -202,6 +206,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 match stmt.clone().unwrap() {
                                     Ast::RetStmt(mb_expr) => {
                                         if mb_expr.is_none() {
+                                            // Use a null ptr when we return void
                                             LLVMBuildRet(self.builder, ptr::null_mut());
                                         } else {
                                             let llvm_val = self.gen_expr(&mb_expr.clone().unwrap());
@@ -223,7 +228,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     // going to be making another pass over them later). Add the llvm function
                     // to the value table so we can look it up later for a call.
                     self.valtab.close_sc();
-                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
                 }
 
                 Vec::new()
