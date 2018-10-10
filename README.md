@@ -8,7 +8,7 @@ kolga is an educational compiler (always WIP) with the following goals:
 4. Eventually (maybe), build some light concurrency primitives like coroutines.
 
 Right now, kolga features basic language syntax:
-1. Functions
+1. Functions (with recursion)
 2. Classes
 3. Basic control flow: if/else/else if, while loops, for loops
 4. A few different types: 64-bit numbers, ASCII strings, bool, and void
