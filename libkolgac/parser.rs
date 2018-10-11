@@ -560,8 +560,12 @@ impl<'l, 's> Parser<'l, 's> {
                             }
                         };
                     },
-                    Ast::ClassGet(cls, prop) => {
-                        return Some(Ast::ClassSet(cls, prop, Box::new(rhs)));
+                    Ast::ClassGet{class_tkn, prop_tkn} => {
+                        return Some(Ast::ClassSet{
+                            class_tkn: class_tkn,
+                            prop_tkn: prop_tkn,
+                            assign_val: Box::new(rhs)
+                        });
                     },
                     _ => {
                         let err_msg = format!("Token {:?} is invalid for assignment", op.ty);
@@ -720,32 +724,20 @@ impl<'l, 's> Parser<'l, 's> {
             return None;
         }
 
-        let func_name_tkn = match maybe_ast.clone().unwrap() {
+        let ident_tkn = match maybe_ast.clone().unwrap() {
             Ast::Primary(tyrec) => Some(tyrec.tkn),
             _ => None
         };
 
-        // TODO: loop this?
+        // If this is a class ident, we expect a period and then either a property name
+        // or a function call. If this is a regular function ident, we expect an
+        // opening paren next.
         match self.currtkn.ty {
             TknTy::LeftParen => {
-                maybe_ast = self.fnparams_expr(func_name_tkn);
+                maybe_ast = self.fnparams_expr(ident_tkn, None);
             },
             TknTy::Period => {
-                // calling a method on a class or getting a property
-                self.consume();
-                let name = self.match_ident_tkn();
-                match self.currtkn.ty {
-                    TknTy::LeftParen => {
-                        let fn_ast = self.fnparams_expr(name.clone());
-                        let params = fn_ast.unwrap().extract_params();
-                        maybe_ast = Some(Ast::ClassFnCall(func_name_tkn.clone().unwrap(),
-                                                          name.unwrap().clone(),
-                                                          params));
-                    },
-                    _ => {
-                        maybe_ast = Some(Ast::ClassGet(func_name_tkn, name));
-                    }
-                }
+                maybe_ast = self.class_expr(ident_tkn);
             },
             _ => ()
         };
@@ -753,19 +745,106 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
-    fn fnparams_expr(&mut self, fn_tkn: Option<Token>) -> Option<Ast> {
+    fn class_expr(&mut self, class_tkn: Option<Token>) -> Option<Ast> {
+        // Consume period token
+        self.expect(TknTy::Period);
+        let mut maybe_ast = None;
+
+        // This token can be a function name, a class prop name, or
+        // another class name.
+        let name_tkn = self.match_ident_tkn();
+        match self.currtkn.ty {
+            TknTy::LeftParen => {
+                // Calling a function that belongs to the class
+                let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
+                let fn_ast = self.fnparams_expr(name_tkn.clone(), class_sym.clone());
+                if fn_ast.is_none() {
+                    return None;
+                }
+
+                let params = fn_ast.unwrap().extract_params();
+                maybe_ast = Some(Ast::ClassFnCall {
+                    class_tkn: class_tkn.clone().unwrap(),
+                    func_tkn: name_tkn.unwrap().clone(),
+                    func_params: params
+                });
+            },
+            TknTy::Period => {
+                // Accessing another class within this class
+                maybe_ast = self.class_expr(name_tkn);
+            }
+            _ => {
+                maybe_ast = Some(Ast::ClassGet {
+                    class_tkn: class_tkn.unwrap(),
+                    prop_tkn: name_tkn.unwrap()
+                });
+            }
+        }
+
+        maybe_ast
+    }
+
+    /// Parses the parameters of a function call. Because the function could be a class method,
+    /// this accepts an optional class symbol, which should be taken out of the symbol table. If this
+    /// is not a class method being parsed, maybe_class_sym should be None.
+    /// This symbol is used to find the expected function params, so that we can ensure that
+    /// what is passed in is correct.
+    fn fnparams_expr(&mut self, fn_tkn: Option<Token>, maybe_class_sym: Option<Rc<Sym>>) -> Option<Ast> {
         self.expect(TknTy::LeftParen);
 
         let fn_sym = self.symtab.retrieve(&fn_tkn.clone().unwrap().get_name());
 
-        if fn_sym.is_none() {
+        // If the fn_sym doesn't exist, we need to handle the case that it might be
+        // a class method, so we check the class symbol if one exists.
+        let maybe_expected_params = match fn_sym {
+            // If there is no class sym and no fn sym, we have no expected params.
+            None if maybe_class_sym.is_none() => {
+                None
+            },
+            // If there is a class sym, check for the method in the class methods list
+            // and get the expected params. If the method doesn't exist on the class,
+            // we return None.
+            None => {
+                let class_decl_ast = maybe_class_sym.unwrap().assign_val.clone().unwrap();
+                let params = match class_decl_ast {
+                    Ast::ClassDecl{ident_tkn:_, methods, props:_, scope_lvl:_} => {
+                        let mut expected_params = None;
+                        for mtod_ast in methods {
+                            match mtod_ast.unwrap() {
+                                Ast::FuncDecl{ident_tkn, params, ret_ty:_, func_body:_, scope_lvl:_} => {
+                                    if ident_tkn.get_name() == fn_tkn.clone().unwrap().get_name() {
+                                        expected_params = Some(params);
+                                    }
+                                },
+                                _ => ()
+                            }
+                        }
+
+                        expected_params
+                    },
+                    _ => None
+                };
+
+                params
+            },
+            // If the fn sym exists, simply take its params.
+            Some(sym) => {
+                sym.fn_params.clone()
+            }
+        };
+
+        // If we have no expected params after checking the fn_sym and the class_sym,
+        // we report an error and return None early.
+        if maybe_expected_params.is_none() {
             let tkn = fn_tkn.clone().unwrap();
             let err_msg = format!("Function call: Undeclared symbol {:?} found",
                                   tkn.get_name());
             let error = ErrC::new(tkn.line, tkn.pos, err_msg);
             self.errors.push(error);
+            return None;
         }
 
+        let expected_params = maybe_expected_params.unwrap();
         let mut params: Vec<Ast> = Vec::new();
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
@@ -787,9 +866,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         self.expect(TknTy::RightParen);
 
-        let expected_params = fn_sym.clone().unwrap().fn_params.clone().unwrap();
         if expected_params.len() != params.len() {
-            // TODO: could pass in a list here and print the list instead of the counts
             let err_msg = format!("Incorrect function parameters: Expected {} arguments, but found {}.",
                                   expected_params.len(),
                                   params.len());

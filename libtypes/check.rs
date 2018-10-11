@@ -203,12 +203,16 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let sym = self.symtab.retrieve(&ident_tkn.get_name()).unwrap();
                 sym.ty_rec.ty.clone().unwrap()
             },
-            Ast::ClassGet(class_name_tkn, prop_tkn) => {
-                let class_sym = self.symtab.retrieve(&class_name_tkn.unwrap().get_name()).unwrap();
+            Ast::ClassGet{class_tkn, prop_tkn} => {
+                let class_sym = self.symtab.retrieve(&class_tkn.get_name()).unwrap();
                 let class_decl_ast = class_sym.assign_val.clone().unwrap();
 
-                self.extract_prop_ty(&class_decl_ast, &prop_tkn.unwrap())
+                self.extract_prop_ty(&class_decl_ast, &prop_tkn)
             },
+            // TODO: add checking for Ast::ClassFnCall
+            // Ast::ClassFnCall{class_tkn:_, func_tkn:_, func_params:_} => {
+            //
+            // },
             _ => {
                 panic!("Unrecognized expression type found!")
             }

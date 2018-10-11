@@ -80,14 +80,22 @@ pub enum Ast {
         scope_lvl: usize
     },
 
-    // Name of the class, function/property name
-    ClassGet(Option<Token>, Option<Token>),
+    ClassGet {
+        class_tkn: Token,
+        prop_tkn: Token
+    },
 
-    // Class name, func name, arguments
-    ClassFnCall(Token, Token, Vec<Ast>),
+    ClassFnCall {
+        class_tkn: Token,
+        func_tkn: Token,
+        func_params: Vec<Ast>
+    },
 
-    // Class name, class prop, rhs ast
-    ClassSet(Option<Token>, Option<Token>, Box<Option<Ast>>),
+    ClassSet {
+        class_tkn: Token,
+        prop_tkn: Token,
+        assign_val: Box<Option<Ast>>
+    },
 
     // Identifier/Literal token
     Primary(TyRecord)
