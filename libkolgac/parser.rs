@@ -224,9 +224,6 @@ impl<'l, 's> Parser<'l, 's> {
         let mut params = Vec::new();
         self.expect(TknTy::LeftParen);
 
-        // Create function level scope
-        self.symtab.init_sc();
-
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
                 let err_msg = format!("Function param count exceeded limit of {}", FN_PARAM_MAX_LEN);
@@ -301,15 +298,12 @@ impl<'l, 's> Parser<'l, 's> {
 
         self.symtab.store(name, new_sym);
 
-        // After parsing the body, we close the function block scope.
-        let sc_idx = self.symtab.finalize_sc();
-
         Some(Ast::FnDecl {
             ident_tkn: fn_ident_tkn,
             fn_params: params,
             ret_ty: fn_ty_rec,
             fn_body: Box::new(fn_body),
-            scope_lvl: sc_idx
+            scope_lvl: self.symtab.finalized_level
         })
     }
 
@@ -342,7 +336,6 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         let final_sc_lvl = self.symtab.finalize_sc();
-
         let ast = Some(Ast::ClassDecl {
             ident_tkn: class_tkn.clone(),
             methods: methods,

@@ -18,7 +18,7 @@ pub struct SymbolTable {
     /// Current level of the finalized scope. This is different from the current
     /// level of the symbol table, because we may have created/closed many
     /// scopes before we finalize one (or vice versa).
-    finalized_level: usize,
+    pub finalized_level: usize,
 
     /// The finalized symbol table. We initialize a finalized global scope when
     /// we create the table, because we expect the global scope to be

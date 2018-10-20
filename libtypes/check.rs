@@ -59,8 +59,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         ()
                     },
                     Ast::ClassFnCall{class_tkn:_, fn_tkn:_, fn_params:_, sc} => {
-                        // TODO: need to use the class decl scope here
-                        // self.check_fn_params(ast, sc);
+                        self.check_fn_params(ast, sc);
                         ()
                     },
                     _ => {
