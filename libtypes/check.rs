@@ -109,9 +109,9 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone().unwrap(), scope_lvl);
                 }
             },
-            Ast::FuncDecl{ident_tkn, params: _, ret_ty, func_body, scope_lvl} => {
+            Ast::FnDecl{ident_tkn, fn_params: _, ret_ty, fn_body, scope_lvl} => {
                 let fn_ty = ret_ty.ty.unwrap();
-                let fn_stmts = func_body.unwrap();
+                let fn_stmts = fn_body.unwrap();
                 match fn_stmts {
                     Ast::BlckStmt{stmts, scope_lvl: inner_sc} => {
                         self.check_fn_stmts(&ident_tkn, fn_ty, stmts, inner_sc);

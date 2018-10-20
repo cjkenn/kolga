@@ -46,7 +46,7 @@ impl Lexer {
             [
                 (String::from("let"), TknTy::Let),
                 (String::from("imm"), TknTy::Imm),
-                (String::from("func"), TknTy::Func),
+                (String::from("fn"), TknTy::Fn),
                 (String::from("return"), TknTy::Return),
                 (String::from("class"), TknTy::Class),
                 (String::from("this"), TknTy::This),

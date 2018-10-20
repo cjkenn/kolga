@@ -6,7 +6,7 @@ use type_record::TyRecord;
 pub enum SymTy {
     Param,
     Var,
-    Func,
+    Fn,
     Class,
 }
 

@@ -74,7 +74,7 @@ impl<'l, 's> Parser<'l, 's> {
     fn decl(&mut self) -> Option<Ast> {
         match self.currtkn.ty {
             TknTy::Let => self.var_decl(),
-            TknTy::Func => self.func_decl(),
+            TknTy::Fn => self.fn_decl(),
             TknTy::Class => self.class_decl(),
             _ => self.stmt()
         }
@@ -216,9 +216,9 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    fn func_decl(&mut self) -> Option<Ast> {
-        self.expect(TknTy::Func);
-        let func_ident_tkn = self.currtkn.clone();
+    fn fn_decl(&mut self) -> Option<Ast> {
+        self.expect(TknTy::Fn);
+        let fn_ident_tkn = self.currtkn.clone();
         self.consume();
 
         let mut params = Vec::new();
@@ -279,23 +279,23 @@ impl<'l, 's> Parser<'l, 's> {
         // encounter a recursive call, we won't report an error for trying
         // to call an undefined function.
         let fn_ty_rec = TyRecord::new_from_tkn(fn_ret_ty_tkn.clone().unwrap());
-        let fn_sym = Sym::new(SymTy::Func,
+        let fn_sym = Sym::new(SymTy::Fn,
                               true,
                               fn_ty_rec.clone(),
-                              func_ident_tkn.clone(),
+                              fn_ident_tkn.clone(),
                               None,
                               Some(params.clone()));
 
-        let name = &func_ident_tkn.get_name();
+        let name = &fn_ident_tkn.get_name();
         self.symtab.store(name, fn_sym);
 
         // Now we parse the function body, update the symbol and store it with
         // the updated body.
         let fn_body = self.block_stmt();
-        let new_sym = Sym::new(SymTy::Func,
+        let new_sym = Sym::new(SymTy::Fn,
                               true,
                               fn_ty_rec.clone(),
-                              func_ident_tkn.clone(),
+                              fn_ident_tkn.clone(),
                               fn_body.clone(),
                               Some(params.clone()));
 
@@ -304,11 +304,11 @@ impl<'l, 's> Parser<'l, 's> {
         // After parsing the body, we close the function block scope.
         let sc_idx = self.symtab.finalize_sc();
 
-        Some(Ast::FuncDecl {
-            ident_tkn: func_ident_tkn,
-            params: params,
+        Some(Ast::FnDecl {
+            ident_tkn: fn_ident_tkn,
+            fn_params: params,
             ret_ty: fn_ty_rec,
-            func_body: Box::new(fn_body),
+            fn_body: Box::new(fn_body),
             scope_lvl: sc_idx
         })
     }
@@ -328,7 +328,7 @@ impl<'l, 's> Parser<'l, 's> {
         loop {
             match self.currtkn.ty {
                 TknTy::Let => props.push(self.var_decl()),
-                TknTy::Func => methods.push(self.func_decl()),
+                TknTy::Fn => methods.push(self.fn_decl()),
                 TknTy::RightBrace => {
                     self.consume();
                     break;
@@ -820,9 +820,9 @@ impl<'l, 's> Parser<'l, 's> {
                         let mut expected_params = None;
                         for mtod_ast in methods {
                             match mtod_ast.unwrap() {
-                                Ast::FuncDecl{ident_tkn, params, ret_ty:_, func_body:_, scope_lvl:_} => {
+                                Ast::FnDecl{ident_tkn, fn_params, ret_ty:_, fn_body:_, scope_lvl:_} => {
                                     if ident_tkn.get_name() == fn_tkn.clone().unwrap().get_name() {
-                                        expected_params = Some(params);
+                                        expected_params = Some(fn_params);
                                     }
                                 },
                                 _ => ()
@@ -915,8 +915,8 @@ impl<'l, 's> Parser<'l, 's> {
                 // or function decl sym, we can return the sym. But no assign value on
                 // any other type requires a check that we are assigning to it, otherwise
                 // we are trying to access an udnefined variable.
-                // Func is here to support recursive calls.
-                if sym.assign_val.is_none() && (sym.sym_ty != SymTy::Param && sym.sym_ty != SymTy::Func) {
+                // Fn is here to support recursive calls.
+                if sym.assign_val.is_none() && (sym.sym_ty != SymTy::Param && sym.sym_ty != SymTy::Fn) {
                     let next_tkn = self.lexer.peek_tkn();
                     // If the following token is '=', we don't need to report an error
                     // for unitialized var (we are initializing it here).

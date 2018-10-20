@@ -1,3 +1,0 @@
-func myFn(x~num) ~num {
-     return 10;
-}

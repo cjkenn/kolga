@@ -40,7 +40,7 @@ pub enum TknTy {
     // Keywords
     Let,
     Imm,
-    Func,
+    Fn,
     Return,
     Class,
     This,
@@ -155,7 +155,7 @@ impl fmt::Debug for TknTy {
             TknTy::Val(val) => val.to_string(),
             TknTy::Let => "let".to_string(),
             TknTy::Imm => "imm".to_string(),
-            TknTy::Func => "func".to_string(),
+            TknTy::Fn => "fn".to_string(),
             TknTy::Return => "return".to_string(),
             TknTy::Class => "class".to_string(),
             TknTy::This => "this".to_string(),

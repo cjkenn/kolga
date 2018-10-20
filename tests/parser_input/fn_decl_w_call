@@ -1,4 +1,4 @@
-func myFn(x~num) ~num {
+fn myFn(x~num) ~num {
      return 10;
 }
 

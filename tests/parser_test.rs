@@ -255,15 +255,15 @@ fn parse_logical_expr_w_keyword() {
 }
 
 #[test]
-fn parse_func_decl() {
-    let mut lexer = Lexer::new(File::open("./tests/parser_input/func_decl").unwrap());
+fn parse_fn_decl() {
+    let mut lexer = Lexer::new(File::open("./tests/parser_input/fn_decl").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
-    let func_decl = &extract_head(ast)[0];
+    let fn_decl = &extract_head(ast)[0];
 
-    match func_decl.clone() {
-        Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl} => {
+    match fn_decl.clone() {
+        Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl} => {
             match ident_tkn.ty {
                 TknTy::Ident(name) => {
                     assert_eq!(name, "myFn");
@@ -271,35 +271,35 @@ fn parse_func_decl() {
                 _ => expected_tkn("Ident", &ident_tkn.ty)
             }
 
-            assert_eq!(params.len(), 1);
+            assert_eq!(fn_params.len(), 1);
             assert_eq!(ret_ty.ty.unwrap(), TyName::Num);
             assert_eq!(scope_lvl, 2); // scope level is 2 because the inner block scope is finalized first
 
-            let func_body = func_body.clone().unwrap();
+            let fn_body = fn_body.clone().unwrap();
 
-            match func_body {
+            match fn_body {
                 Ast::BlckStmt{stmts, scope_lvl} => {
                     assert_eq!(scope_lvl, 1);
                     assert_eq!(stmts.len(), 1);
                 },
-                _ => expected_ast("BlckStmt", &func_body)
+                _ => expected_ast("BlckStmt", &fn_body)
             }
 
         },
-        _ => expected_ast("FnDecl", &func_decl)
+        _ => expected_ast("FnDecl", &fn_decl)
     }
 }
 
 #[test]
-fn parse_func_decl_w_call() {
-    let mut lexer = Lexer::new(File::open("./tests/parser_input/func_decl_w_call").unwrap());
+fn parse_fn_decl_w_call() {
+    let mut lexer = Lexer::new(File::open("./tests/parser_input/fn_decl_w_call").unwrap());
     let mut symtab = SymbolTable::new();
     let ast = Parser::new(&mut lexer, &mut symtab).parse().ast.unwrap();
 
-    let func_decl = &extract_head(ast.clone())[0];
+    let fn_decl = &extract_head(ast.clone())[0];
 
-    match func_decl.clone() {
-        Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl: _} => {
+    match fn_decl.clone() {
+        Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl: _} => {
             match ident_tkn.ty {
                 TknTy::Ident(name) => {
                     assert_eq!(name, "myFn");
@@ -307,42 +307,42 @@ fn parse_func_decl_w_call() {
                 _ => expected_tkn("Ident", &ident_tkn.ty)
             }
 
-            assert_eq!(params.len(), 1);
+            assert_eq!(fn_params.len(), 1);
             assert_eq!(ret_ty.ty.unwrap(), TyName::Num);
 
-            let func_body = func_body.clone().unwrap();
+            let fn_body = fn_body.clone().unwrap();
 
-            match func_body {
+            match fn_body {
                 Ast::BlckStmt{stmts, scope_lvl} => {
                     assert_eq!(scope_lvl, 1);
                     assert_eq!(stmts.len(), 1);
                 },
-                _ => expected_ast("BlckStmt", &func_body)
+                _ => expected_ast("BlckStmt", &fn_body)
             }
 
         },
-        _ => expected_ast("FnDecl", &func_decl)
+        _ => expected_ast("FnDecl", &fn_decl)
     }
 
-    let func_call_expr = &extract_head(ast)[1];
-    match func_call_expr.clone() {
+    let fn_call_expr = &extract_head(ast)[1];
+    match fn_call_expr.clone() {
         Ast::ExprStmt(mb_func_ast) => {
-            let func_call = mb_func_ast.clone().unwrap();
-            match func_call {
-                Ast::FnCall(ident_tkn, params) => {
-                    match ident_tkn.clone().unwrap().ty {
+            let fn_call = mb_func_ast.clone().unwrap();
+            match fn_call {
+                Ast::FnCall{fn_tkn, fn_params} => {
+                    match fn_tkn.clone().ty {
                         TknTy::Ident(name) => {
                             assert_eq!(name, "myFn");
                         },
-                        _ => expected_tkn("Ident", &ident_tkn.unwrap().ty)
+                        _ => expected_tkn("Ident", &fn_tkn.ty)
                     };
 
-                    assert_eq!(params.len(), 1);
+                    assert_eq!(fn_params.len(), 1);
                 },
-                _ => expected_ast("FnCall", &func_call)
+                _ => expected_ast("FnCall", &fn_call)
             }
         },
-        _ => expected_ast("ExprStmt", &func_call_expr)
+        _ => expected_ast("ExprStmt", &fn_call_expr)
     }
 }
 

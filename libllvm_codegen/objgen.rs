@@ -16,7 +16,7 @@ impl ObjGenerator {
         }
     }
 
-    pub fn emit(&mut self, filename: &str) {
+    pub fn emit(&mut self, _filename: &str) {
         unsafe {
             let triple = LLVMGetDefaultTargetTriple();
 
@@ -46,6 +46,7 @@ impl ObjGenerator {
 
 
             let mut gen_obj_error = c_str!("error generating object file") as *mut i8;
+
             // TODO: actually use the filename for output file
             let result = LLVMTargetMachineEmitToFile(target_machine,
                                                      self.ir,

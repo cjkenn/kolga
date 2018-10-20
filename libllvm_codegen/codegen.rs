@@ -15,7 +15,6 @@ use std::ptr;
 use std::slice;
 
 const LLVM_FALSE: LLVMBool = 0;
-const LLVM_TRUE: LLVMBool = 1;
 
 /// CodeGenerator handles the code generation for LLVM IR. Converts an AST to LLVM IR. We assume
 /// there are no parsing errors and that each node in the AST can be safely unwrapped. Each
@@ -156,7 +155,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
                 self.for_stmt(for_var_decl, for_cond_expr, for_step_expr, stmts)
             },
-            Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl: _} => {
+            Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl: _} => {
                 unsafe {
                     self.valtab.init_sc();
 
@@ -167,7 +166,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     // types to the function to encode the types of our params. After we create
                     // our function, we can add it to the builder and position it at
                     // the end of the new basic block.
-                    let mut param_tys = self.llvm_tys_from_ty_rec_arr(params);
+                    let mut param_tys = self.llvm_tys_from_ty_rec_arr(fn_params);
                     let llvm_fn_ty = LLVMFunctionType(fn_ty,
                                                       param_tys.as_mut_ptr(),
                                                       param_tys.len() as u32,
@@ -185,14 +184,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     LLVMGetParams(llvm_fn, llvm_params);
                     let param_value_vec = slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
                     for (idx, param) in param_value_vec.iter().enumerate() {
-                        let name = self.c_str(&params[idx].tkn.get_name());
+                        let name = self.c_str(&fn_params[idx].tkn.get_name());
                         LLVMSetValueName(*param, name);
 
                         let alloca_instr = self.build_entry_bb_alloca(llvm_fn,
-                                                                      params[idx].clone(),
-                                                                      &params[idx].tkn.get_name());
+                                                                      fn_params[idx].clone(),
+                                                                      &fn_params[idx].tkn.get_name());
                         LLVMBuildStore(self.builder, *param, alloca_instr);
-                        self.valtab.store(&params[idx].tkn.get_name(), alloca_instr);
+                        self.valtab.store(&fn_params[idx].tkn.get_name(), alloca_instr);
                     }
 
                     // Store the function symbol inside the value table before parsing the
@@ -200,7 +199,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     self.valtab.store(&ident_tkn.get_name(), llvm_fn);
 
                     // TODO: this is hard to read -_-
-                    match func_body.clone().unwrap() {
+                    match fn_body.clone().unwrap() {
                         Ast::BlckStmt{stmts, scope_lvl: _} => {
                             for stmt in stmts {
                                 match stmt.clone().unwrap() {
@@ -350,7 +349,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let class_tkn = ident_tkn.clone();
                     for mtod in methods {
                         match mtod.clone().unwrap() {
-                            Ast::FuncDecl{ident_tkn, params, ret_ty, func_body, scope_lvl} => {
+                            Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl} => {
                                 // We need to add the class declaration type to the list of params so we obtain
                                 // a pointer to it inside the method body.
                                 let fake_class_param = TyRecord {
@@ -358,14 +357,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                     tkn: class_tkn.clone()
                                 };
 
-                                let mut new_params = params.clone();
+                                let mut new_params = fn_params.clone();
                                 new_params.insert(0, fake_class_param);
 
-                                let new_method = Ast::FuncDecl{
+                                let new_method = Ast::FnDecl{
                                     ident_tkn: ident_tkn.clone(),
-                                    params: new_params,
+                                    fn_params: new_params,
                                     ret_ty: ret_ty.clone(),
-                                    func_body: func_body.clone(),
+                                    fn_body: fn_body.clone(),
                                     scope_lvl: scope_lvl
                                 };
 
@@ -483,7 +482,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             },
             // Class declarations ast types can be used as rvalues when creating a class.
-            Ast::ClassDecl{ident_tkn, methods, props, scope_lvl} => {
+            Ast::ClassDecl{ident_tkn, methods:_, props:_, scope_lvl:_} => {
                 let name = ident_tkn.get_name();
                 let llvm_struct_ty = self.classtab.retrieve(&name);
                 match llvm_struct_ty {
@@ -491,7 +490,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         let c_name = self.c_str(&name);
                         unsafe {
                             LLVMDumpType(ty_ref);
-                            let llvm_val = LLVMBuildAlloca(self.builder, ty_ref, c_str!("x"));
+                            let llvm_val = LLVMBuildAlloca(self.builder, ty_ref, c_name);
                             return Some(llvm_val);
                         }
                     },

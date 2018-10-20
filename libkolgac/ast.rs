@@ -62,11 +62,11 @@ pub enum Ast {
     // Operator token, rhs ast
     Unary(Token, Box<Option<Ast>>),
 
-    FuncDecl {
+    FnDecl {
         ident_tkn: Token,
-        params: Vec<TyRecord>,
+        fn_params: Vec<TyRecord>,
         ret_ty: TyRecord,
-        func_body: Box<Option<Ast>>,
+        fn_body: Box<Option<Ast>>,
         scope_lvl: usize
     },
 
