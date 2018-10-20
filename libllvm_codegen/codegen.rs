@@ -430,11 +430,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     _ => None
                 }
             },
-            Ast::FnCall(mb_ident_tkn, params) => {
+            Ast::FnCall{fn_tkn, fn_params} => {
                 // Check if the function was defined in the IR. We should always have
                 // the function defined in the IR though, since we wouldn't pass the parsing
                 // phase if we tried to call an undefined function name.
-                let fn_name = mb_ident_tkn.clone().unwrap().get_name();
+                let fn_name = fn_tkn.clone().get_name();
                 let llvm_fn = self.valtab.retrieve(&fn_name);
                 if llvm_fn.is_none() {
                     let msg = format!("Undeclared function call: {:?}", fn_name);
@@ -446,7 +446,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // might be non-primary expressions themselves. We store these in a vector,
                 // so we can pass it to the LLVM IR function call instruction.
                 let mut param_tys: Vec<LLVMValueRef> = Vec::new();
-                for param in params {
+                for param in fn_params {
                     let llvm_val = self.gen_expr(param);
                     if llvm_val.is_none() {
                         let msg = format!("Invalid function call param: {:?}", param);

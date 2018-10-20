@@ -745,6 +745,7 @@ impl<'l, 's> Parser<'l, 's> {
         maybe_ast
     }
 
+    /// Parses calling class methods or getting/setting class props.
     fn class_expr(&mut self, class_tkn: Option<Token>) -> Option<Ast> {
         // Consume period token
         self.expect(TknTy::Period);
@@ -757,6 +758,13 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::LeftParen => {
                 // Calling a function that belongs to the class
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
+                let sc_lvl = match class_sym.clone().unwrap().assign_val.clone().unwrap() {
+                    Ast::ClassDecl{ident_tkn:_,methods:_,props:_,scope_lvl} => {
+                        scope_lvl
+                    },
+                    _ => panic!("incorrect sym type found")
+                };
+
                 let fn_ast = self.fnparams_expr(name_tkn.clone(), class_sym.clone());
                 if fn_ast.is_none() {
                     return None;
@@ -765,8 +773,9 @@ impl<'l, 's> Parser<'l, 's> {
                 let params = fn_ast.unwrap().extract_params();
                 maybe_ast = Some(Ast::ClassFnCall {
                     class_tkn: class_tkn.clone().unwrap(),
-                    func_tkn: name_tkn.unwrap().clone(),
-                    func_params: params
+                    fn_tkn: name_tkn.unwrap().clone(),
+                    fn_params: params,
+                    sc: sc_lvl
                 });
             },
             TknTy::Period => {
@@ -875,7 +884,10 @@ impl<'l, 's> Parser<'l, 's> {
             self.errors.push(error);
         }
 
-        Some(Ast::FnCall(fn_tkn, params))
+        Some(Ast::FnCall{
+            fn_tkn: fn_tkn.unwrap(),
+            fn_params: params
+        })
     }
 
     fn primary_expr(&mut self) -> Option<Ast> {

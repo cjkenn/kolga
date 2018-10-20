@@ -71,7 +71,10 @@ pub enum Ast {
     },
 
     // Func name, params
-    FnCall(Option<Token>, Vec<Ast>),
+    FnCall {
+        fn_tkn: Token,
+        fn_params: Vec<Ast>
+    },
 
     ClassDecl {
         ident_tkn: Token,
@@ -85,16 +88,17 @@ pub enum Ast {
         prop_tkn: Token
     },
 
-    ClassFnCall {
-        class_tkn: Token,
-        func_tkn: Token,
-        func_params: Vec<Ast>
-    },
-
     ClassSet {
         class_tkn: Token,
         prop_tkn: Token,
         assign_val: Box<Option<Ast>>
+    },
+
+    ClassFnCall {
+        class_tkn: Token,
+        fn_tkn: Token,
+        fn_params: Vec<Ast>,
+        sc: usize
     },
 
     // Identifier/Literal token
@@ -118,7 +122,7 @@ impl Ast {
 
     pub fn extract_params(&self) -> Vec<Ast> {
         match self {
-            Ast::FnCall(_, pars) => pars.clone(),
+            Ast::FnCall{fn_tkn:_, fn_params} => fn_params.clone(),
             _ => Vec::new()
         }
     }

@@ -54,8 +54,13 @@ impl<'t, 's> TyCheck<'t, 's> {
             Ast::ExprStmt(ref maybe_ast) => {
                 let ast = maybe_ast.clone().unwrap();
                 match ast {
-                    Ast::FnCall(_, _) => {
+                    Ast::FnCall{fn_tkn:_, fn_params:_} => {
                         self.check_fn_params(ast, final_sc);
+                        ()
+                    },
+                    Ast::ClassFnCall{class_tkn:_, fn_tkn:_, fn_params:_, sc} => {
+                        // TODO: need to use the class decl scope here
+                        // self.check_fn_params(ast, sc);
                         ()
                     },
                     _ => {
@@ -114,13 +119,13 @@ impl<'t, 's> TyCheck<'t, 's> {
                     _ => self.check_stmt(fn_stmts.clone(), scope_lvl)
                 };
             },
-            Ast::ClassDecl{ident_tkn:_, methods, props, scope_lvl:_} => {
+            Ast::ClassDecl{ident_tkn:_, methods, props, scope_lvl} => {
                 for prop_stmt in props {
-                    self.check_stmt(prop_stmt.clone().unwrap(), final_sc);
+                    self.check_stmt(prop_stmt.clone().unwrap(), scope_lvl);
                 }
 
                 for stmt in &methods {
-                    self.check_stmt(stmt.clone().unwrap(), final_sc);
+                    self.check_stmt(stmt.clone().unwrap(), scope_lvl);
                 }
             },
             _ => {
@@ -209,10 +214,6 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.extract_prop_ty(&class_decl_ast, &prop_tkn)
             },
-            // TODO: add checking for Ast::ClassFnCall
-            // Ast::ClassFnCall{class_tkn:_, func_tkn:_, func_params:_} => {
-            //
-            // },
             _ => {
                 panic!("Unrecognized expression type found!")
             }
@@ -254,20 +255,40 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_fn_params(&mut self, fn_call_ast: Ast, final_sc: usize) {
         match fn_call_ast {
-            Ast::FnCall(name_tkn, params) => {
-                let fn_sym = self.find_fn_sym(&name_tkn.clone().unwrap(), final_sc);
+            Ast::FnCall{fn_tkn, fn_params} => {
+                let fn_sym = self.find_fn_sym(&fn_tkn.clone(), final_sc);
                 let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
 
                 let mut passed_in_param_tys = Vec::new();
 
-                for ast in &params {
+                for ast in &fn_params {
                     passed_in_param_tys.push(self.check_expr(ast.clone(), 0));
                 }
 
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
                     let ty_name = mb_ty_rec.clone().ty.unwrap();
                     if passed_in_param_tys[idx] != ty_name {
-                        let err = self.ty_mismatch(&name_tkn.clone().unwrap(),
+                        let err = self.ty_mismatch(&fn_tkn.clone(),
+                                                   &passed_in_param_tys[idx],
+                                                   &ty_name);
+                        self.errors.push(err);
+                    }
+                }
+            },
+            Ast::ClassFnCall{class_tkn:_, fn_tkn, fn_params, sc} => {
+                let fn_sym = self.find_fn_sym(&fn_tkn.clone(), sc);
+                let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
+
+                let mut passed_in_param_tys = Vec::new();
+
+                for ast in &fn_params {
+                    passed_in_param_tys.push(self.check_expr(ast.clone(), 0));
+                }
+
+                for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
+                    let ty_name = mb_ty_rec.clone().ty.unwrap();
+                    if passed_in_param_tys[idx] != ty_name {
+                        let err = self.ty_mismatch(&fn_tkn.clone(),
                                                    &passed_in_param_tys[idx],
                                                    &ty_name);
                         self.errors.push(err);
