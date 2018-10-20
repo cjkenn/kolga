@@ -47,16 +47,16 @@ The `src` directory contains the file `kolga.rs`, which is the main entry point 
 ### Some Small Examples
 
 ```
-func basicFunc(x~num, y~num)~num {
+fn basicFunc(x~num, y~num)~num {
   let z~num = 10;
   return x + y + z;
 }
 
-func double(x~num)~num {
+fn double(x~num)~num {
   return x * 2;
 }
 
-func negate(y~bool)~bool {
+fn negate(y~bool)~bool {
   return !y;
 }
 ```
@@ -66,11 +66,11 @@ class mClass {
   let z~num;
   let y~num = 10;
   
-  func nop()~void {
+  fn nop()~void {
     return;
   }
   
-  func triple()~num {
+  fn triple()~num {
     return y * 3;
   }
 }
