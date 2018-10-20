@@ -749,12 +749,11 @@ impl<'l, 's> Parser<'l, 's> {
     fn class_expr(&mut self, class_tkn: Option<Token>) -> Option<Ast> {
         // Consume period token
         self.expect(TknTy::Period);
-        let mut maybe_ast = None;
 
         // This token can be a function name, a class prop name, or
         // another class name.
         let name_tkn = self.match_ident_tkn();
-        match self.currtkn.ty {
+        let maybe_ast = match self.currtkn.ty {
             TknTy::LeftParen => {
                 // Calling a function that belongs to the class
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
@@ -771,24 +770,24 @@ impl<'l, 's> Parser<'l, 's> {
                 }
 
                 let params = fn_ast.unwrap().extract_params();
-                maybe_ast = Some(Ast::ClassFnCall {
+                Some(Ast::ClassFnCall {
                     class_tkn: class_tkn.clone().unwrap(),
                     fn_tkn: name_tkn.unwrap().clone(),
                     fn_params: params,
                     sc: sc_lvl
-                });
+                })
             },
             TknTy::Period => {
                 // Accessing another class within this class
-                maybe_ast = self.class_expr(name_tkn);
+                self.class_expr(name_tkn)
             }
             _ => {
-                maybe_ast = Some(Ast::ClassGet {
+                Some(Ast::ClassGet {
                     class_tkn: class_tkn.unwrap(),
                     prop_tkn: name_tkn.unwrap()
-                });
+                })
             }
-        }
+        };
 
         maybe_ast
     }

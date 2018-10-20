@@ -23,7 +23,7 @@ pub struct SymbolTable {
     /// The finalized symbol table. We initialize a finalized global scope when
     /// we create the table, because we expect the global scope to be
     /// finalized after parsing.
-    pub finalized: Vec<Scope>
+    finalized: Vec<Scope>
 }
 
 impl SymbolTable {
