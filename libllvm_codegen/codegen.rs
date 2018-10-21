@@ -3,7 +3,7 @@ use llvm_sys::prelude::*;
 use llvm_sys::core::*;
 
 use kolgac::ast::Ast;
-use kolgac::token::TknTy;
+use kolgac::token::{Token, TknTy};
 use kolgac::type_record::{TyRecord, TyName};
 
 use errors::ErrCodeGen;
@@ -227,6 +227,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     // going to be making another pass over them later). Add the llvm function
                     // to the value table so we can look it up later for a call.
                     self.valtab.close_sc();
+                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
                 }
 
                 Vec::new()
@@ -235,14 +236,18 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 match is_global {
                     true => {
                         let c_name = self.c_str(&ident_tkn.get_name());
+                        let var_ident = ident_tkn.get_name();
+
                         match value.clone().unwrap() {
                             Ast::ClassDecl{ident_tkn, methods:_, props:_, scope_lvl:_} => {
                                 let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
                                 if llvm_ty.is_none() {
+                                    // TODO: proper error handling
                                     panic!("Unkown class found");
                                 }
                                 unsafe {
                                     let global = LLVMAddGlobal(self.module, llvm_ty.unwrap(), c_name);
+                                    self.valtab.store(&var_ident, global);
                                     vec![global]
                                 }
                             },
@@ -360,8 +365,19 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 let mut new_params = fn_params.clone();
                                 new_params.insert(0, fake_class_param);
 
+                                // We change the name of the function by prepending the
+                                // class name so we avoid storing duplicates in the value table.
+                                // This is mostly a hack though, because then no one can
+                                // create a function with the class name prepended to the class
+                                // function name!
+                                let curr_name = ident_tkn.get_name();
+                                let new_name = format!("{}_{}", class_tkn.get_name(), curr_name);
+                                let new_tkn = Token::new(TknTy::Ident(new_name),
+                                                         ident_tkn.line,
+                                                         ident_tkn.pos);
+
                                 let new_method = Ast::FnDecl{
-                                    ident_tkn: ident_tkn.clone(),
+                                    ident_tkn: new_tkn,
                                     fn_params: new_params,
                                     ret_ty: ret_ty.clone(),
                                     fn_body: fn_body.clone(),
@@ -464,6 +480,45 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                        c_str!("")))
                 }
 
+            },
+            Ast::ClassFnCall{class_tkn, class_name, fn_tkn, fn_params, sc} => {
+                // The class function is stored under a different name in the
+                // value table, with the class name prepended.
+                let fn_name = fn_tkn.clone().get_name();
+                let class_fn_name = format!("{}_{}", class_name, fn_name);
+
+                let llvm_fn = self.valtab.retrieve(&class_fn_name);
+                if llvm_fn.is_none() {
+                    let msg = format!("Undeclared function call: {:?}", fn_name);
+                    self.errors.push(ErrCodeGen::new(msg));
+                    return None;
+                }
+
+                // We need to insert a pointer to the class instance as the first param in order to
+                // call the class function. We get that pointer from the value table (the pointer
+                // is the actual instance of the class that has been created).
+                let mut param_tys: Vec<LLVMValueRef> = Vec::new();
+                let class_instance = self.valtab.retrieve(&class_tkn.get_name());
+                param_tys.push(class_instance.unwrap());
+
+                for param in fn_params {
+                    let llvm_val = self.gen_expr(param);
+                    if llvm_val.is_none() {
+                        let msg = format!("Invalid function call param: {:?}", param);
+                        self.errors.push(ErrCodeGen::new(msg));
+                        return None;
+                    }
+
+                    param_tys.push(llvm_val.unwrap());
+                }
+
+                unsafe {
+                    Some(LLVMBuildCall(self.builder,
+                                       llvm_fn.unwrap(),
+                                       param_tys.as_mut_ptr(),
+                                       param_tys.len() as u32,
+                                       c_str!("")))
+                }
             },
             Ast::VarAssign{ty_rec:_, ident_tkn, is_imm:_, is_global:_, value} => {
                 // This is a variable re-assign, not a new declaration and assign. Thus,
@@ -821,9 +876,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             TyName::Bool => self.i8_ty(),
             TyName::Void => self.void_ty(),
             TyName::Class(name) => {
-                // Retrieve the class type from the class table.
+                // Retrieve the class type from the class table, and return a pointer to it.
                 // TODO: error checking here
-                self.classtab.retrieve(&name).unwrap()
+                let class_ty = self.classtab.retrieve(&name).unwrap();
+                unsafe { LLVMPointerType(class_ty, 0) }
             }
         }
     }

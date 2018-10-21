@@ -58,7 +58,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         self.check_fn_params(ast, final_sc);
                         ()
                     },
-                    Ast::ClassFnCall{class_tkn:_, fn_tkn:_, fn_params:_, sc} => {
+                    Ast::ClassFnCall{class_tkn:_, class_name:_, fn_tkn:_, fn_params:_, sc} => {
                         self.check_fn_params(ast, sc);
                         ()
                     },
@@ -274,7 +274,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             },
-            Ast::ClassFnCall{class_tkn:_, fn_tkn, fn_params, sc} => {
+            Ast::ClassFnCall{class_tkn:_, class_name:_, fn_tkn, fn_params, sc} => {
                 let fn_sym = self.find_fn_sym(&fn_tkn.clone(), sc);
                 let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
 

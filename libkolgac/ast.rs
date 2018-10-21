@@ -96,6 +96,7 @@ pub enum Ast {
 
     ClassFnCall {
         class_tkn: Token,
+        class_name: String,
         fn_tkn: Token,
         fn_params: Vec<Ast>,
         sc: usize

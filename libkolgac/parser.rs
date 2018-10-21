@@ -750,9 +750,9 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::LeftParen => {
                 // Calling a function that belongs to the class
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
-                let sc_lvl = match class_sym.clone().unwrap().assign_val.clone().unwrap() {
-                    Ast::ClassDecl{ident_tkn:_,methods:_,props:_,scope_lvl} => {
-                        scope_lvl
+                let (sc_lvl, class_name) = match class_sym.clone().unwrap().assign_val.clone().unwrap() {
+                    Ast::ClassDecl{ident_tkn, methods:_,props:_, scope_lvl} => {
+                        (scope_lvl, ident_tkn.get_name())
                     },
                     _ => panic!("incorrect sym type found")
                 };
@@ -765,6 +765,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let params = fn_ast.unwrap().extract_params();
                 Some(Ast::ClassFnCall {
                     class_tkn: class_tkn.clone().unwrap(),
+                    class_name: class_name,
                     fn_tkn: name_tkn.unwrap().clone(),
                     fn_params: params,
                     sc: sc_lvl
