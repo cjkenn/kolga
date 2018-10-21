@@ -26,13 +26,13 @@ impl TyName {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TyRecord {
+pub struct TyRec {
     pub ty: Option<TyName>,
     pub tkn: Token
 }
 
-impl TyRecord {
-    pub fn new_from_tkn(tkn: Token) -> TyRecord {
+impl TyRec {
+    pub fn new_from_tkn(tkn: Token) -> TyRec {
         let ty = match tkn.ty {
             TknTy::Num => Some(TyName::Num),
             TknTy::String => Some(TyName::String),
@@ -47,7 +47,7 @@ impl TyRecord {
             _ => None
         };
 
-        TyRecord {
+        TyRec {
             ty: ty,
             tkn: tkn.clone(),
         }

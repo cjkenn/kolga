@@ -1,6 +1,6 @@
 use token::Token;
 use ast::Ast;
-use type_record::TyRecord;
+use ty_rec::TyRec;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SymTy {
@@ -14,19 +14,19 @@ pub enum SymTy {
 pub struct Sym {
     pub sym_ty: SymTy,
     pub imm: bool,
-    pub ty_rec: TyRecord,
+    pub ty_rec: TyRec,
     pub ident_tkn: Token,
     pub assign_val: Option<Ast>,
-    pub fn_params: Option<Vec<TyRecord>>
+    pub fn_params: Option<Vec<TyRec>>
 }
 
 impl Sym {
     pub fn new(sym_ty: SymTy,
                imm: bool,
-               ty_rec: TyRecord,
+               ty_rec: TyRec,
                ident_tkn: Token,
                rhs: Option<Ast>,
-               params: Option<Vec<TyRecord>>) -> Sym {
+               params: Option<Vec<TyRec>>) -> Sym {
         Sym {
             sym_ty: sym_ty,
             imm: imm,

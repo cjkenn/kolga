@@ -1,5 +1,5 @@
 use token::Token;
-use type_record::TyRecord;
+use ty_rec::TyRec;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
@@ -39,14 +39,14 @@ pub enum Ast {
     ExprStmt(Box<Option<Ast>>),
 
     VarDecl {
-        ty_rec: TyRecord,
+        ty_rec: TyRec,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool
     },
 
     VarAssign {
-        ty_rec: TyRecord,
+        ty_rec: TyRec,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
@@ -64,8 +64,8 @@ pub enum Ast {
 
     FnDecl {
         ident_tkn: Token,
-        fn_params: Vec<TyRecord>,
-        ret_ty: TyRecord,
+        fn_params: Vec<TyRec>,
+        ret_ty: TyRec,
         fn_body: Box<Option<Ast>>,
         scope_lvl: usize
     },
@@ -103,7 +103,7 @@ pub enum Ast {
     },
 
     // Identifier/Literal token
-    Primary(TyRecord)
+    Primary(TyRec)
 }
 
 impl Ast {
@@ -114,7 +114,7 @@ impl Ast {
         }
     }
 
-    pub fn extract_primary_ty_rec(&self) -> TyRecord {
+    pub fn extract_primary_ty_rec(&self) -> TyRec {
         match self {
             Ast::Primary(tyrec) => tyrec.clone(),
             _ => panic!()

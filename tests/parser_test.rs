@@ -7,7 +7,7 @@ use kolgac::token::TknTy;
 use kolgac::parser::Parser;
 use kolgac::ast::Ast;
 use kolgac::symtab::SymbolTable;
-use kolgac::type_record::TyName;
+use kolgac::ty_rec::TyName;
 
 #[test]
 fn parse_empty() {

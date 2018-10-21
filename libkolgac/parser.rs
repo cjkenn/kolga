@@ -3,7 +3,7 @@ use symtab::SymbolTable;
 use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
-use type_record::TyRecord;
+use ty_rec::TyRec;
 use errors::ErrC;
 use std::rc::Rc;
 
@@ -140,7 +140,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let var_val = self.expr();
                 self.expect(TknTy::Semicolon);
 
-                let ty_rec = TyRecord::new_from_tkn(var_ty_tkn.unwrap());
+                let ty_rec = TyRec::new_from_tkn(var_ty_tkn.unwrap());
                 let sym = Sym::new(SymTy::Var,
                                    is_imm,
                                    ty_rec.clone(),
@@ -169,7 +169,7 @@ impl<'l, 's> Parser<'l, 's> {
 
                 if is_class_type {
                     let class_sym = self.symtab.retrieve(&var_ty_tkn.clone().unwrap().get_name()).unwrap();
-                    let cl_ty_rec = TyRecord::new_from_tkn(var_ty_tkn.clone().unwrap());
+                    let cl_ty_rec = TyRec::new_from_tkn(var_ty_tkn.clone().unwrap());
                     let cl_assign = class_sym.assign_val.clone();
                     let cl_sym = Sym::new(SymTy::Var,
                                           is_imm,
@@ -190,7 +190,7 @@ impl<'l, 's> Parser<'l, 's> {
                     });
                 }
 
-                let ty_rec = TyRecord::new_from_tkn(var_ty_tkn.unwrap());
+                let ty_rec = TyRec::new_from_tkn(var_ty_tkn.unwrap());
                 let sym = Sym::new(SymTy::Var,
                                    is_imm,
                                    ty_rec.clone(),
@@ -235,7 +235,7 @@ impl<'l, 's> Parser<'l, 's> {
             self.consume();
             self.expect(TknTy::Tilde);
 
-            let mut ty_rec = TyRecord::new_from_tkn(self.currtkn.clone());
+            let mut ty_rec = TyRec::new_from_tkn(self.currtkn.clone());
             ty_rec.tkn = ident_tkn.clone();
 
             params.push(ty_rec.clone());
@@ -275,7 +275,7 @@ impl<'l, 's> Parser<'l, 's> {
         // set an actual value. This is so that when parsing the body, if we
         // encounter a recursive call, we won't report an error for trying
         // to call an undefined function.
-        let fn_ty_rec = TyRecord::new_from_tkn(fn_ret_ty_tkn.clone().unwrap());
+        let fn_ty_rec = TyRec::new_from_tkn(fn_ret_ty_tkn.clone().unwrap());
         let fn_sym = Sym::new(SymTy::Fn,
                               true,
                               fn_ty_rec.clone(),
@@ -348,7 +348,7 @@ impl<'l, 's> Parser<'l, 's> {
         // current scope before this call to store()).
         let sym = Sym::new(SymTy::Class,
                            true,
-                           TyRecord::new_from_tkn(class_tkn.clone()),
+                           TyRec::new_from_tkn(class_tkn.clone()),
                            class_tkn.clone(),
                            ast.clone(),
                            None);
@@ -890,7 +890,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::True |
             TknTy::False |
             TknTy::Null => {
-                let ast = Some(Ast::Primary(TyRecord::new_from_tkn(self.currtkn.clone())));
+                let ast = Some(Ast::Primary(TyRec::new_from_tkn(self.currtkn.clone())));
                 self.consume();
                 ast
             },
