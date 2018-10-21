@@ -9,7 +9,7 @@ pub enum Ast {
 
     BlckStmt {
         stmts: Vec<Option<Ast>>,
-        scope_lvl: usize
+        sc: usize
     },
 
     // Condition expr, if block stmt, else if exprs, else stmts
@@ -67,7 +67,7 @@ pub enum Ast {
         fn_params: Vec<TyRec>,
         ret_ty: TyRec,
         fn_body: Box<Option<Ast>>,
-        scope_lvl: usize
+        sc: usize
     },
 
     // Func name, params
@@ -80,7 +80,7 @@ pub enum Ast {
         ident_tkn: Token,
         methods: Vec<Option<Ast>>,
         props: Vec<Option<Ast>>,
-        scope_lvl: usize
+        sc: usize
     },
 
     ClassGet {

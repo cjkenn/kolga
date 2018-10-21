@@ -124,7 +124,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     // we need to know which values we generated.
     fn gen_stmt(&mut self, stmt: &Ast) -> Vec<LLVMValueRef> {
         match stmt {
-            Ast::BlckStmt{stmts, scope_lvl: _} => {
+            Ast::BlckStmt{stmts, sc: _} => {
                 let mut generated = Vec::new();
                 for stmt in stmts {
                     let mb_gen = self.gen_stmt(&stmt.clone().unwrap());
@@ -155,7 +155,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
                 self.for_stmt(for_var_decl, for_cond_expr, for_step_expr, stmts)
             },
-            Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl: _} => {
+            Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, sc: _} => {
                 unsafe {
                     self.valtab.init_sc();
 
@@ -200,7 +200,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                     // TODO: this is hard to read -_-
                     match fn_body.clone().unwrap() {
-                        Ast::BlckStmt{stmts, scope_lvl: _} => {
+                        Ast::BlckStmt{stmts, sc: _} => {
                             for stmt in stmts {
                                 match stmt.clone().unwrap() {
                                     Ast::RetStmt(mb_expr) => {
@@ -239,7 +239,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         let var_ident = ident_tkn.get_name();
 
                         match value.clone().unwrap() {
-                            Ast::ClassDecl{ident_tkn, methods:_, props:_, scope_lvl:_} => {
+                            Ast::ClassDecl{ident_tkn, methods:_, props:_, sc:_} => {
                                 let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
                                 if llvm_ty.is_none() {
                                     // TODO: proper error handling
@@ -278,7 +278,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             // here should already be a struct type (if we tried to create a class
                             // before declaring it we would not pass parsing).
                             match raw_val {
-                                Ast::ClassDecl{ident_tkn:_, methods:_, props:_, scope_lvl:_} => {
+                                Ast::ClassDecl{ident_tkn:_, methods:_, props:_, sc:_} => {
                                     vec![alloca_instr]
                                 },
                                 _ => {
@@ -316,7 +316,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             },
-            Ast::ClassDecl{ident_tkn, methods, props, scope_lvl:_} => {
+            Ast::ClassDecl{ident_tkn, methods, props, sc:_} => {
                 unsafe {
                     let mut prop_tys = Vec::new();
                     for pr in props {
@@ -354,7 +354,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let class_tkn = ident_tkn.clone();
                     for mtod in methods {
                         match mtod.clone().unwrap() {
-                            Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl} => {
+                            Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, sc} => {
                                 // We need to add the class declaration type to the list of params so we obtain
                                 // a pointer to it inside the method body.
                                 let fake_class_param = TyRec {
@@ -381,7 +381,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                     fn_params: new_params,
                                     ret_ty: ret_ty.clone(),
                                     fn_body: fn_body.clone(),
-                                    scope_lvl: scope_lvl
+                                    sc: sc
                                 };
 
                                 self.gen_stmt(&new_method);
@@ -537,7 +537,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             },
             // Class declarations ast types can be used as rvalues when creating a class.
-            Ast::ClassDecl{ident_tkn, methods:_, props:_, scope_lvl:_} => {
+            Ast::ClassDecl{ident_tkn, methods:_, props:_, sc:_} => {
                 let name = ident_tkn.get_name();
                 let llvm_struct_ty = self.classtab.retrieve(&name);
                 match llvm_struct_ty {

@@ -103,28 +103,28 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.check_stmt(stmts.clone().unwrap(), final_sc);
             },
-            Ast::BlckStmt{stmts, scope_lvl} => {
+            Ast::BlckStmt{stmts, sc} => {
                 for stmt in &stmts {
-                    self.check_stmt(stmt.clone().unwrap(), scope_lvl);
+                    self.check_stmt(stmt.clone().unwrap(), sc);
                 }
             },
-            Ast::FnDecl{ident_tkn, fn_params: _, ret_ty, fn_body, scope_lvl} => {
+            Ast::FnDecl{ident_tkn, fn_params: _, ret_ty, fn_body, sc} => {
                 let fn_ty = ret_ty.ty.unwrap();
                 let fn_stmts = fn_body.unwrap();
                 match fn_stmts {
-                    Ast::BlckStmt{stmts, scope_lvl: inner_sc} => {
+                    Ast::BlckStmt{stmts, sc: inner_sc} => {
                         self.check_fn_stmts(&ident_tkn, fn_ty, stmts, inner_sc);
                     },
-                    _ => self.check_stmt(fn_stmts.clone(), scope_lvl)
+                    _ => self.check_stmt(fn_stmts.clone(), sc)
                 };
             },
-            Ast::ClassDecl{ident_tkn:_, methods, props, scope_lvl} => {
+            Ast::ClassDecl{ident_tkn:_, methods, props, sc} => {
                 for prop_stmt in props {
-                    self.check_stmt(prop_stmt.clone().unwrap(), scope_lvl);
+                    self.check_stmt(prop_stmt.clone().unwrap(), sc);
                 }
 
                 for stmt in &methods {
-                    self.check_stmt(stmt.clone().unwrap(), scope_lvl);
+                    self.check_stmt(stmt.clone().unwrap(), sc);
                 }
             },
             _ => {
@@ -203,7 +203,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             },
-            Ast::ClassDecl{ident_tkn, methods:_, props:_, scope_lvl:_} => {
+            Ast::ClassDecl{ident_tkn, methods:_, props:_, sc:_} => {
                 let sym = self.symtab.retrieve(&ident_tkn.get_name()).unwrap();
                 sym.ty_rec.ty.clone().unwrap()
             },
@@ -225,7 +225,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name_tkn: &Token) -> TyName {
         let prop_name = prop_name_tkn.get_name();
         match class_decl_ast {
-            Ast::ClassDecl{ident_tkn:_, methods:_, props, scope_lvl:_} => {
+            Ast::ClassDecl{ident_tkn:_, methods:_, props, sc:_} => {
                 let mut prop_ty = None;
                 // TODO: this is O(n) and not efficient (should store props in a map)
                 for prop in props {
@@ -369,14 +369,14 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_var_assign(&mut self, stmt: Ast, scope_lvl: usize) -> TyName {
+    fn check_var_assign(&mut self, stmt: Ast, sc: usize) -> TyName {
         match stmt {
             Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
                 let lhs_ty = ty_rec.ty.unwrap();
                 let rhs = value.unwrap();
 
                 // TODO: this shouldnt be 0 finalized scope
-                let rhs_ty = self.check_expr(rhs, scope_lvl);
+                let rhs_ty = self.check_expr(rhs, sc);
                 if lhs_ty != rhs_ty {
                     let err = self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
                     self.errors.push(err);
@@ -410,9 +410,9 @@ impl<'t, 's> TyCheck<'t, 's> {
         ErrC::new(tkn.line, tkn.pos, msg)
     }
 
-    fn find_fn_sym(&mut self, ident_tkn: &Token, scope_lvl: usize) -> Option<Rc<Sym>> {
+    fn find_fn_sym(&mut self, ident_tkn: &Token, sc: usize) -> Option<Rc<Sym>> {
         let name = ident_tkn.get_name();
-        let sym = self.symtab.retrieve_from_finalized_sc(&name, scope_lvl);
+        let sym = self.symtab.retrieve_from_finalized_sc(&name, sc);
         match sym {
             Some(symbol) => Some(symbol),
             None => {

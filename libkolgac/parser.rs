@@ -303,7 +303,7 @@ impl<'l, 's> Parser<'l, 's> {
             fn_params: params,
             ret_ty: fn_ty_rec,
             fn_body: Box::new(fn_body),
-            scope_lvl: self.symtab.finalized_level
+            sc: self.symtab.finalized_level
         })
     }
 
@@ -340,7 +340,7 @@ impl<'l, 's> Parser<'l, 's> {
             ident_tkn: class_tkn.clone(),
             methods: methods,
             props: props,
-            scope_lvl: final_sc_lvl
+            sc: final_sc_lvl
         });
 
         // This should be stored in the starting level of the symbol table, not the
@@ -389,7 +389,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         Some(Ast::BlckStmt{
             stmts: stmts,
-            scope_lvl: sc_lvl
+            sc: sc_lvl
         })
     }
 
@@ -751,8 +751,8 @@ impl<'l, 's> Parser<'l, 's> {
                 // Calling a function that belongs to the class
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
                 let (sc_lvl, class_name) = match class_sym.clone().unwrap().assign_val.clone().unwrap() {
-                    Ast::ClassDecl{ident_tkn, methods:_,props:_, scope_lvl} => {
-                        (scope_lvl, ident_tkn.get_name())
+                    Ast::ClassDecl{ident_tkn, methods:_,props:_, sc} => {
+                        (sc, ident_tkn.get_name())
                     },
                     _ => panic!("incorrect sym type found")
                 };
@@ -809,11 +809,11 @@ impl<'l, 's> Parser<'l, 's> {
             None => {
                 let class_decl_ast = maybe_class_sym.unwrap().assign_val.clone().unwrap();
                 let params = match class_decl_ast {
-                    Ast::ClassDecl{ident_tkn:_, methods, props:_, scope_lvl:_} => {
+                    Ast::ClassDecl{ident_tkn:_, methods, props:_, sc:_} => {
                         let mut expected_params = None;
                         for mtod_ast in methods {
                             match mtod_ast.unwrap() {
-                                Ast::FnDecl{ident_tkn, fn_params, ret_ty:_, fn_body:_, scope_lvl:_} => {
+                                Ast::FnDecl{ident_tkn, fn_params, ret_ty:_, fn_body:_, sc:_} => {
                                     if ident_tkn.get_name() == fn_tkn.clone().unwrap().get_name() {
                                         expected_params = Some(fn_params);
                                     }

@@ -263,7 +263,7 @@ fn parse_fn_decl() {
     let fn_decl = &extract_head(ast)[0];
 
     match fn_decl.clone() {
-        Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl} => {
+        Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, sc} => {
             match ident_tkn.ty {
                 TknTy::Ident(name) => {
                     assert_eq!(name, "myFn");
@@ -273,13 +273,13 @@ fn parse_fn_decl() {
 
             assert_eq!(fn_params.len(), 1);
             assert_eq!(ret_ty.ty.unwrap(), TyName::Num);
-            assert_eq!(scope_lvl, 2); // scope level is 2 because the inner block scope is finalized first
+            assert_eq!(sc, 2); // scope level is 2 because the inner block scope is finalized first
 
             let fn_body = fn_body.clone().unwrap();
 
             match fn_body {
-                Ast::BlckStmt{stmts, scope_lvl} => {
-                    assert_eq!(scope_lvl, 1);
+                Ast::BlckStmt{stmts, sc} => {
+                    assert_eq!(sc, 1);
                     assert_eq!(stmts.len(), 1);
                 },
                 _ => expected_ast("BlckStmt", &fn_body)
@@ -299,7 +299,7 @@ fn parse_fn_decl_w_call() {
     let fn_decl = &extract_head(ast.clone())[0];
 
     match fn_decl.clone() {
-        Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, scope_lvl: _} => {
+        Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, sc: _} => {
             match ident_tkn.ty {
                 TknTy::Ident(name) => {
                     assert_eq!(name, "myFn");
@@ -313,8 +313,8 @@ fn parse_fn_decl_w_call() {
             let fn_body = fn_body.clone().unwrap();
 
             match fn_body {
-                Ast::BlckStmt{stmts, scope_lvl} => {
-                    assert_eq!(scope_lvl, 1);
+                Ast::BlckStmt{stmts, sc} => {
+                    assert_eq!(sc, 1);
                     assert_eq!(stmts.len(), 1);
                 },
                 _ => expected_ast("BlckStmt", &fn_body)
