@@ -1,12 +1,12 @@
 [package]
-name = "types"
+name = "ty"
 version = "0.1.0"
 authors = ["cjkenn <cam.j.kennedy@gmail.com"]
 
 [lib]
-name = "types"
+name = "ty"
 path = "lib.rs"
 
 [dependencies]
-errors = { path = "../liberrors" }
-kolgac = { path = "../libkolgac" }
+error = { path = "../error" }
+kolgac = { path = "../kolgac" }

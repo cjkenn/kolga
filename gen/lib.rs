@@ -1,6 +1,6 @@
 extern crate llvm_sys;
 extern crate kolgac;
-extern crate errors;
+extern crate error;
 
 macro_rules! c_str {
     ($s:expr) => (

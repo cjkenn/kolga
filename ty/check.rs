@@ -5,7 +5,7 @@ use kolgac::token::{Token, TknTy};
 use kolgac::symtab::SymbolTable;
 use kolgac::ty_rec::TyName;
 use kolgac::sym::Sym;
-use errors::ErrC;
+use error::ErrC;
 
 pub struct TyCheck<'t, 's> {
     ast: &'t Ast,

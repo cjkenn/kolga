@@ -1,6 +1,6 @@
 extern crate kolgac;
-extern crate types;
-extern crate llvm_codegen;
+extern crate ty;
+extern crate gen;
 
 use std::fs::File;
 use std::env;
@@ -9,10 +9,10 @@ use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
 use kolgac::symtab::SymbolTable;
 
-use types::check::TyCheck;
+use ty::check::TyCheck;
 
-use llvm_codegen::codegen::CodeGenerator;
-use llvm_codegen::valtab::ValTab;
+use gen::codegen::CodeGenerator;
+use gen::valtab::ValTab;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

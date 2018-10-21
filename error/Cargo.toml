@@ -1,8 +1,8 @@
 [package]
-name = "errors"
+name = "error"
 version = "0.1.0"
 authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
 
 [lib]
-name = "errors"
+name = "error"
 path = "lib.rs"

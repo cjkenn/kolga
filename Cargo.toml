@@ -8,7 +8,7 @@ name = "kolga_bin"
 path = "./src/kolga.rs"
 
 [dependencies]
-kolgac = { path = "libkolgac" }
-llvm_codegen = { path = "libllvm_codegen" }
-errors = { path = "liberrors" }
-types = { path = "libtypes" }
+kolgac = { path = "kolgac" }
+gen = { path = "gen" }
+error = { path = "error" }
+ty = { path = "ty" }

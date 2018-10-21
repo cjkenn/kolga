@@ -6,7 +6,7 @@ use kolgac::ast::Ast;
 use kolgac::token::{Token, TknTy};
 use kolgac::ty_rec::{TyRec, TyName};
 
-use errors::ErrCodeGen;
+use error::ErrCodeGen;
 use valtab::ValTab;
 use classtab::ClassTab;
 //use fpm::FPM;

@@ -1,4 +1,4 @@
-extern crate errors;
+extern crate error;
 
 pub mod token;
 pub mod lexer;

@@ -8,4 +8,4 @@ name = "kolgac"
 path = "lib.rs"
 
 [dependencies]
-errors = { path = "../liberrors" }
+error = { path = "../error" }

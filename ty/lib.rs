@@ -1,4 +1,4 @@
 extern crate kolgac;
-extern crate errors;
+extern crate error;
 
 pub mod check;
