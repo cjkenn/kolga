@@ -273,7 +273,7 @@ fn parse_fn_decl() {
 
             assert_eq!(fn_params.len(), 1);
             assert_eq!(ret_ty.ty.unwrap(), TyName::Num);
-            assert_eq!(sc, 2); // scope level is 2 because the inner block scope is finalized first
+            assert_eq!(sc, 1);
 
             let fn_body = fn_body.clone().unwrap();
 
