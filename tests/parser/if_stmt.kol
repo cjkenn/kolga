@@ -21,3 +21,13 @@ if y > 10 {
 } else {
   let z~num = 1;
 }
+
+let z~num = 2;
+
+if z >= y {
+  let g~num = 1;
+} elif z < y {
+  let g~num = 2;
+} elif z == y {
+  let g~num = 3;
+}

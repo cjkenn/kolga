@@ -1,0 +1,7 @@
+// expect::pass
+
+let y~num = 0;
+
+for let i~num = 0; i < 10; i = i + 1; {
+    y = y + 1;
+}

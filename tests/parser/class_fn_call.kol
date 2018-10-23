@@ -1,0 +1,21 @@
+// expect::pass
+
+class cls {
+  fn clsFn()~num {
+    return 1;
+  }
+}
+
+let x~cls;
+x.clsFn();
+
+let q~num = x.clsFn();
+
+class cls2 {
+  fn cls2Fn(x~num)~num {
+    return x + 1;
+  }
+}
+
+let y~cls2;
+let g~num = y.cls2Fn(5);

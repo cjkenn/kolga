@@ -1,0 +1,7 @@
+// expect::pass
+
+let x~bool = true;
+let y~bool = !x;
+
+let q~num = 1;
+let g~num = -q;
