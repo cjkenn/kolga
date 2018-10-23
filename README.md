@@ -30,7 +30,7 @@ cargo run [filename]
 
 ### Testing
 ```sh
-cargo test
+cargo test -- --nocapture
 ```
 
 ### Project Layout
