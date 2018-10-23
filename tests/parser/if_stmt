@@ -1,0 +1,23 @@
+// expect::pass
+
+if true && false {
+  let x~num = 1;
+} else {
+  let x~num = 2;
+}
+
+if 1 < 2 {
+  let x~num = 1;
+} elif 2 < 3 {
+  let x~num = 2;
+} else {
+  let x~num = 3;
+}
+
+let y~num = 3;
+
+if y > 10 {
+  let q~num = 1;
+} else {
+  let z~num = 1;
+}

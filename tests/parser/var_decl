@@ -1,0 +1,5 @@
+// expect::pass
+
+let x~num;
+let y~string;
+let q~bool;

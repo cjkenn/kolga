@@ -1,0 +1,7 @@
+// expect::pass
+
+fn myFn(x~num) ~num {
+   return x + 10;
+}
+
+myFn(5);

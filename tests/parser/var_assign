@@ -1,0 +1,6 @@
+// expect::pass
+
+let imm x~num = 1;
+let y~num = 2;
+let q~string = "test";
+let m~bool = true;

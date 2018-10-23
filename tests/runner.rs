@@ -2,40 +2,117 @@ extern crate kolgac;
 
 use std::fs;
 use std::fs::File;
+use std::path::PathBuf;
 use std::io::{BufRead, BufReader};
+use kolgac::lexer::Lexer;
+use kolgac::symtab::SymbolTable;
+use kolgac::parser::Parser;
 
 struct ParseExpect {
-    is_pass: bool,
-    line: usize,
-    pos: usize,
-    error: String
+    pub is_pass: bool,
+    pub line: usize,
+    pub pos: usize
 }
 
 #[test]
 fn parser() {
-    // TODO: get the input directory right
-    let inputs = fs::read_dir("./tests/parser_input").ok().unwrap();
+    let inputs = fs::read_dir("./tests/parser").ok().unwrap();
 
     for entry in inputs {
         let path = entry.unwrap().path();
-        let file = File::open(path).unwrap();
+        let file = File::open(path.clone()).unwrap();
 
-        // Parse test expectations in file comment
         let expectations = BufReader::new(file).lines().next().unwrap();
-        let expected = parse_expectations(expectations.unwrap());
-
-        // Run the parser and match the parse result with expectations
+        let parse_result = parse_expectations(expectations.unwrap());
+        match parse_result {
+            Err(e) => {
+                println!("Error parsing test expectations: {:?}", e);
+                return;
+            },
+            Ok(expectation) => {
+                run_parser_test(path, expectation);
+            }
+        }
     }
 }
 
-fn parse_expectations(expectations: String) -> ParseExpect {
-    let parts: Vec<&str> = expectations.split("::").collect();
-    let pass = parts[1] == "pass";
+fn run_parser_test(path: PathBuf, expct: ParseExpect) {
+    let mut symtab = SymbolTable::new();
+    let file = File::open(path.clone()).unwrap();
+    let mut lexer = Lexer::new(file);
+    let mut parser = Parser::new(&mut lexer, &mut symtab);
 
-    ParseExpect {
-        is_pass: pass,
-        line: 0,
-        pos: 0,
-        error: String::new()
+    let parse_result = parser.parse();
+
+    match expct.is_pass {
+        true => {
+            if parse_result.error.len() > 0 {
+                assert!(false,
+                        "FAIL: {:?} expected successful parse, found error:\n{}",
+                        path.file_stem().unwrap(),
+                        parse_result.error[0].text);
+            } else {
+                println!("PASS: parse {:?}", path.file_stem().unwrap());
+            }
+        },
+        false => {
+            if parse_result.error.len() == 0 {
+                assert!(false,
+                        "FAIL: {:?} expected error, found none",
+                        path.file_stem().unwrap());
+            } else {
+                assert_eq!(parse_result.error[0].line, expct.line);
+                assert_eq!(parse_result.error[0].pos, expct.pos);
+                println!("PASS: parse {:?}", path.file_stem().unwrap());
+            }
+        }
     }
+}
+
+fn parse_expectations(expectations: String) -> Result<ParseExpect, &'static str> {
+    let parts: Vec<&str> = expectations.split("::").collect();
+    if parts.len() == 0 {
+        return Err("No test expectations string found");
+    }
+
+    if parts.len() < 2 {
+       return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+    }
+
+    if !parts[0].contains("expect") {
+        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+    }
+
+    if parts[1] != "fail" && parts[1] != "pass" {
+        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+    }
+
+    if parts[1] == "pass" {
+        return Ok(ParseExpect{
+            is_pass: true,
+            line: 0,
+            pos: 0
+        });
+    }
+
+    if parts.len() < 4 {
+        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+    }
+
+    let line = parts[2].parse::<usize>();
+    if line.is_err() {
+        return Err("Line number in expectations must be valid int");
+    }
+
+    let pos = parts[3].parse::<usize>();
+    if pos.is_err() {
+        return Err("Position number in expectations must be valid int");
+    }
+
+    Ok(ParseExpect{
+        is_pass: false,
+        line: line.unwrap(),
+        pos: pos.unwrap()
+    })
+
 }

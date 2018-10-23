@@ -1,8 +1,8 @@
 #[derive(Debug, Clone)]
 pub struct ErrC {
-    line: usize,
-    pos: usize,
-    text: String
+    pub line: usize,
+    pub pos: usize,
+    pub text: String
 }
 
 impl ErrC {
