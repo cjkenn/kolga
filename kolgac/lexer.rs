@@ -2,7 +2,8 @@ use std::io::{BufReader, BufRead, Seek, SeekFrom};
 use std::fs::File;
 use std::collections::HashMap;
 
-use error::ErrC;
+use error::lex::{LexErr, LexErrTy};
+use error::KolgaErr;
 use token::{Token, TknTy};
 
 #[derive(Debug)]
@@ -194,8 +195,7 @@ impl Lexer {
             _ if ch.is_digit(10) => self.lex_num(),
             _ if ch.is_alphabetic() => self.lex_ident(),
             _ => {
-                let err = ErrC::new(self.linenum, self.pos, format!("Unrecognized character {}", ch));
-                err.emit();
+                LexErr::new(self.linenum, self.pos, LexErrTy::UnknownChar(ch)).emit();
                 self.eof_tkn()
             }
         }
@@ -249,19 +249,13 @@ impl Lexer {
                     }
                 },
                 None => {
-                    let err = ErrC::new(self.linenum,
-                                        self.pos,
-                                        format!("Unterminated string literal {}", lit));
-                    err.emit();
+                    LexErr::new(self.linenum, self.pos, LexErrTy::UnterminatedStr(lit)).emit();
                     return self.eof_tkn();
                 }
             }
         }
 
-        let err = ErrC::new(self.linenum,
-                            self.pos,
-                            format!("Unterminated string literal {}", lit));
-        err.emit();
+        LexErr::new(self.linenum, self.pos, LexErrTy::UnterminatedStr(lit)).emit();
         self.eof_tkn()
     }
 
