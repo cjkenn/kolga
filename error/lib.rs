@@ -1,4 +1,5 @@
 pub mod parse;
+pub mod gen;
 
 pub trait KolgaErr {
     fn emit(&self);
@@ -23,39 +24,5 @@ impl ErrC {
 
     pub fn emit(&self) {
         println!("kolgac: [Line {}:{}] {}", self.line, self.pos, self.text);
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ErrCodeGen {
-    text: String
-}
-
-impl ErrCodeGen {
-    pub fn new(txt: String) -> ErrCodeGen {
-        ErrCodeGen {
-            text: txt
-        }
-    }
-
-    pub fn emit(&self) {
-        println!("kolga: Failed to generate LLVM ir: {}", self.text)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ErrRuntime {
-    text: String
-}
-
-impl ErrRuntime {
-    pub fn new(txt: String) -> ErrRuntime {
-        ErrRuntime {
-            text: txt
-        }
-    }
-
-    pub fn emit(&self) {
-        println!("kolga: Runtime Error -> {}", self.text)
     }
 }

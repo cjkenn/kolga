@@ -4,7 +4,7 @@ use llvm_sys::core::*;
 use kolgac::ast::Ast;
 use kolgac::token::{Token, TknTy};
 use kolgac::ty_rec::{TyRec, TyName};
-use error::ErrCodeGen;
+use error::gen::{GenErrTy, GenErr};
 use valtab::ValTab;
 use classtab::ClassTab;
 //use fpm::FPM;
@@ -40,7 +40,7 @@ pub struct CodeGenerator<'t, 'v> {
     strings: Vec<CString>,
 
     /// Vector of potential errors to return.
-    pub errors: Vec<ErrCodeGen>
+    pub errors: Vec<GenErr>
 
     // /// LLVM Function pass manager, for some optimization passes after function codegen.
     //fpm: FPM
@@ -142,9 +142,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 match val {
                     Some(exprval) => vec![exprval],
                     None => {
-                        let msg = format!("Error: codegen failed for ast {:?}", ast);
-                        self.errors.push(ErrCodeGen::new(msg));
-
+                        self.error(GenErrTy::InvalidAst);
                         Vec::new()
                     }
                 }
@@ -245,8 +243,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             Ast::ClassDecl{ident_tkn, methods:_, props:_, sc:_} => {
                                 let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
                                 if llvm_ty.is_none() {
-                                    // TODO: proper error handling
-                                    panic!("Unkown class found");
+                                    self.error(GenErrTy::InvalidClass(ident_tkn.get_name()));
+                                    return Vec::new();
                                 }
                                 unsafe {
                                     let global = LLVMAddGlobal(self.module, llvm_ty.unwrap(), c_name);
@@ -455,8 +453,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 let fn_name = fn_tkn.clone().get_name();
                 let llvm_fn = self.valtab.retrieve(&fn_name);
                 if llvm_fn.is_none() {
-                    let msg = format!("Undeclared function call: {:?}", fn_name);
-                    self.errors.push(ErrCodeGen::new(msg));
+                    self.error(GenErrTy::InvalidFn(fn_name));
                     return None;
                 }
 
@@ -467,8 +464,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 for param in fn_params {
                     let llvm_val = self.gen_expr(param);
                     if llvm_val.is_none() {
-                        let msg = format!("Invalid function call param: {:?}", param);
-                        self.errors.push(ErrCodeGen::new(msg));
+                        self.error(GenErrTy::InvalidFnParam);
                         return None;
                     }
 
@@ -492,8 +488,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                 let llvm_fn = self.valtab.retrieve(&class_fn_name);
                 if llvm_fn.is_none() {
-                    let msg = format!("Undeclared function call: {:?}", fn_name);
-                    self.errors.push(ErrCodeGen::new(msg));
+                    self.error(GenErrTy::InvalidFn(fn_name));
                     return None;
                 }
 
@@ -507,8 +502,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 for param in fn_params {
                     let llvm_val = self.gen_expr(param);
                     if llvm_val.is_none() {
-                        let msg = format!("Invalid function call param: {:?}", param);
-                        self.errors.push(ErrCodeGen::new(msg));
+                        self.error(GenErrTy::InvalidFnParam);
                         return None;
                     }
 
@@ -552,7 +546,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             return Some(llvm_val);
                         }
                     },
-                    None => panic!("unknown class found")
+                    None => {
+                        self.error(GenErrTy::InvalidClass(name));
+                        None
+                    }
                 }
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
@@ -639,8 +636,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             // to build a conditional branch from the then block to the else block, if needed.
             let cond_val = self.gen_expr(&mb_if_cond.clone().unwrap());
             if cond_val.is_none() {
-                let msg = format!("Error: codegen failed for ast");
-                self.errors.push(ErrCodeGen::new(msg));
+                self.error(GenErrTy::InvalidAst);
                 return Vec::new();
             }
 
@@ -695,8 +691,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                         let elif_cond_val = self.gen_expr(&mb_cond.clone().unwrap());
                         if elif_cond_val.is_none() {
-                            let msg = format!("Error: codegen failed for ast {:?}", stmt);
-                            self.errors.push(ErrCodeGen::new(msg));
+                            self.error(GenErrTy::InvalidAst);
                             continue;
                         }
 
@@ -780,8 +775,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             // Evaluate the conditional expression
             let cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
             if cond_val.is_none() {
-                let msg = format!("Error: codegen failed for ast");
-                self.errors.push(ErrCodeGen::new(msg));
+                self.error(GenErrTy::InvalidAst);
                 return Vec::new();
             }
 
@@ -966,6 +960,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         let cstr = CString::new(s).unwrap();
         let cstr_ptr = cstr.as_ptr() as *mut _;
         self.strings.push(cstr);
+
         cstr_ptr
+    }
+
+    fn error(&mut self, ty: GenErrTy) {
+        let err = GenErr::new(ty);
+        self.errors.push(err);
     }
 }
