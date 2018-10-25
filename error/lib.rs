@@ -16,9 +16,9 @@ pub struct ParseErr {
 pub enum ParseErrTy {
     TknMismatch(String, String),
     InvalidIdent(String),
-    InvalidToken(String),
+    InvalidTkn(String),
     InvalidAssign(String),
-    InvalidType(String),
+    InvalidTy(String),
     UndeclaredSym(String),
     UnassignedVar(String),
     WrongFnParamCnt(usize),
@@ -42,13 +42,17 @@ impl ParseErr {
     }
 
     fn to_msg(&self) -> String {
+        let str_pos = format!("[Line {}:{}]", self.line, self.pos);
+
         match self.ty {
             ParseErrTy::TknMismatch(ref expected, ref found) => {
-                format!("[Line {}:{}] Expected token '{}', but found '{}'",
-                        self.line,
-                        self.pos,
-                        expected,
-                        found)
+                format!("{} Expected token '{}', but found '{}'", str_pos, expected, found)
+            },
+            ParseErrTy::InvalidIdent(ref found) => {
+                format!("{} Invalid identifier '{}' found", str_pos, found)
+            },
+            ParseErrTy::InvalidTkn(ref found) => {
+                format!("{} Invalid token '{}' found", str_pos, found)
             },
             _ => panic!("Illegal error type found!")
         }

@@ -14,7 +14,7 @@ pub struct ParserResult {
     pub ast: Option<Box<Ast>>,
 
     /// Vector of any parser errors
-    pub error: Vec<ErrC>
+    pub error: Vec<ParseErr>
 }
 
 impl ParserResult {
@@ -30,7 +30,7 @@ pub struct Parser<'l, 's> {
     /// Reference to the lexer needed to get characters from the file
     lexer: &'l mut Lexer,
     symtab: &'s mut SymbolTable,
-    errors: Vec<ErrC>,
+    errors: Vec<ParseErr>,
     currtkn: Token
 }
 
@@ -934,14 +934,12 @@ impl<'l, 's> Parser<'l, 's> {
                 ast
             },
             TknTy::String | TknTy::Num | TknTy::Bool => {
-                let err_msg = format!("Cannot assign reserved type '{:?}' to variable", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
+                self.error(ParseErrTy::InvalidAssign(self.currtkn.ty.to_string()));
                 self.consume();
                 None
             },
             _ => {
-                let err_msg = format!("Unknown token {:?} found", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
+                self.error(ParseErrTy::InvalidTkn(self.currtkn.ty.to_string()));
                 self.consume();
                 None
             }
@@ -956,8 +954,7 @@ impl<'l, 's> Parser<'l, 's> {
                 tkn
             },
             _ => {
-                let err_msg = format!("{:?} token is not a valid identifier", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
+                self.error(ParseErrTy::InvalidIdent(self.currtkn.ty.to_string()));
                 None
             }
         }
@@ -966,11 +963,9 @@ impl<'l, 's> Parser<'l, 's> {
     /// Check that the current token is the same as the one we expect. If it is, consume the
     /// token and advance. If it isn't report an error.
     fn expect(&mut self, tknty: TknTy) {
-        let err_msg = format!("Expected token '{:?}', but found '{:?}'", tknty, self.currtkn.ty);
         if self.currtkn.ty == tknty {
             self.consume()
         } else {
-            self.err_from_tkn(err_msg);
             self.error(ParseErrTy::TknMismatch(tknty.to_string(), self.currtkn.ty.to_string()));
         }
     }
@@ -982,7 +977,7 @@ impl<'l, 's> Parser<'l, 's> {
     fn err_from_tkn(&mut self, message: String) {
         let prefixed_msg = format!("Parse Error - {}", message);
         let error = ErrC::new(self.currtkn.line, self.currtkn.pos, prefixed_msg);
-        self.errors.push(error);
+        //self.errors.push(error);
     }
 
     fn error(&mut self, ty: ParseErrTy) {
