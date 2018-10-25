@@ -14,18 +14,18 @@ pub struct ParseErr {
 
 #[derive(Debug, Clone)]
 pub enum ParseErrTy {
-    TknMismatch(String, String),
     InvalidIdent(String),
     InvalidTkn(String),
     InvalidAssign(String),
-    InvalidTy(String),
-    UndeclaredSym(String),
-    UnassignedVar(String),
-    WrongFnParamCnt(usize),
-    FnParamCntExceeded(usize),
     InvalidImmAssign(String),
-    InvalidForStmt(String),
-    ImmDecl(String)
+    InvalidTy(String),
+    InvalidForStmt,
+    ImmDecl(String),
+    TknMismatch(String, String),
+    FnParamCntExceeded(usize),
+    WrongFnParamCnt(usize, usize),
+    UndeclaredSym(String),
+    UnassignedVar(String)
 }
 
 impl ParseErr {
@@ -54,7 +54,33 @@ impl ParseErr {
             ParseErrTy::InvalidTkn(ref found) => {
                 format!("{} Invalid token '{}' found", str_pos, found)
             },
-            _ => panic!("Illegal error type found!")
+            ParseErrTy::UnassignedVar(ref found) => {
+                format!("{} Cannot reference un-assigned variable '{}'", str_pos, found)
+            },
+            ParseErrTy::UndeclaredSym(ref found) => {
+                format!("{} Undeclared symbol '{}' found", str_pos, found)
+            },
+            ParseErrTy::WrongFnParamCnt(ref expected, ref found) => {
+                format!("{} Expected {} parameters, but found {}", str_pos, expected, found)
+            },
+            ParseErrTy::FnParamCntExceeded(ref expected) => {
+                format!("{} Parameter count exceeds limit of {}", str_pos, expected)
+            },
+            ParseErrTy::InvalidAssign(ref found) => {
+                format!("{} '{}' is not a valid assignment value", str_pos, found)
+            },
+            ParseErrTy::InvalidImmAssign(ref found) => {
+                format!("{} Cannot re-assign immutable variable '{}'", str_pos, found)
+            },
+            ParseErrTy::InvalidForStmt => {
+                format!("{} Invalid for loop: must start with a variable declaration", str_pos)
+            },
+            ParseErrTy::InvalidTy(ref found) => {
+                format!("{} '{}' is not a valid type", str_pos, found)
+            },
+            ParseErrTy::ImmDecl(ref found) => {
+                format!("{} Cannot declare immutable variable '{}' with no value", str_pos, found)
+            }
         }
     }
 }

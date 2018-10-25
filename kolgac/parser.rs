@@ -4,7 +4,7 @@ use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
 use ty_rec::TyRec;
-use error::{ErrC, ParseErrTy, ParseErr};
+use error::{ParseErrTy, ParseErr};
 use std::rc::Rc;
 
 const FN_PARAM_MAX_LEN: usize = 64;
@@ -103,8 +103,8 @@ impl<'l, 's> Parser<'l, 's> {
         let var_ty_tkn = if self.currtkn.is_ty() {
             // But Void isn't a valid type for a variable, just a function that returns nothing
             if self.currtkn.ty == TknTy::Void {
-                let err_msg = String::from("'void' is not a valid type for a variable");
-                self.err_from_tkn(err_msg);
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidTy(ty_str));
                 return None;
             }
 
@@ -115,8 +115,8 @@ impl<'l, 's> Parser<'l, 's> {
             let ty_name = self.currtkn.get_name();
             let maybe_class_sym = self.symtab.retrieve(&ty_name);
             if maybe_class_sym.is_none() {
-                let err_msg = format!("{:?} is not a valid type", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidTy(ty_str));
                 None
             } else if maybe_class_sym.unwrap().sym_ty == SymTy::Class {
                 is_class_type = true;
@@ -124,8 +124,8 @@ impl<'l, 's> Parser<'l, 's> {
                 self.consume();
                 tkn
             } else {
-                let err_msg = format!("{:?} is not a valid type", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidTy(ty_str));
                 None
             }
         };
@@ -161,8 +161,8 @@ impl<'l, 's> Parser<'l, 's> {
             },
             TknTy::Semicolon => {
                 if is_imm {
-                    let err_msg = format!("Cannot declare immutable variable with no value");
-                    self.err_from_tkn(err_msg);
+                    let ty_str = self.currtkn.ty.to_string();
+                    self.error(ParseErrTy::ImmDecl(ty_str));
                     return None;
                 }
                 self.consume();
@@ -209,8 +209,8 @@ impl<'l, 's> Parser<'l, 's> {
                 })
             },
             _ => {
-                let err_msg = format!("Invalid var declaration: {:?}", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidAssign(ty_str));
                 None
             }
         }
@@ -226,8 +226,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
-                let err_msg = format!("Function param count exceeded limit of {}", FN_PARAM_MAX_LEN);
-                self.err_from_tkn(err_msg);
+                self.error(ParseErrTy::FnParamCntExceeded(FN_PARAM_MAX_LEN));
                 return None;
             }
 
@@ -261,8 +260,8 @@ impl<'l, 's> Parser<'l, 's> {
                 Some(tkn)
             },
             false => {
-                let err_msg = format!("Token is not a valid type: {:?}", self.currtkn.ty);
-                self.err_from_tkn(err_msg);
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidTy(ty_str));
                 None
             }
         };
@@ -328,8 +327,8 @@ impl<'l, 's> Parser<'l, 's> {
                     break;
                 },
                 _ => {
-                    let err_msg = format!("Invalid token in class declaration: {:?}", self.currtkn.ty);
-                    self.err_from_tkn(err_msg);
+                    let ty_str = self.currtkn.ty.to_string();
+                    self.error(ParseErrTy::InvalidTkn(ty_str));
                     break;
                 }
             }
@@ -451,8 +450,7 @@ impl<'l, 's> Parser<'l, 's> {
                 for_var_decl = self.var_decl();
             },
             _ => {
-                let err_msg = String::from("Invalid for statement: Must start with a var declaration");
-                self.err_from_tkn(err_msg);
+                self.error(ParseErrTy::InvalidForStmt)
             }
         };
 
@@ -523,17 +521,14 @@ impl<'l, 's> Parser<'l, 's> {
                             TknTy::Ident(name) => {
                                 let maybe_sym = self.symtab.retrieve(&name);
                                 if maybe_sym.is_none() {
-                                    let err_msg = format!("Undeclared variable {:?} found, cannot assign",
-                                                          name);
-                                    self.err_from_tkn(err_msg);
+                                    self.error(ParseErrTy::UndeclaredSym(name));
                                     return None;
                                 }
 
                                 let sym = maybe_sym.unwrap();
 
                                 if sym.imm {
-                                    let err_msg = format!("Cannot re-assign immutable variable");
-                                    self.err_from_tkn(err_msg);
+                                    self.error(ParseErrTy::InvalidImmAssign(name));
                                     return None;
                                 }
 
@@ -546,9 +541,7 @@ impl<'l, 's> Parser<'l, 's> {
                                 });
                             },
                             _ => {
-                                let err_msg = format!("Token {:?} is invalid for assignment",
-                                                      tyrec.tkn.ty.clone());
-                                self.err_from_tkn(err_msg);
+                                self.error(ParseErrTy::InvalidAssign(tyrec.tkn.ty.clone().to_string()));
                                 return None;
                             }
                         };
@@ -561,9 +554,7 @@ impl<'l, 's> Parser<'l, 's> {
                         });
                     },
                     _ => {
-                        let err_msg = format!("Token {:?} is invalid for assignment", op.ty);
-                        let error = ErrC::new(op.line, op.pos, err_msg);
-                        self.errors.push(error);
+                        self.error_w_pos(op.line, op.pos, ParseErrTy::InvalidAssign(op.ty.to_string()));
                     }
                 }
             },
@@ -754,7 +745,10 @@ impl<'l, 's> Parser<'l, 's> {
                     Ast::ClassDecl{ident_tkn, methods:_,props:_, sc} => {
                         (sc, ident_tkn.get_name())
                     },
-                    _ => panic!("incorrect sym type found") // TODO: undeclared sym err here
+                    _ => {
+                        self.error(ParseErrTy::UndeclaredSym(name_tkn.clone().unwrap().get_name()));
+                        (0, String::new())
+                    }
                 };
 
                 let fn_ast = self.fnparams_expr(name_tkn.clone(), class_sym.clone());
@@ -808,9 +802,11 @@ impl<'l, 's> Parser<'l, 's> {
             // we return None.
             None => {
                 let class_decl_ast = maybe_class_sym.unwrap().assign_val.clone().unwrap();
+
                 let params = match class_decl_ast {
                     Ast::ClassDecl{ident_tkn:_, methods, props:_, sc:_} => {
                         let mut expected_params = None;
+
                         for mtod_ast in methods {
                             match mtod_ast.unwrap() {
                                 Ast::FnDecl{ident_tkn, fn_params, ret_ty:_, fn_body:_, sc:_} => {
@@ -839,10 +835,7 @@ impl<'l, 's> Parser<'l, 's> {
         // we report an error and return None early.
         if maybe_expected_params.is_none() {
             let tkn = fn_tkn.clone().unwrap();
-            let err_msg = format!("Function call: Undeclared symbol {:?} found",
-                                  tkn.get_name());
-            let error = ErrC::new(tkn.line, tkn.pos, err_msg);
-            self.errors.push(error);
+            self.error_w_pos(tkn.line, tkn.pos, ParseErrTy::UndeclaredSym(tkn.get_name()));
             return None;
         }
 
@@ -850,8 +843,7 @@ impl<'l, 's> Parser<'l, 's> {
         let mut params: Vec<Ast> = Vec::new();
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
-                let err_msg = format!("Function param count exceeded limit of {}", FN_PARAM_MAX_LEN);
-                self.err_from_tkn(err_msg);
+                self.error(ParseErrTy::FnParamCntExceeded(FN_PARAM_MAX_LEN));
                 return None;
             }
 
@@ -869,12 +861,10 @@ impl<'l, 's> Parser<'l, 's> {
         self.expect(TknTy::RightParen);
 
         if expected_params.len() != params.len() {
-            let err_msg = format!("Incorrect function parameters: Expected {} arguments, but found {}.",
-                                  expected_params.len(),
-                                  params.len());
             let tkn = fn_tkn.clone().unwrap();
-            let error = ErrC::new(tkn.line, tkn.pos, err_msg);
-            self.errors.push(error);
+            self.error_w_pos(tkn.line,
+                             tkn.pos,
+                             ParseErrTy::WrongFnParamCnt(expected_params.len(), params.len()));
         }
 
         Some(Ast::FnCall{
@@ -897,8 +887,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::Ident(ref ident_name) => {
                 let mb_sym = self.symtab.retrieve(ident_name);
                 if mb_sym.is_none() {
-                    let msg = format!("Undeclared variable {} found", ident_name);
-                    self.err_from_tkn(msg);
+                    self.error(ParseErrTy::UndeclaredSym(ident_name.to_string()));
                     self.consume();
                     return None;
                 }
@@ -914,8 +903,7 @@ impl<'l, 's> Parser<'l, 's> {
                     // If the following token is '=', we don't need to report an error
                     // for unitialized var (we are initializing it here).
                     if next_tkn.ty != TknTy::Eq {
-                        let msg = format!("Cannot use un-assigned variable {}", ident_name);
-                        self.err_from_tkn(msg);
+                        self.error(ParseErrTy::UnassignedVar(ident_name.to_string()));
                         self.consume();
                         return None;
                     }
@@ -934,12 +922,14 @@ impl<'l, 's> Parser<'l, 's> {
                 ast
             },
             TknTy::String | TknTy::Num | TknTy::Bool => {
-                self.error(ParseErrTy::InvalidAssign(self.currtkn.ty.to_string()));
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidAssign(ty_str));
                 self.consume();
                 None
             },
             _ => {
-                self.error(ParseErrTy::InvalidTkn(self.currtkn.ty.to_string()));
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidTkn(ty_str));
                 self.consume();
                 None
             }
@@ -954,7 +944,8 @@ impl<'l, 's> Parser<'l, 's> {
                 tkn
             },
             _ => {
-                self.error(ParseErrTy::InvalidIdent(self.currtkn.ty.to_string()));
+                let ty_str = self.currtkn.ty.to_string();
+                self.error(ParseErrTy::InvalidIdent(ty_str));
                 None
             }
         }
@@ -966,22 +957,25 @@ impl<'l, 's> Parser<'l, 's> {
         if self.currtkn.ty == tknty {
             self.consume()
         } else {
-            self.error(ParseErrTy::TknMismatch(tknty.to_string(), self.currtkn.ty.to_string()));
+            let ty_str = self.currtkn.ty.to_string();
+            self.error(ParseErrTy::TknMismatch(tknty.to_string(), ty_str));
         }
     }
 
+    /// Advance to the next token, discarded the previously read token.
     fn consume(&mut self) {
         self.currtkn = self.lexer.lex();
     }
 
-    fn err_from_tkn(&mut self, message: String) {
-        let prefixed_msg = format!("Parse Error - {}", message);
-        let error = ErrC::new(self.currtkn.line, self.currtkn.pos, prefixed_msg);
-        //self.errors.push(error);
-    }
-
+    /// Report a parsing error from the current token, with the given parser error type.
     fn error(&mut self, ty: ParseErrTy) {
         let err = ParseErr::new(self.currtkn.line, self.currtkn.pos, ty);
+        self.errors.push(err);
+    }
+
+    /// Report a parsing error at a given location with a provided error type.
+    fn error_w_pos(&mut self, line: usize, pos: usize, ty: ParseErrTy) {
+        let err = ParseErr::new(line, pos, ty);
         self.errors.push(err);
     }
 }
