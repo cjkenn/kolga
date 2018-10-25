@@ -1,18 +1,16 @@
 use llvm_sys::LLVMRealPredicate;
 use llvm_sys::prelude::*;
 use llvm_sys::core::*;
-
 use kolgac::ast::Ast;
 use kolgac::token::{Token, TknTy};
 use kolgac::ty_rec::{TyRec, TyName};
-
 use error::ErrCodeGen;
 use valtab::ValTab;
 use classtab::ClassTab;
 //use fpm::FPM;
-
 use std::ptr;
 use std::slice;
+use std::ffi::CString;
 
 const LLVM_FALSE: LLVMBool = 0;
 
@@ -29,9 +27,6 @@ pub struct CodeGenerator<'t, 'v> {
     /// Class table stores LLVmStructTypes so we can look them up before allocating.
     classtab: ClassTab,
 
-    /// Vector of potential errors to return.
-    pub errors: Vec<ErrCodeGen>,
-
     /// LLVM Context.
     context: LLVMContextRef,
 
@@ -40,6 +35,12 @@ pub struct CodeGenerator<'t, 'v> {
 
     /// LLVM Module. We use only a single module for single file programs.
     module: LLVMModuleRef,
+
+    /// Owned CStrings that we use for naming things in our LLVM module.
+    strings: Vec<CString>,
+
+    /// Vector of potential errors to return.
+    pub errors: Vec<ErrCodeGen>
 
     // /// LLVM Function pass manager, for some optimization passes after function codegen.
     //fpm: FPM
@@ -66,6 +67,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     pub fn new(ast: &'t Ast, valtab: &'v mut ValTab) -> CodeGenerator<'t, 'v> {
         unsafe {
             let context = LLVMContextCreate();
+            // TODO: get rid of this macro?
             let module = LLVMModuleCreateWithNameInContext(c_str!("kolga"), context);
             CodeGenerator {
                 ast: ast,
@@ -74,7 +76,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 errors: Vec::new(),
                 context: context,
                 builder: LLVMCreateBuilderInContext(context),
-                module: module
+                module: module,
+                strings: Vec::new()
                 //fpm: FPM::new(module)
             }
         }
@@ -431,7 +434,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
                 match op_tkn.ty {
                     TknTy::Minus => {
-                        unsafe { Some(LLVMBuildFNeg(self.builder, rhs_llvm_val, c_str!("tmpneg"))) }
+                        unsafe { Some(LLVMBuildFNeg(self.builder, rhs_llvm_val, self.c_str("tmpneg"))) }
                     },
                     TknTy::Bang => {
                         unsafe {
@@ -439,7 +442,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             // flip the value (which is of type i8 now) from 0/1 to represent
                             // the opposite boolean value.
                             let xor_rhs = LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE);
-                            Some(LLVMBuildXor(self.builder, rhs_llvm_val, xor_rhs, c_str!("tmpnot")))
+                            Some(LLVMBuildXor(self.builder, rhs_llvm_val, xor_rhs, self.c_str("tmpnot")))
                         }
                     },
                     _ => None
@@ -477,7 +480,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                        llvm_fn.unwrap(),
                                        param_tys.as_mut_ptr(),
                                        param_tys.len() as u32,
-                                       c_str!("")))
+                                       self.c_str("")))
                 }
 
             },
@@ -517,7 +520,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                        llvm_fn.unwrap(),
                                        param_tys.as_mut_ptr(),
                                        param_tys.len() as u32,
-                                       c_str!("")))
+                                       self.c_str("")))
                 }
             },
             Ast::VarAssign{ty_rec:_, ident_tkn, is_imm:_, is_global:_, value} => {
@@ -564,7 +567,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.double_ty(), *val)) },
             TknTy::Str(ref lit) => unsafe { Some(LLVMBuildGlobalStringPtr(self.builder,
                                                                           self.c_str(lit),
-                                                                          c_str!("")))},
+                                                                          self.c_str("")))},
             TknTy::True => unsafe { Some(LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE)) },
             TknTy::False => unsafe { Some(LLVMConstInt(self.i8_ty(), 0, LLVM_FALSE)) },
             TknTy::Ident(ref name) => {
@@ -605,13 +608,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let insert_bb = LLVMGetInsertBlock(self.builder);
             let fn_val = LLVMGetBasicBlockParent(insert_bb);
 
-            let then_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("then"));
+            let then_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("then"));
             LLVMMoveBasicBlockAfter(then_bb, insert_bb);
 
-            let else_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("el"));
+            let else_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("el"));
             LLVMMoveBasicBlockAfter(else_bb, then_bb);
 
-            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("merge"));
             LLVMMoveBasicBlockAfter(merge_bb, else_bb);
 
             // Build any necessary blocks for elif conditions. This is a vector of conditional blocks
@@ -629,7 +632,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             // conditional. We immediately move it back to the start of the conditional so
             // we're still in the correct position.
             LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
+            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), self.c_str("phi"));
             LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
             // Calculate the LLVMValueRef for the if conditional expression. We use this
@@ -766,12 +769,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let fn_val = LLVMGetBasicBlockParent(insert_bb);
 
             // Set up our blocks
-            let entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
-            let while_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("while"));
-            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+            let entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("entry"));
+            let while_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("while"));
+            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("merge"));
 
             LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
+            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), self.c_str("phi"));
             LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
             // Evaluate the conditional expression
@@ -818,12 +821,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let insert_bb = LLVMGetInsertBlock(self.builder);
             let fn_val = LLVMGetBasicBlockParent(insert_bb);
 
-            let entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("entry"));
-            let for_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("for"));
-            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, c_str!("merge"));
+            let entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("entry"));
+            let for_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("for"));
+            let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("merge"));
 
             LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), c_str!("phi"));
+            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), self.c_str("phi"));
             LLVMPositionBuilderAtEnd(self.builder, entry_bb);
 
             // Codegen the var declaration and save the loop counter variable. We do this
@@ -899,45 +902,45 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// generated already. Comparison instructions are built from each function argument, if the
     /// operator given is of the logical type.
     /// We return None if the operator given is not supported.
-    fn llvm_val_from_op(&self, op: &TknTy, lhs: LLVMValueRef, rhs: LLVMValueRef) -> Option<LLVMValueRef> {
+    fn llvm_val_from_op(&mut self, op: &TknTy, lhs: LLVMValueRef, rhs: LLVMValueRef) -> Option<LLVMValueRef> {
         unsafe {
             match op {
-                TknTy::Plus => Some(LLVMBuildFAdd(self.builder, lhs, rhs,c_str!("addtmp"))),
-                TknTy::Minus => Some(LLVMBuildFSub(self.builder, lhs, rhs, c_str!("subtmp"))),
-                TknTy::Star => Some(LLVMBuildFMul(self.builder, lhs, rhs, c_str!("multmp"))),
-                TknTy::Slash => Some(LLVMBuildFDiv(self.builder, lhs, rhs, c_str!("divtmp"))),
-                TknTy::AmpAmp | TknTy::And => Some(LLVMBuildAnd(self.builder, lhs, rhs, c_str!("andtmp"))),
-                TknTy::PipePipe | TknTy::Or => Some(LLVMBuildOr(self.builder, lhs, rhs, c_str!("ortmp"))),
+                TknTy::Plus => Some(LLVMBuildFAdd(self.builder, lhs, rhs, self.c_str("addtmp"))),
+                TknTy::Minus => Some(LLVMBuildFSub(self.builder, lhs, rhs, self.c_str("subtmp"))),
+                TknTy::Star => Some(LLVMBuildFMul(self.builder, lhs, rhs, self.c_str("multmp"))),
+                TknTy::Slash => Some(LLVMBuildFDiv(self.builder, lhs, rhs, self.c_str("divtmp"))),
+                TknTy::AmpAmp | TknTy::And => Some(LLVMBuildAnd(self.builder, lhs, rhs, self.c_str("andtmp"))),
+                TknTy::PipePipe | TknTy::Or => Some(LLVMBuildOr(self.builder, lhs, rhs, self.c_str("ortmp"))),
                 TknTy::Lt => Some(LLVMBuildFCmp(self.builder,
                                                 LLVMRealPredicate::LLVMRealULT,
                                                 lhs,
                                                 rhs,
-                                                c_str!("lttmp"))),
+                                                self.c_str("lttmp"))),
                 TknTy::Gt => Some(LLVMBuildFCmp(self.builder,
                                                 LLVMRealPredicate::LLVMRealUGT,
                                                 lhs,
                                                 rhs,
-                                                c_str!("gttmp"))),
+                                                self.c_str("gttmp"))),
                 TknTy::LtEq => Some(LLVMBuildFCmp(self.builder,
                                                   LLVMRealPredicate::LLVMRealULE,
                                                   lhs,
                                                   rhs,
-                                                  c_str!("ltetmp"))),
+                                                  self.c_str("ltetmp"))),
                 TknTy::GtEq => Some(LLVMBuildFCmp(self.builder,
                                                   LLVMRealPredicate::LLVMRealUGE,
                                                   lhs,
                                                   rhs,
-                                                  c_str!("gtetmp"))),
+                                                  self.c_str("gtetmp"))),
                 TknTy::EqEq => Some(LLVMBuildFCmp(self.builder,
                                                   LLVMRealPredicate::LLVMRealUEQ,
                                                   lhs,
                                                   rhs,
-                                                  c_str!("eqtmp"))),
+                                                  self.c_str("eqtmp"))),
                 TknTy::BangEq => Some(LLVMBuildFCmp(self.builder,
                                                     LLVMRealPredicate::LLVMRealUNE,
                                                     lhs,
                                                     rhs,
-                                                    c_str!("neqtmp"))),
+                                                    self.c_str("neqtmp"))),
                 _ => None
             }
         }
@@ -959,8 +962,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         unsafe { LLVMInt8TypeInContext(self.context) }
     }
 
-    fn c_str(&self, val: &str) -> *const i8 {
-        // TODO: use CString here? why doesnt it work?
-        format!("{}{}", val, "\0").as_ptr() as *const i8
+    fn c_str(&mut self, s: &str) -> *mut i8 {
+        let cstr = CString::new(s).unwrap();
+        let cstr_ptr = cstr.as_ptr() as *mut _;
+        self.strings.push(cstr);
+        cstr_ptr
     }
 }
