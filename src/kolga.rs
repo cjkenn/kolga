@@ -1,18 +1,17 @@
 extern crate kolgac;
 extern crate ty;
 extern crate gen;
+extern crate error;
 
 use std::fs::File;
 use std::env;
-
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
 use kolgac::symtab::SymbolTable;
-
 use ty::check::TyCheck;
-
 use gen::codegen::CodeGenerator;
 use gen::valtab::ValTab;
+use error::KolgaErr;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

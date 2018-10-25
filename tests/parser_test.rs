@@ -48,9 +48,9 @@ fn run_parser_test(path: PathBuf, expct: ParseExpect) {
         true => {
             if parse_result.error.len() > 0 {
                 assert!(false,
-                        "FAIL: {:?} expected successful parse, found error:\n{}",
+                        "FAIL: {:?} expected successful parse, found error:\n{:?}",
                         path.file_stem().unwrap(),
-                        parse_result.error[0].text);
+                        parse_result.error[0].ty);
             } else {
                 println!("PASS: parse {:?}", path.file_stem().unwrap());
             }

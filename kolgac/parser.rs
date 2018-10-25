@@ -4,7 +4,7 @@ use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
 use ty_rec::TyRec;
-use error::{ParseErrTy, ParseErr};
+use error::parse::{ParseErrTy, ParseErr};
 use std::rc::Rc;
 
 const FN_PARAM_MAX_LEN: usize = 64;
