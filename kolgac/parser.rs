@@ -4,7 +4,7 @@ use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
 use ty_rec::TyRec;
-use error::ErrC;
+use error::{ErrC, ParseErrTy, ParseErr};
 use std::rc::Rc;
 
 const FN_PARAM_MAX_LEN: usize = 64;
@@ -754,7 +754,7 @@ impl<'l, 's> Parser<'l, 's> {
                     Ast::ClassDecl{ident_tkn, methods:_,props:_, sc} => {
                         (sc, ident_tkn.get_name())
                     },
-                    _ => panic!("incorrect sym type found")
+                    _ => panic!("incorrect sym type found") // TODO: undeclared sym err here
                 };
 
                 let fn_ast = self.fnparams_expr(name_tkn.clone(), class_sym.clone());
@@ -970,7 +970,8 @@ impl<'l, 's> Parser<'l, 's> {
         if self.currtkn.ty == tknty {
             self.consume()
         } else {
-            self.err_from_tkn(err_msg)
+            self.err_from_tkn(err_msg);
+            self.error(ParseErrTy::TknMismatch(tknty.to_string(), self.currtkn.ty.to_string()));
         }
     }
 
@@ -982,5 +983,10 @@ impl<'l, 's> Parser<'l, 's> {
         let prefixed_msg = format!("Parse Error - {}", message);
         let error = ErrC::new(self.currtkn.line, self.currtkn.pos, prefixed_msg);
         self.errors.push(error);
+    }
+
+    fn error(&mut self, ty: ParseErrTy) {
+        let err = ParseErr::new(self.currtkn.line, self.currtkn.pos, ty);
+        self.errors.push(err);
     }
 }
