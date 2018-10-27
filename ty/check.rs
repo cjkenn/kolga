@@ -118,7 +118,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     _ => self.check_stmt(fn_stmts.clone(), sc)
                 };
             },
-            Ast::ClassDecl{ident_tkn:_, methods, props, sc} => {
+            Ast::ClassDecl{ident_tkn:_, methods, props, prop_pos:_,sc} => {
                 for prop_stmt in props {
                     self.check_stmt(prop_stmt.clone().unwrap(), sc);
                 }
@@ -199,15 +199,12 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             },
-            Ast::ClassDecl{ident_tkn, methods:_, props:_, sc:_} => {
+            Ast::ClassDecl{ident_tkn, methods:_, props:_, prop_pos:_, sc:_} => {
                 let sym = self.symtab.retrieve(&ident_tkn.get_name()).unwrap();
                 sym.ty_rec.ty.clone().unwrap()
             },
-            Ast::ClassGet{class_tkn, prop_tkn} => {
-                let class_sym = self.symtab.retrieve(&class_tkn.get_name()).unwrap();
-                let class_decl_ast = class_sym.assign_val.clone().unwrap();
-
-                self.extract_prop_ty(&class_decl_ast, &prop_tkn)
+            Ast::ClassPropAccess{ident_tkn:_, prop_name, idx:_, owner_class} => {
+                self.extract_prop_ty(&owner_class, prop_name.clone())
             },
             _ => {
                 panic!("Unrecognized expression type found!")
@@ -218,10 +215,9 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// Given a class declaration, retrieve the type of a property in the class. Because
     /// a class does not maintain a mapping of properties (right now), we loop through all
     /// available props until we find the name of the expected prop (the second param).
-    fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name_tkn: &Token) -> TyName {
-        let prop_name = prop_name_tkn.get_name();
+    fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name: String) -> TyName {
         match class_decl_ast {
-            Ast::ClassDecl{ident_tkn:_, methods:_, props, sc:_} => {
+            Ast::ClassDecl{ident_tkn:_, methods:_, props, prop_pos:_, sc:_} => {
                 let mut prop_ty = None;
                 // TODO: this is O(n) and not efficient (should store props in a map)
                 for prop in props {

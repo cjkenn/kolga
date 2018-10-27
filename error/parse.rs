@@ -8,6 +8,7 @@ pub enum ParseErrTy {
     InvalidImmAssign(String),
     InvalidTy(String),
     InvalidForStmt,
+    InvalidClassProp,
     ImmDecl(String),
     TknMismatch(String, String),
     FnParamCntExceeded(usize),
@@ -59,6 +60,9 @@ impl KolgaErr for ParseErr {
             },
             ParseErrTy::InvalidForStmt => {
                 format!("{} Invalid for loop: must start with a variable declaration", str_pos)
+            },
+            ParseErrTy::InvalidClassProp => {
+                format!("{} Invalid class property declaration", str_pos)
             },
             ParseErrTy::ImmDecl(ref found) => {
                 format!("{} Cannot declare immutable variable '{}' with no value", str_pos, found)

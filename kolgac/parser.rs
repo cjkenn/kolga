@@ -5,6 +5,7 @@ use lexer::Lexer;
 use token::{Token, TknTy};
 use ty_rec::TyRec;
 use error::parse::{ParseErrTy, ParseErr};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 const FN_PARAM_MAX_LEN: usize = 64;
@@ -317,10 +318,28 @@ impl<'l, 's> Parser<'l, 's> {
         self.symtab.init_sc();
         let mut methods = Vec::new();
         let mut props = Vec::new();
+        let mut prop_map = HashMap::new();
 
+        let mut prop_ctr = 0;
         loop {
             match self.currtkn.ty {
-                TknTy::Let => props.push(self.var_decl()),
+                TknTy::Let => {
+                    let prop_ast = self.var_decl();
+                    if prop_ast.is_none() {
+                        return None;
+                    }
+                    match prop_ast.clone().unwrap() {
+                        Ast::VarDecl{ty_rec:_,ident_tkn, is_imm:_, is_global:_} => {
+                            prop_map.insert(ident_tkn.get_name(), prop_ctr);
+                        },
+                        _ => {
+                            self.error(ParseErrTy::InvalidClassProp);
+                            return None;
+                        }
+                    }
+                    props.push(prop_ast);
+                    prop_ctr = prop_ctr + 1;
+                },
                 TknTy::Fn => methods.push(self.fn_decl()),
                 TknTy::RightBrace => {
                     self.consume();
@@ -339,6 +358,7 @@ impl<'l, 's> Parser<'l, 's> {
             ident_tkn: class_tkn.clone(),
             methods: methods,
             props: props,
+            prop_pos: prop_map,
             sc: final_sc_lvl
         });
 
@@ -514,6 +534,9 @@ impl<'l, 's> Parser<'l, 's> {
                 let op = self.currtkn.clone();
                 self.consume();
                 let rhs = self.assign_expr();
+                if rhs.is_none() {
+                    return None;
+                }
 
                 match maybe_ast.clone().unwrap() {
                     Ast::Primary(tyrec) => {
@@ -546,11 +569,13 @@ impl<'l, 's> Parser<'l, 's> {
                             }
                         };
                     },
-                    Ast::ClassGet{class_tkn, prop_tkn} => {
-                        return Some(Ast::ClassSet{
-                            class_tkn: class_tkn,
-                            prop_tkn: prop_tkn,
-                            assign_val: Box::new(rhs)
+                    Ast::ClassPropAccess{ident_tkn, prop_name, idx, owner_class} => {
+                        return Some(Ast::ClassPropSet{
+                            ident_tkn: ident_tkn,
+                            prop_name: prop_name,
+                            idx: idx,
+                            owner_class: owner_class,
+                            assign_val: Box::new(rhs.unwrap())
                         });
                     },
                     _ => {
@@ -742,7 +767,7 @@ impl<'l, 's> Parser<'l, 's> {
                 // Calling a function that belongs to the class
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
                 let (sc_lvl, class_name) = match class_sym.clone().unwrap().assign_val.clone().unwrap() {
-                    Ast::ClassDecl{ident_tkn, methods:_,props:_, sc} => {
+                    Ast::ClassDecl{ident_tkn, methods:_,props:_, prop_pos:_, sc} => {
                         (sc, ident_tkn.get_name())
                     },
                     _ => {
@@ -770,9 +795,33 @@ impl<'l, 's> Parser<'l, 's> {
                 self.class_expr(name_tkn)
             }
             _ => {
-                Some(Ast::ClassGet {
-                    class_tkn: class_tkn.unwrap(),
-                    prop_tkn: name_tkn.unwrap()
+                let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
+                if class_sym.is_none() {
+                    self.error(ParseErrTy::UndeclaredSym(name_tkn.clone().unwrap().get_name()));
+                    return None;
+                }
+                let class_ptr = class_sym.unwrap();
+                let owner = class_ptr.assign_val.clone().unwrap();
+                let pos = match &owner {
+                    Ast::ClassDecl{ident_tkn:_, methods:_, props:_, prop_pos, sc:_} => {
+                        let map = prop_pos.clone();
+                        let idx = map.get(&name_tkn.clone().unwrap().get_name());
+                        match idx {
+                            Some(num) => num.clone() as usize,
+                            None => {
+                                self.error(ParseErrTy::InvalidClassProp);
+                                0 as usize
+                            }
+                        }
+                    },
+                    _ => 0 as usize
+                };
+
+                Some(Ast::ClassPropAccess {
+                    ident_tkn: class_tkn.unwrap(),
+                    prop_name: name_tkn.unwrap().get_name(),
+                    idx: pos,
+                    owner_class: Box::new(owner)
                 })
             }
         };
@@ -804,7 +853,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let class_decl_ast = maybe_class_sym.unwrap().assign_val.clone().unwrap();
 
                 let params = match class_decl_ast {
-                    Ast::ClassDecl{ident_tkn:_, methods, props:_, sc:_} => {
+                    Ast::ClassDecl{ident_tkn:_, methods, props:_, prop_pos:_, sc:_} => {
                         let mut expected_params = None;
 
                         for mtod_ast in methods {

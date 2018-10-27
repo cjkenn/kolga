@@ -1,5 +1,6 @@
 use token::Token;
 use ty_rec::TyRec;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
@@ -70,7 +71,6 @@ pub enum Ast {
         sc: usize
     },
 
-    // Func name, params
     FnCall {
         fn_tkn: Token,
         fn_params: Vec<Ast>
@@ -80,18 +80,23 @@ pub enum Ast {
         ident_tkn: Token,
         methods: Vec<Option<Ast>>,
         props: Vec<Option<Ast>>,
+        prop_pos: HashMap<String, usize>,
         sc: usize
     },
 
-    ClassGet {
-        class_tkn: Token,
-        prop_tkn: Token
+    ClassPropAccess {
+        ident_tkn: Token,
+        prop_name: String,
+        idx: usize,
+        owner_class: Box<Ast>
     },
 
-    ClassSet {
-        class_tkn: Token,
-        prop_tkn: Token,
-        assign_val: Box<Option<Ast>>
+    ClassPropSet {
+        ident_tkn: Token,
+        prop_name: String,
+        idx: usize,
+        owner_class: Box<Ast>,
+        assign_val: Box<Ast>
     },
 
     ClassFnCall {

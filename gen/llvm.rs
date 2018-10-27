@@ -239,7 +239,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         let var_ident = ident_tkn.get_name();
 
                         match value.clone().unwrap() {
-                            Ast::ClassDecl{ident_tkn, methods:_, props:_, sc:_} => {
+                            Ast::ClassDecl{ident_tkn, methods:_, props:_, prop_pos:_, sc:_} => {
                                 let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
                                 if llvm_ty.is_none() {
                                     self.error(GenErrTy::InvalidClass(ident_tkn.get_name()));
@@ -278,7 +278,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             // here should already be a struct type (if we tried to create a class
                             // before declaring it we would not pass parsing).
                             match raw_val {
-                                Ast::ClassDecl{ident_tkn:_, methods:_, props:_, sc:_} => {
+                                Ast::ClassDecl{ident_tkn:_, methods:_, props:_, prop_pos:_, sc:_} => {
                                     vec![alloca_instr]
                                 },
                                 _ => {
@@ -316,7 +316,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             },
-            Ast::ClassDecl{ident_tkn, methods, props, sc:_} => {
+            Ast::ClassDecl{ident_tkn, methods, props, prop_pos:_, sc:_} => {
                 unsafe {
                     let mut prop_tys = Vec::new();
                     for pr in props {
@@ -533,7 +533,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             },
             // Class declarations ast types can be used as rvalues when creating a class.
-            Ast::ClassDecl{ident_tkn, methods:_, props:_, sc:_} => {
+            Ast::ClassDecl{ident_tkn, methods:_, props:_, prop_pos:_, sc:_} => {
                 let name = ident_tkn.get_name();
                 let llvm_struct_ty = self.classtab.retrieve(&name);
                 match llvm_struct_ty {
@@ -550,18 +550,22 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             },
-            Ast::ClassGet{class_tkn, prop_tkn} => {
-                let class = self.valtab.retrieve(&class_tkn.get_name());
+            Ast::ClassPropAccess{ident_tkn, prop_name, idx, owner_class:_} => {
+                let name = ident_tkn.get_name();
+                let class = self.valtab.retrieve(&name);
                 if class.is_none() {
-                    self.error(GenErrTy::InvalidClass(class_tkn.get_name()));
+                    self.error(GenErrTy::InvalidClass(name));
                     return None;
                 }
-                let classptr = class.unwrap();
 
+                let classptr = class.unwrap();
                 // Build a GEP to get the address of the prop in the struct
-                // TODO: get index of class prop? what is the name argument?
                 unsafe {
-                    let gep_val = LLVMBuildStructGEP(self.builder, classptr, 0, c_str!("tmp"));
+                    let gep_val = LLVMBuildStructGEP(self.builder,
+                                                     classptr,
+                                                     *idx as u32,
+                                                     self.c_str(prop_name));
+                    LLVMDumpValue(gep_val);
                     return Some(gep_val);
                 }
 
