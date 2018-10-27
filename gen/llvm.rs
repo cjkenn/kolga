@@ -67,7 +67,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     pub fn new(ast: &'t Ast, valtab: &'v mut ValTab) -> CodeGenerator<'t, 'v> {
         unsafe {
             let context = LLVMContextCreate();
-            // TODO: get rid of this macro?
             let module = LLVMModuleCreateWithNameInContext(c_str!("kolga"), context);
             CodeGenerator {
                 ast: ast,
@@ -356,8 +355,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     for mtod in methods {
                         match mtod.clone().unwrap() {
                             Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, sc} => {
-                                // We need to add the class declaration type to the list of params so we obtain
-                                // a pointer to it inside the method body.
+                                // We need to add the class declaration type to the list of
+                                // params so we obtain a pointer to it inside the method body.
                                 let fake_class_param = TyRec {
                                     ty: Some(TyName::Class(class_name.clone())),
                                     tkn: class_tkn.clone()
@@ -541,7 +540,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     Some(ty_ref) => {
                         let c_name = self.c_str(&name);
                         unsafe {
-                            LLVMDumpType(ty_ref);
                             let llvm_val = LLVMBuildAlloca(self.builder, ty_ref, c_name);
                             return Some(llvm_val);
                         }
@@ -551,6 +549,25 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         None
                     }
                 }
+            },
+            Ast::ClassGet{class_tkn, prop_tkn} => {
+                let class = self.valtab.retrieve(&class_tkn.get_name());
+                if class.is_none() {
+                    self.error(GenErrTy::InvalidClass(class_tkn.get_name()));
+                    return None;
+                }
+                let classptr = class.unwrap();
+
+                // Build a GEP to get the address of the prop in the struct
+                // TODO: get index of class prop? what is the name argument?
+                unsafe {
+                    let gep_val = LLVMBuildStructGEP(self.builder, classptr, 0, c_str!("tmp"));
+                    return Some(gep_val);
+                }
+
+                // Get the value that corresponds to that prop from GEP and return it
+
+                None
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
         }

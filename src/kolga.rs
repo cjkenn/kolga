@@ -9,7 +9,7 @@ use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
 use kolgac::symtab::SymbolTable;
 use ty::check::TyCheck;
-use gen::codegen::CodeGenerator;
+use gen::llvm::CodeGenerator;
 use gen::valtab::ValTab;
 use error::KolgaErr;
 
