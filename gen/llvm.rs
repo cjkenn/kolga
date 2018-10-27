@@ -479,7 +479,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
 
             },
-            Ast::ClassFnCall{class_tkn, class_name, fn_tkn, fn_params, sc} => {
+            Ast::ClassFnCall{class_tkn, class_name, fn_tkn, fn_params, sc:_} => {
                 // The class function is stored under a different name in the
                 // value table, with the class name prepended.
                 let fn_name = fn_tkn.clone().get_name();
@@ -559,19 +559,20 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
 
                 let classptr = class.unwrap();
-                // Build a GEP to get the address of the prop in the struct
                 unsafe {
                     let gep_val = LLVMBuildStructGEP(self.builder,
                                                      classptr,
                                                      *idx as u32,
                                                      self.c_str(prop_name));
                     LLVMDumpValue(gep_val);
-                    return Some(gep_val);
+                    // TODO: how to assign the gep to a value? We need to store the
+                    // gep and then load the stored value into another variable to
+                    // access the prop?
+                    let ld_val = LLVMBuildLoad(self.builder, st, self.c_str("tmp"));
+                    LLVMDumpValue(ld_val);
+
+                    Some(gep_val)
                 }
-
-                // Get the value that corresponds to that prop from GEP and return it
-
-                None
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
         }
