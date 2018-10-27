@@ -1,3 +1,4 @@
+use std::fmt;
 use token::{Token, TknTy};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -22,6 +23,20 @@ impl TyName {
             TyName::Bool => true,
             _ => false
         }
+    }
+}
+
+impl fmt::Display for TyName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let display_ty = match self {
+            TyName::String => "string".to_string(),
+            TyName::Num => "number".to_string(),
+            TyName::Bool => "bool".to_string(),
+            TyName::Void => "void".to_string(),
+            TyName::Class(name) => format!("class '{}'", name)
+        };
+
+        write!(f, "{}", display_ty)
     }
 }
 

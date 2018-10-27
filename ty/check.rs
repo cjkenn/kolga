@@ -5,12 +5,12 @@ use kolgac::token::{Token, TknTy};
 use kolgac::symtab::SymbolTable;
 use kolgac::ty_rec::TyName;
 use kolgac::sym::Sym;
-use error::ErrC;
+use error::ty::{TypeErrTy, TypeErr};
 
 pub struct TyCheck<'t, 's> {
     ast: &'t Ast,
     symtab: &'s mut SymbolTable,
-    errors: Vec<ErrC>
+    errors: Vec<TypeErr>
 }
 
 impl<'t, 's> TyCheck<'t, 's> {
@@ -25,7 +25,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// Initial entry point into the type checker. Loops through each statement in the
     /// AST and type checks them. Returns a vector of errors encountered during type
     /// checking.
-    pub fn check(&mut self) -> Vec<ErrC> {
+    pub fn check(&mut self) -> Vec<TypeErr> {
         match self.ast {
             Ast::Prog{stmts} => {
                 for stmt in stmts {
@@ -143,14 +143,12 @@ impl<'t, 's> TyCheck<'t, 's> {
                     has_ret_stmt = true;
                     if maybe_expr.is_none() {
                         if fn_ret_ty != TyName::Void {
-                            let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &TyName::Void);
-                            self.errors.push(err);
+                            self.ty_mismatch(&fn_tkn, &fn_ret_ty, &TyName::Void);
                         }
                     } else {
                         let rhs_ty = self.check_expr(maybe_expr.clone().unwrap(), sc_lvl);
                         if fn_ret_ty != rhs_ty {
-                            let err = self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
-                            self.errors.push(err);
+                            self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
                         }
                     }
                 },
@@ -159,11 +157,9 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
 
         if fn_ret_ty != TyName::Void && !has_ret_stmt {
-            let err = format!("Function {:?} expects a return type of {:?}, but no return statement found",
-                              fn_tkn.get_name(),
-                              fn_ret_ty);
-            let errc = ErrC::new(fn_tkn.line, fn_tkn.pos, err);
-            self.errors.push(errc);
+            self.error(fn_tkn.line,
+                       fn_tkn.pos,
+                       TypeErrTy::InvalidRet(fn_tkn.get_name(), fn_ret_ty.to_string()));
         }
     }
 
@@ -267,10 +263,9 @@ impl<'t, 's> TyCheck<'t, 's> {
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
                     let ty_name = mb_ty_rec.clone().ty.unwrap();
                     if passed_in_param_tys[idx] != ty_name {
-                        let err = self.ty_mismatch(&fn_tkn.clone(),
-                                                   &passed_in_param_tys[idx],
-                                                   &ty_name);
-                        self.errors.push(err);
+                        self.ty_mismatch(&fn_tkn.clone(),
+                                         &passed_in_param_tys[idx],
+                                         &ty_name);
                     }
                 }
             },
@@ -287,10 +282,9 @@ impl<'t, 's> TyCheck<'t, 's> {
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
                     let ty_name = mb_ty_rec.clone().ty.unwrap();
                     if passed_in_param_tys[idx] != ty_name {
-                        let err = self.ty_mismatch(&fn_tkn.clone(),
-                                                   &passed_in_param_tys[idx],
-                                                   &ty_name);
-                        self.errors.push(err);
+                        self.ty_mismatch(&fn_tkn.clone(),
+                                         &passed_in_param_tys[idx],
+                                         &ty_name);
                     }
                 }
             },
@@ -303,20 +297,18 @@ impl<'t, 's> TyCheck<'t, 's> {
         match op_tkn.ty {
             TknTy::Minus => {
                 if rhs_ty != TyName::Num {
-                    let err = self.ty_mismatch(&op_tkn, &TyName::Num, &rhs_ty);
-                    self.errors.push(err);
+                    self.ty_mismatch(&op_tkn, &TyName::Num, &rhs_ty);
                 }
-                return TyName::Num;
+                TyName::Num
             },
             TknTy::Bang => {
                 if rhs_ty != TyName::Bool {
-                    let err = self.ty_mismatch(&op_tkn, &TyName::Bool, &rhs_ty);
-                    self.errors.push(err);
+                    self.ty_mismatch(&op_tkn, &TyName::Bool, &rhs_ty);
                 }
-                return TyName::Bool;
+                TyName::Bool
             },
             _ => panic!("Unimplemented unary operator found!")
-        };
+        }
     }
 
     /// Reduce a binary ast so we can check the types in it. Returns the expected type
@@ -327,43 +319,40 @@ impl<'t, 's> TyCheck<'t, 's> {
             TknTy::Plus | TknTy::Minus | TknTy::Star | TknTy::Slash => {
                 // We can only operate on types of the same kind
                 if lhs_ty != rhs_ty {
-                    let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    self.errors.push(err);
+                    self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
+                    return TyName::Num;
                 }
 
                 // Ensure that the types are correct for the given operator
                 if !lhs_ty.is_numerical() || !rhs_ty.is_numerical() {
-                    let err = self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    self.errors.push(err);
+                    self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                 }
 
-                return TyName::Num
+                TyName::Num
             },
             TknTy::Gt | TknTy::GtEq | TknTy::Lt | TknTy::LtEq | TknTy::EqEq | TknTy::BangEq => {
                 if lhs_ty != rhs_ty {
-                    let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    self.errors.push(err);
+                    self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
+                    return TyName::Bool;
                 }
 
                 if !lhs_ty.is_numerical() || !rhs_ty.is_numerical() {
-                    let err = self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    self.errors.push(err);
+                    self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                 }
 
-                return TyName::Bool
+                TyName::Bool
             },
             TknTy::And | TknTy::Or | TknTy::AmpAmp | TknTy::PipePipe => {
                 if lhs_ty != rhs_ty {
-                    let err = self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    self.errors.push(err);
+                    self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
+                    return TyName::Bool;
                 }
 
                 if !lhs_ty.is_bool() || !rhs_ty.is_bool() {
-                    let err = self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    self.errors.push(err);
+                    self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                 }
 
-                return TyName::Bool
+                TyName::Bool
             },
             _ => panic!("Unimplemented binary operator found!")
         }
@@ -375,11 +364,9 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let lhs_ty = ty_rec.ty.unwrap();
                 let rhs = value.unwrap();
 
-                // TODO: this shouldnt be 0 finalized scope
                 let rhs_ty = self.check_expr(rhs, sc);
                 if lhs_ty != rhs_ty {
-                    let err = self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
-                    self.errors.push(err);
+                    self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
                 }
 
                 return lhs_ty;
@@ -388,12 +375,11 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn ty_mismatch(&self, tkn: &Token, lhs: &TyName, rhs: &TyName) -> ErrC {
-        let msg = format!("Type mismatch: Wanted {:?}, but found {:?}", lhs, rhs);
-        ErrC::new(tkn.line, tkn.pos, msg)
+    fn ty_mismatch(&mut self, tkn: &Token, lhs: &TyName, rhs: &TyName) {
+        self.error(tkn.line, tkn.pos, TypeErrTy::TyMismatch(lhs.to_string(), rhs.to_string()));
     }
 
-    fn op_mismatch(&self, tkn: &Token, lhs: &TyName, rhs: &TyName) -> ErrC {
+    fn op_mismatch(&mut self, tkn: &Token, lhs: &TyName, rhs: &TyName) {
         let ty = tkn.ty.clone();
         let op_desired = if ty.is_numerical_op() {
             (TyName::Num, TyName::Num)
@@ -401,13 +387,14 @@ impl<'t, 's> TyCheck<'t, 's> {
             (TyName::Bool, TyName::Bool)
         };
 
-        let msg = format!("Operator mismatch: {:?} wants {:?} and {:?}, but found {:?} and {:?}",
-                          tkn.ty,
-                          op_desired.0,
-                          op_desired.1,
-                          lhs,
-                          rhs);
-        ErrC::new(tkn.line, tkn.pos, msg)
+        let err_ty = TypeErrTy::BinOpMismatch(
+            tkn.ty.to_string(),
+            op_desired.0.to_string(),
+            op_desired.1.to_string(),
+            lhs.to_string(),
+            rhs.to_string());
+
+        self.error(tkn.line, tkn.pos, err_ty);
     }
 
     fn find_fn_sym(&mut self, ident_tkn: &Token, sc: usize) -> Option<Rc<Sym>> {
@@ -416,10 +403,14 @@ impl<'t, 's> TyCheck<'t, 's> {
         match sym {
             Some(symbol) => Some(symbol),
             None => {
-                let err_msg = format!("types: Undeclared function symbol {:?} found", name);
-                self.errors.push(ErrC::new(ident_tkn.line, ident_tkn.pos, err_msg));
+                self.error(ident_tkn.line, ident_tkn.pos, TypeErrTy::InvalidFn(name));
                 None
             }
         }
+    }
+
+    fn error(&mut self, line: usize, pos: usize, ty: TypeErrTy) {
+        let err = TypeErr::new(line, pos, ty);
+        self.errors.push(err);
     }
 }
