@@ -252,8 +252,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 }
                             },
                             _ => {
-                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                                 unsafe {
+                                    let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                                     let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
 
                                     let val = self.gen_expr(&value.clone().unwrap()).unwrap();
@@ -367,7 +367,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                                 // We change the name of the function by prepending the
                                 // class name so we avoid storing duplicates in the value table.
-                                // This is mostly a hack though, because then no one can
+                                // TOOD: This is mostly a hack though, because then no one can
                                 // create a function with the class name prepended to the class
                                 // function name!
                                 let curr_name = ident_tkn.get_name();
@@ -564,14 +564,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                                      classptr,
                                                      *idx as u32,
                                                      self.c_str(prop_name));
-                    LLVMDumpValue(gep_val);
-                    // TODO: how to assign the gep to a value? We need to store the
-                    // gep and then load the stored value into another variable to
-                    // access the prop?
-                    let ld_val = LLVMBuildLoad(self.builder, st, self.c_str("tmp"));
-                    LLVMDumpValue(ld_val);
-
-                    Some(gep_val)
+                    // GEP returns the address of the prop we want to access. We can load it
+                    // into a variable here so that we return a non-pointer type.
+                    // TODO: can this be set as a global variable?
+                    let ld_val = LLVMBuildLoad(self.builder, gep_val, self.c_str(prop_name));
+                    Some(ld_val)
                 }
             },
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr)
