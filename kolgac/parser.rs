@@ -3,7 +3,7 @@ use symtab::SymbolTable;
 use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
-use ty_rec::TyRec;
+use ty_rec::{TyName, TyRec};
 use error::parse::{ParseErrTy, ParseErr};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -238,10 +238,26 @@ impl<'l, 's> Parser<'l, 's> {
             let mut ty_rec = TyRec::new_from_tkn(self.currtkn.clone());
             ty_rec.tkn = ident_tkn.clone();
 
+            // We must create an assign value if the parameter is a class. This is because
+            // when parsing the function body, we might need to access the class props/methods
+            // and we can't do that unless we store the class declaration there.
+            let assign_val = match ty_rec.ty.clone().unwrap() {
+                TyName::Class(name) => {
+                    let class_sym = self.symtab.retrieve(&name);
+                    if class_sym.is_none() {
+                        self.error(ParseErrTy::UndeclaredSym(name));
+                        return None;
+                    }
+
+                    class_sym.unwrap().assign_val.clone()
+                },
+                _ => None
+            };
+
             params.push(ty_rec.clone());
 
             // Store param variable name in the symbol table for the function scope.
-            let param_sym = Sym::new(SymTy::Param, false, ty_rec, ident_tkn.clone(), None, None);
+            let param_sym = Sym::new(SymTy::Param, false, ty_rec, ident_tkn.clone(), assign_val, None);
             self.symtab.store(&ident_tkn.get_name(), param_sym);
 
             self.consume();
