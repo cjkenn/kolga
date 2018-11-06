@@ -4,6 +4,7 @@ use sym::{Sym, SymTy};
 use lexer::Lexer;
 use token::{Token, TknTy};
 use ty_rec::{TyName, TyRec};
+use error::KolgaErr;
 use error::parse::{ParseErrTy, ParseErr};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -56,8 +57,14 @@ impl<'l, 's> Parser<'l, 's> {
 
         while self.currtkn.ty != TknTy::Eof {
             match self.decl() {
-                Some(a) => stmts.push(a),
-                None => ()
+                Ok(a) => stmts.push(a),
+                Err(e) => {
+                    e.emit();
+                    match e.continuable() {
+                        true => (),
+                        false => break
+                    };
+                }
             }
         }
 
@@ -72,18 +79,18 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     /// Parses a declaration. In kolga we can declare variables, functions, and classes.
-    fn decl(&mut self) -> Option<Ast> {
+    fn decl(&mut self) -> Result<Ast, ParseErr> {
         match self.currtkn.ty {
             TknTy::Let => self.var_decl(),
-            TknTy::Fn => self.fn_decl(),
-            TknTy::Class => self.class_decl(),
-            _ => self.stmt()
+            TknTy::Fn => (), //self.fn_decl(),
+            TknTy::Class => (), //self.class_decl(),
+            _ => () //self.stmt()
         }
     }
 
     /// Parses a variable declaration
-    fn var_decl(&mut self) -> Option<Ast> {
-        self.expect(TknTy::Let);
+    fn var_decl(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::Let)?;
 
         let is_imm = match self.currtkn.ty {
             TknTy::Imm => {
@@ -94,19 +101,16 @@ impl<'l, 's> Parser<'l, 's> {
         };
 
         let ident_tkn = self.match_ident_tkn();
-        if ident_tkn.is_none() {
-            return None;
-        }
+        self.expect(TknTy::Tilde)?;
 
-        self.expect(TknTy::Tilde);
         let mut is_class_type = false;
+        let mut var_err;
 
         let var_ty_tkn = if self.currtkn.is_ty() {
             // But Void isn't a valid type for a variable, just a function that returns nothing
             if self.currtkn.ty == TknTy::Void {
                 let ty_str = self.currtkn.ty.to_string();
-                self.error(ParseErrTy::InvalidTy(ty_str));
-                return None;
+                return Err(self.error(ParseErrTy::InvalidTy(ty_str)));
             }
 
             let tkn = Some(self.currtkn.clone());
@@ -117,7 +121,7 @@ impl<'l, 's> Parser<'l, 's> {
             let maybe_class_sym = self.symtab.retrieve(&ty_name);
             if maybe_class_sym.is_none() {
                 let ty_str = self.currtkn.ty.to_string();
-                self.error(ParseErrTy::InvalidTy(ty_str));
+                var_err = self.error(ParseErrTy::InvalidTy(ty_str));
                 None
             } else if maybe_class_sym.unwrap().sym_ty == SymTy::Class {
                 is_class_type = true;
@@ -126,20 +130,20 @@ impl<'l, 's> Parser<'l, 's> {
                 tkn
             } else {
                 let ty_str = self.currtkn.ty.to_string();
-                self.error(ParseErrTy::InvalidTy(ty_str));
+                var_err = self.error(ParseErrTy::InvalidTy(ty_str));
                 None
             }
         };
 
         if var_ty_tkn.is_none() {
-            return None;
+            return Err(var_err);
         }
 
         match self.currtkn.ty {
             TknTy::Eq => {
                 self.consume();
                 let var_val = self.expr();
-                self.expect(TknTy::Semicolon);
+                self.expect(TknTy::Semicolon)?;
 
                 let ty_rec = TyRec::new_from_tkn(var_ty_tkn.unwrap());
                 let sym = Sym::new(SymTy::Var,
@@ -152,7 +156,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Some(Ast::VarAssign{
+                Ok(Ast::VarAssign{
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -163,8 +167,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::Semicolon => {
                 if is_imm {
                     let ty_str = self.currtkn.ty.to_string();
-                    self.error(ParseErrTy::ImmDecl(ty_str));
-                    return None;
+                    return Err(self.error(ParseErrTy::ImmDecl(ty_str)));
                 }
                 self.consume();
 
@@ -182,7 +185,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let name = &ident_tkn.clone().unwrap().get_name();
                     self.symtab.store(name, cl_sym);
 
-                    return Some(Ast::VarAssign{
+                    return Ok(Ast::VarAssign{
                         ty_rec: cl_ty_rec,
                         ident_tkn: ident_tkn.clone().unwrap(),
                         is_imm: is_imm,
@@ -202,7 +205,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Some(Ast::VarDecl{
+                Ok(Ast::VarDecl{
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -211,8 +214,7 @@ impl<'l, 's> Parser<'l, 's> {
             },
             _ => {
                 let ty_str = self.currtkn.ty.to_string();
-                self.error(ParseErrTy::InvalidAssign(ty_str));
-                None
+                Err(self.error(ParseErrTy::InvalidAssign(ty_str)))
             }
         }
     }
@@ -1018,12 +1020,14 @@ impl<'l, 's> Parser<'l, 's> {
 
     /// Check that the current token is the same as the one we expect. If it is, consume the
     /// token and advance. If it isn't report an error.
-    fn expect(&mut self, tknty: TknTy) {
+    fn expect(&mut self, tknty: TknTy) -> Result<(), ParseErr> {
         if self.currtkn.ty == tknty {
-            self.consume()
+            self.consume();
+            Ok(())
         } else {
             let ty_str = self.currtkn.ty.to_string();
-            self.error(ParseErrTy::TknMismatch(tknty.to_string(), ty_str));
+            let err_ty = ParseErrTy::TknMismatch(tknty.to_string(), ty_str);
+            Err(ParseErr::new(self.currtkn.line, self.currtkn.pos, err_ty))
         }
     }
 
@@ -1033,9 +1037,10 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     /// Report a parsing error from the current token, with the given parser error type.
-    fn error(&mut self, ty: ParseErrTy) {
+    fn error(&mut self, ty: ParseErrTy) -> ParseErr {
         let err = ParseErr::new(self.currtkn.line, self.currtkn.pos, ty);
         self.errors.push(err);
+        err
     }
 
     /// Report a parsing error at a given location with a provided error type.
