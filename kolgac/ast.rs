@@ -9,7 +9,7 @@ pub enum Ast {
     },
 
     BlckStmt {
-        stmts: Vec<Option<Ast>>,
+        stmts: Vec<Ast>,
         sc: usize
     },
 

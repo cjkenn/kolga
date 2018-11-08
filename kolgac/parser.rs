@@ -84,7 +84,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::Let => self.var_decl(),
             TknTy::Fn => self.fn_decl(),
             TknTy::Class => self.class_decl(),
-            _ => () //self.stmt()
+            _ => self.stmt()
         }
     }
 
@@ -390,35 +390,38 @@ impl<'l, 's> Parser<'l, 's> {
 
     /// Parses a statement. This function does not perform any scope management, which
     /// is delegated to each statement type.
-    fn stmt(&mut self) -> Option<Ast> {
+    fn stmt(&mut self) -> Result<Ast, ParseErr> {
         match self.currtkn.ty {
-            TknTy::If => self.if_stmt(),
-            TknTy::While => self.while_stmt(),
-            TknTy::For => self.for_stmt(),
-            TknTy::Return => self.ret_stmt(),
-            TknTy::LeftBrace => self.block_stmt(),
-            _ => self.expr_stmt()
+            TknTy::If => self.if_stmt()?,
+            TknTy::While => self.while_stmt()?,
+            TknTy::For => self.for_stmt()?,
+            TknTy::Return => self.ret_stmt()?,
+            TknTy::LeftBrace => self.block_stmt()?,
+            _ => self.expr_stmt()?
         }
     }
 
     /// Parses a block statement, beginning with a '{' token. This creates a new scope,
     /// parses any statements within the block, and closes the block scope at the end.
-    fn block_stmt(&mut self) -> Option<Ast> {
-        self.expect(TknTy::LeftBrace);
+    fn block_stmt(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::LeftBrace)?;
         let mut stmts = Vec::new();
         self.symtab.init_sc();
 
         loop {
             match self.currtkn.ty {
                 TknTy::RightBrace | TknTy::Eof => break,
-                _ => stmts.push(self.decl())
+                _ => {
+                    let result = self.decl()?
+                    stmts.push(result);
+                }
             };
         }
 
-        self.expect(TknTy::RightBrace);
+        self.expect(TknTy::RightBrace)?;
         let sc_lvl = self.symtab.finalize_sc();
 
-        Some(Ast::BlckStmt{
+        Ok(Ast::BlckStmt{
             stmts: stmts,
             sc: sc_lvl
         })
@@ -426,52 +429,45 @@ impl<'l, 's> Parser<'l, 's> {
 
     /// Parse an if statement, including else and elif blocks. These are stored in the
     /// IfStmt Ast type.
-    fn if_stmt(&mut self) -> Option<Ast> {
-        self.expect(TknTy::If);
-        let maybe_if_cond = self.expr();
-        if maybe_if_cond.is_none() {
-            return None;
-        }
+    fn if_stmt(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::If)?;
+        let maybe_if_cond = self.expr()?;
 
-        let maybe_if_blck = self.block_stmt();
+        let maybe_if_blck = self.block_stmt()?;
         let mut maybe_else_blck = None;
         let mut else_ifs = Vec::new();
         loop {
             match self.currtkn.ty {
                 TknTy::Elif => {
                     self.consume();
-                    let maybe_elif_ast = self.expr();
-                    let maybe_elif_blck = self.block_stmt();
+                    let maybe_elif_ast = self.expr()?;
+                    let maybe_elif_blck = self.block_stmt()?;
                     else_ifs.push(Some(Ast::ElifStmt(Box::new(maybe_elif_ast), Box::new(maybe_elif_blck))));
                 },
                 TknTy::Else => {
                     self.consume();
-                    maybe_else_blck = self.block_stmt();
+                    maybe_else_blck = self.block_stmt()?;
                 },
                 _ => break
             };
         }
 
-        Some(Ast::IfStmt(Box::new(maybe_if_cond),
+        Ok(Ast::IfStmt(Box::new(maybe_if_cond),
                      Box::new(maybe_if_blck),
                      else_ifs,
                      Box::new(maybe_else_blck)))
     }
 
-    fn while_stmt(&mut self) -> Option<Ast> {
-        self.expect(TknTy::While);
+    fn while_stmt(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::While)?;
         // TODO: skip expr for infinite loop when we have a break stmt
-        let maybe_while_cond = self.expr();
-        if maybe_while_cond.is_none() {
-            return None;
-        }
-
-        let while_stmts = self.block_stmt();
-        Some(Ast::WhileStmt(Box::new(maybe_while_cond), Box::new(while_stmts)))
+        let maybe_while_cond = self.expr()?;
+        let while_stmts = self.block_stmt()?;
+        Ok(Ast::WhileStmt(Box::new(maybe_while_cond), Box::new(while_stmts)))
     }
 
-    fn for_stmt(&mut self) -> Option<Ast> {
-        self.expect(TknTy::For);
+    fn for_stmt(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::For)?;
         let mut for_var_decl = None;
         let mut for_var_cond = None;
         let mut for_incr_expr = None;
@@ -479,7 +475,7 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
             TknTy::Let => {
-                for_var_decl = self.var_decl();
+                for_var_decl = self.var_decl()?;
             },
             _ => {
                 self.error(ParseErrTy::InvalidForStmt)
@@ -489,20 +485,20 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
             _ => {
-                for_var_cond = self.expr_stmt();
+                for_var_cond = self.expr_stmt()?;
             }
         };
 
         match self.currtkn.ty {
             TknTy::Semicolon => self.consume(),
             _ => {
-                for_incr_expr = self.expr_stmt();
+                for_incr_expr = self.expr_stmt()?;
             }
         };
 
-        let for_stmt = self.block_stmt();
+        let for_stmt = self.block_stmt()?;
 
-        Some(Ast::ForStmt{
+        Ok(Ast::ForStmt{
             for_var_decl: Box::new(for_var_decl),
             for_cond_expr: Box::new(for_var_cond),
             for_step_expr: Box::new(for_incr_expr),
@@ -510,29 +506,29 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn ret_stmt(&mut self) -> Option<Ast> {
-        self.expect(TknTy::Return);
+    fn ret_stmt(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::Return)?;
         match self.currtkn.ty {
             TknTy::Semicolon => {
                 self.consume();
-                Some(Ast::RetStmt(Box::new(None)))
+                Ok(Ast::RetStmt(Box::new(None)))
             },
             _ => {
-                let maybe_ret_expr = self.expr();
-                self.expect(TknTy::Semicolon);
-                Some(Ast::RetStmt(Box::new(maybe_ret_expr)))
+                let maybe_ret_expr = self.expr()?;
+                self.expect(TknTy::Semicolon)?;
+                Ok(Ast::RetStmt(Box::new(maybe_ret_expr)))
             }
         }
     }
 
-    fn expr_stmt(&mut self) -> Option<Ast> {
-        let maybe_expr = self.expr();
-        self.expect(TknTy::Semicolon);
-        Some(Ast::ExprStmt(Box::new(maybe_expr)))
+    fn expr_stmt(&mut self) -> Result<Ast, ParseErr> {
+        let maybe_expr = self.expr()?;
+        self.expect(TknTy::Semicolon)?;
+        Ok(Ast::ExprStmt(Box::new(maybe_expr)))
     }
 
-    fn expr(&mut self) -> Option<Ast> {
-        self.assign_expr()
+    fn expr(&mut self) -> Result<Ast, ParseErr> {
+        self.assign_expr()?
     }
 
     fn assign_expr(&mut self) -> Option<Ast> {
