@@ -5,7 +5,7 @@ use std::fs::File;
 use std::fs;
 use std::io::prelude::*;
 
-use gen::codegen::CodeGenerator;
+use gen::llvm::CodeGenerator;
 use gen::valtab::ValTab;
 
 use kolgac::lexer::Lexer;

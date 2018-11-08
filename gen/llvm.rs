@@ -129,14 +129,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             Ast::BlckStmt{stmts, sc: _} => {
                 let mut generated = Vec::new();
                 for stmt in stmts {
-                    let mb_gen = self.gen_stmt(&stmt.clone().unwrap());
+                    let mb_gen = self.gen_stmt(&stmt.clone());
                     generated.extend(mb_gen);
                 }
 
                 generated
             },
             Ast::ExprStmt(maybe_ast) => {
-                let ast = maybe_ast.clone().unwrap();
+                let ast = maybe_ast.clone();
                 let val = self.gen_expr(&ast);
                 match val {
                     Some(exprval) => vec![exprval],
@@ -146,8 +146,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             },
-            Ast::IfStmt(mb_if_cond, mb_then_stmts, else_if_stmts, mb_else_stmts) => {
-                self.if_stmt(mb_if_cond, mb_then_stmts, else_if_stmts, mb_else_stmts)
+            Ast::IfStmt(if_cond, then_stmts, else_if_stmts, mb_else_stmts) => {
+                self.if_stmt(if_cond, then_stmts, else_if_stmts, mb_else_stmts)
             },
             Ast::WhileStmt(mb_cond_expr, mb_stmts) => {
                 self.while_stmt(mb_cond_expr, mb_stmts)
@@ -199,10 +199,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     self.valtab.store(&ident_tkn.get_name(), llvm_fn);
 
                     // TODO: this is hard to read -_-
-                    match fn_body.clone().unwrap() {
+                    match *fn_body.clone() {
                         Ast::BlckStmt{stmts, sc: _} => {
                             for stmt in stmts {
-                                match stmt.clone().unwrap() {
+                                match stmt.clone() {
                                     Ast::RetStmt(mb_expr) => {
                                         if mb_expr.is_none() {
                                             // Use a null ptr when we return void
@@ -212,7 +212,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                             LLVMBuildRet(self.builder, llvm_val.unwrap());
                                         }
                                     },
-                                    _ => { self.gen_stmt(&stmt.clone().unwrap()); }
+                                    _ => { self.gen_stmt(&stmt.clone()); }
                                 }
                             }
                         },
@@ -238,7 +238,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         let c_name = self.c_str(&ident_tkn.get_name());
                         let var_ident = ident_tkn.get_name();
 
-                        match value.clone().unwrap() {
+                        match *value.clone() {
                             Ast::ClassDecl{ident_tkn, methods:_, props:_, prop_pos:_, sc:_} => {
                                 let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
                                 if llvm_ty.is_none() {
@@ -256,7 +256,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                     let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                                     let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
 
-                                    let val = self.gen_expr(&value.clone().unwrap()).unwrap();
+                                    let val = self.gen_expr(&value.clone()).unwrap();
                                     LLVMSetInitializer(global, val);
                                     self.valtab.store(&ident_tkn.get_name(), global);
                                     vec![global]
@@ -272,12 +272,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                                                           ty_rec.clone(),
                                                                           &ident_tkn.get_name());
 
-                            let raw_val = value.clone().unwrap();
+                            let raw_val = value.clone();
                             // We don't need to store anything for class types, since they
                             // are already built into structs in the class declaration. The class
                             // here should already be a struct type (if we tried to create a class
                             // before declaring it we would not pass parsing).
-                            match raw_val {
+                            match *raw_val {
                                 Ast::ClassDecl{ident_tkn:_, methods:_, props:_, prop_pos:_, sc:_} => {
                                     vec![alloca_instr]
                                 },
@@ -325,7 +325,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         // create an object of this class.
                         // So, we want the llvm type of the props, but we
                         // don't want to generate any code for them yet.
-                        match &pr.clone().unwrap() {
+                        match &pr.clone() {
                             Ast::VarDecl{ty_rec, ident_tkn:_, is_imm:_, is_global:_} => {
                                 let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                                 prop_tys.push(llvm_ty);
@@ -353,7 +353,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     // live anywhere in the output
                     let class_tkn = ident_tkn.clone();
                     for mtod in methods {
-                        match mtod.clone().unwrap() {
+                        match mtod.clone() {
                             Ast::FnDecl{ident_tkn, fn_params, ret_ty, fn_body, sc} => {
                                 // We need to add the class declaration type to the list of
                                 // params so we obtain a pointer to it inside the method body.
@@ -408,8 +408,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             Ast::Logical(op_tkn, maybe_lhs, maybe_rhs) => {
                 // Recursively generate the LLVMValueRef's for the LHS and RHS. This is just
                 // a single call for each if they are primary expressions.
-                let mb_lhs_llvm_val = self.gen_expr(&maybe_lhs.clone().unwrap());
-                let mb_rhs_llvm_val = self.gen_expr(&maybe_rhs.clone().unwrap());
+                let mb_lhs_llvm_val = self.gen_expr(&maybe_lhs.clone());
+                let mb_rhs_llvm_val = self.gen_expr(&maybe_rhs.clone());
 
                 if mb_lhs_llvm_val.is_none() || mb_rhs_llvm_val.is_none() {
                     return None;
@@ -422,14 +422,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // LHS and RHS values.
                 self.llvm_val_from_op(&op_tkn.ty, lhs_llvm_val, rhs_llvm_val)
             },
-            Ast::Unary(op_tkn, mb_rhs) => {
-                let mb_rhs_llvm_val = self.gen_expr(&mb_rhs.clone().unwrap());
+            Ast::Unary{op, rhs} => {
+                let mb_rhs_llvm_val = self.gen_expr(&rhs);
                 if mb_rhs_llvm_val.is_none() {
                     return None;
                 }
 
                 let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
-                match op_tkn.ty {
+                match op.ty {
                     TknTy::Minus => {
                         unsafe { Some(LLVMBuildFNeg(self.builder, rhs_llvm_val, self.c_str("tmpneg"))) }
                     },
@@ -525,7 +525,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // TODO: what if this isn't a re-assign?
                 unsafe {
                     let curr_alloca_instr = self.valtab.retrieve(&ident_tkn.get_name()).unwrap();
-                    let raw_val = value.clone().unwrap();
+                    let raw_val = value.clone();
                     let val = self.gen_expr(&raw_val).unwrap();
 
                     LLVMBuildStore(self.builder, val, curr_alloca_instr);
@@ -605,9 +605,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Returns a vector of LLVM values that are created during generation. If there are no
     /// values created, returns an empty vector.
     fn if_stmt(&mut self,
-               mb_if_cond: &Box<Option<Ast>>,
-               mb_then_stmts: &Box<Option<Ast>>,
-               else_if_stmts: &Vec<Option<Ast>>,
+               if_cond: &Box<Ast>,
+               then_stmts: &Box<Ast>,
+               else_if_stmts: &Vec<Ast>,
                mb_else_stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
         let mut return_stmt_vec = Vec::new();
         unsafe {
@@ -653,7 +653,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
             // Calculate the LLVMValueRef for the if conditional expression. We use this
             // to build a conditional branch from the then block to the else block, if needed.
-            let cond_val = self.gen_expr(&mb_if_cond.clone().unwrap());
+            let cond_val = self.gen_expr(&if_cond.clone());
             if cond_val.is_none() {
                 self.error(GenErrTy::InvalidAst);
                 return Vec::new();
@@ -677,7 +677,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
             // Build then block values and branch to merge block from inside the then block.
             LLVMPositionBuilderAtEnd(self.builder, then_bb);
-            let mut then_expr_vals = self.gen_stmt(&mb_then_stmts.clone().unwrap());
+            let mut then_expr_vals = self.gen_stmt(&then_stmts.clone());
             return_stmt_vec.extend(then_expr_vals.clone());
             LLVMBuildBr(self.builder, merge_bb);
 
@@ -692,7 +692,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             // else block to sit after the elifs, and not after the then block.
             let mut final_elif_bb = then_bb;
             for (idx, stmt) in else_if_stmts.iter().enumerate() {
-                match stmt.clone().unwrap() {
+                match stmt.clone() {
                     Ast::ElifStmt(mb_cond, mb_stmts) => {
                         // Get the conditional block from the vector made above. Create a seperate
                         // block to the elif code to live in, that we can branch to from the
@@ -708,7 +708,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                         LLVMMoveBasicBlockAfter(elif_code_bb, elif_cond_bb);
 
-                        let elif_cond_val = self.gen_expr(&mb_cond.clone().unwrap());
+                        let elif_cond_val = self.gen_expr(&mb_cond.clone());
                         if elif_cond_val.is_none() {
                             self.error(GenErrTy::InvalidAst);
                             continue;
@@ -737,7 +737,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                         // Evaluate the elif block statements and branch to the merge block
                         // from inside the elif block.
-                        let mut elif_expr_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
+                        let mut elif_expr_vals = self.gen_stmt(&mb_stmts.clone());
                         return_stmt_vec.extend(elif_expr_vals.clone());
                         LLVMBuildBr(self.builder, merge_bb);
                         let mut elif_end_bb = LLVMGetInsertBlock(self.builder);
@@ -775,8 +775,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Generates LLVM IR for a while loop statement, and returns a vector of values
     /// that are created during that code gen. If there are no values, the vector is
     /// empty.
-    fn while_stmt(&mut self, mb_cond_expr: &Box<Option<Ast>>,
-                  mb_stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
+    fn while_stmt(&mut self, cond_expr: &Box<Ast>, stmts: &Box<Ast>) -> Vec<LLVMValueRef> {
         let mut return_stmt_vec = Vec::new();
         unsafe {
             let insert_bb = LLVMGetInsertBlock(self.builder);
@@ -792,7 +791,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
             // Evaluate the conditional expression
-            let cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
+            let cond_val = self.gen_expr(&cond_expr.clone());
             if cond_val.is_none() {
                 self.error(GenErrTy::InvalidAst);
                 return Vec::new();
@@ -803,14 +802,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
             LLVMPositionBuilderAtEnd(self.builder, while_bb);
 
-            let mut stmt_vals = self.gen_stmt(&mb_stmts.clone().unwrap());
+            let mut stmt_vals = self.gen_stmt(&stmts.clone());
             return_stmt_vec.extend(stmt_vals.clone());
 
             // Evaluate the conditional expression again. This will handle reading
             // the updated loop variable (if any) to properly branch out of the loop
             // if necessary. We build another conditional branch in the loop to handle
             // this.
-            let updated_cond_val = self.gen_expr(&mb_cond_expr.clone().unwrap());
+            let updated_cond_val = self.gen_expr(&cond_expr.clone());
             LLVMBuildCondBr(self.builder, updated_cond_val.unwrap(), while_bb, merge_bb);
             let while_end_bb = LLVMGetInsertBlock(self.builder);
             LLVMPositionBuilderAtEnd(self.builder, merge_bb);
@@ -824,10 +823,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// that are created during that code gen. If there are no values, the vector is
     /// empty.
     fn for_stmt(&mut self,
-                for_var_decl: &Box<Option<Ast>>,
-                for_cond_expr: &Box<Option<Ast>>,
-                for_step_expr: &Box<Option<Ast>>,
-                stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
+                for_var_decl: &Box<Ast>,
+                for_cond_expr: &Box<Ast>,
+                for_step_expr: &Box<Ast>,
+                stmts: &Box<Ast>) -> Vec<LLVMValueRef> {
         let mut return_stmt_vec = Vec::new();
 
         unsafe {
@@ -844,19 +843,19 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
             // Codegen the var declaration and save the loop counter variable. We do this
             // first to store the loop var and to make sure it's allocated.
-            self.gen_stmt(&for_var_decl.clone().unwrap());
+            self.gen_stmt(&for_var_decl.clone());
             LLVMBuildBr(self.builder, for_bb);
             LLVMPositionBuilderAtEnd(self.builder, for_bb);
 
             // Codegen the for loop body
-            let mut stmt_vals = self.gen_stmt(&stmts.clone().unwrap());
+            let mut stmt_vals = self.gen_stmt(&stmts.clone());
             return_stmt_vec.extend(stmt_vals.clone());
 
             // Codegen the loop step counter
-            self.gen_stmt(&for_step_expr.clone().unwrap());
+            self.gen_stmt(&for_step_expr.clone());
 
             // Codegen the conditional for exit the loop
-            let cond_val = self.gen_stmt(&for_cond_expr.clone().unwrap())[0];
+            let cond_val = self.gen_stmt(&for_cond_expr.clone())[0];
             LLVMBuildCondBr(self.builder, cond_val, for_bb, merge_bb);
 
             let for_end_bb = LLVMGetInsertBlock(self.builder);
