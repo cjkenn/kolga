@@ -82,8 +82,8 @@ impl<'l, 's> Parser<'l, 's> {
     fn decl(&mut self) -> Result<Ast, ParseErr> {
         match self.currtkn.ty {
             TknTy::Let => self.var_decl(),
-            TknTy::Fn => (), //self.fn_decl(),
-            TknTy::Class => (), //self.class_decl(),
+            TknTy::Fn => self.fn_decl(),
+            TknTy::Class => self.class_decl(),
             _ => () //self.stmt()
         }
     }
@@ -219,23 +219,22 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    fn fn_decl(&mut self) -> Option<Ast> {
-        self.expect(TknTy::Fn);
+    fn fn_decl(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::Fn)?;
         let fn_ident_tkn = self.currtkn.clone();
         self.consume();
 
         let mut params = Vec::new();
-        self.expect(TknTy::LeftParen);
+        self.expect(TknTy::LeftParen)?;
 
         while self.currtkn.ty != TknTy::RightParen {
             if params.len() > FN_PARAM_MAX_LEN {
-                self.error(ParseErrTy::FnParamCntExceeded(FN_PARAM_MAX_LEN));
-                return None;
+                return Err(self.error(ParseErrTy::FnParamCntExceeded(FN_PARAM_MAX_LEN)));
             }
 
             let ident_tkn = self.currtkn.clone();
             self.consume();
-            self.expect(TknTy::Tilde);
+            self.expect(TknTy::Tilde)?;
 
             let mut ty_rec = TyRec::new_from_tkn(self.currtkn.clone());
             ty_rec.tkn = ident_tkn.clone();
@@ -247,8 +246,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TyName::Class(name) => {
                     let class_sym = self.symtab.retrieve(&name);
                     if class_sym.is_none() {
-                        self.error(ParseErrTy::UndeclaredSym(name));
-                        return None;
+                        return Err(self.error(ParseErrTy::UndeclaredSym(name)));
                     }
 
                     class_sym.unwrap().assign_val.clone()
@@ -266,11 +264,11 @@ impl<'l, 's> Parser<'l, 's> {
             if self.currtkn.ty == TknTy::RightParen {
                 break;
             }
-            self.expect(TknTy::Comma);
+            self.expect(TknTy::Comma)?;
         }
 
-        self.expect(TknTy::RightParen);
-        self.expect(TknTy::Tilde);
+        self.expect(TknTy::RightParen)?;
+        self.expect(TknTy::Tilde)?;
 
         let fn_ret_ty_tkn = match self.currtkn.is_ty() {
             true => {
@@ -278,15 +276,12 @@ impl<'l, 's> Parser<'l, 's> {
                 self.consume();
                 Some(tkn)
             },
-            false => {
-                let ty_str = self.currtkn.ty.to_string();
-                self.error(ParseErrTy::InvalidTy(ty_str));
-                None
-            }
+            false => None
         };
 
         if fn_ret_ty_tkn.is_none() {
-            return None;
+            let ty_str = self.currtkn.ty.to_string();
+            return Err(self.error(ParseErrTy::InvalidTy(ty_str)));
         }
 
         // Create and store the function sym before we parse the body and
@@ -316,7 +311,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         self.symtab.store(name, new_sym);
 
-        Some(Ast::FnDecl {
+        Ok(Ast::FnDecl {
             ident_tkn: fn_ident_tkn,
             fn_params: params,
             ret_ty: fn_ty_rec,
@@ -326,11 +321,11 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     /// Parses a class declaration
-    fn class_decl(&mut self) -> Option<Ast> {
-        self.expect(TknTy::Class);
+    fn class_decl(&mut self) -> Result<Ast, ParseErr> {
+        self.expect(TknTy::Class)?;
         let class_tkn = self.currtkn.clone();
         self.consume();
-        self.expect(TknTy::LeftBrace);
+        self.expect(TknTy::LeftBrace)?;
 
         // Initialize a new scope for the class methods + props
         self.symtab.init_sc();
@@ -342,23 +337,22 @@ impl<'l, 's> Parser<'l, 's> {
         loop {
             match self.currtkn.ty {
                 TknTy::Let => {
-                    let prop_ast = self.var_decl();
-                    if prop_ast.is_none() {
-                        return None;
-                    }
-                    match prop_ast.clone().unwrap() {
+                    let prop_ast = self.var_decl()?;
+                    match prop_ast.clone() {
                         Ast::VarDecl{ty_rec:_,ident_tkn, is_imm:_, is_global:_} => {
                             prop_map.insert(ident_tkn.get_name(), prop_ctr);
                         },
                         _ => {
-                            self.error(ParseErrTy::InvalidClassProp);
-                            return None;
+                            return Err(self.error(ParseErrTy::InvalidClassProp));
                         }
                     }
                     props.push(prop_ast);
                     prop_ctr = prop_ctr + 1;
                 },
-                TknTy::Fn => methods.push(self.fn_decl()),
+                TknTy::Fn => {
+                    let result = self.fn_decl()?;
+                    methods.push(result);
+                },
                 TknTy::RightBrace => {
                     self.consume();
                     break;
@@ -372,13 +366,13 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         let final_sc_lvl = self.symtab.finalize_sc();
-        let ast = Some(Ast::ClassDecl {
+        let ast = Ast::ClassDecl {
             ident_tkn: class_tkn.clone(),
             methods: methods,
             props: props,
             prop_pos: prop_map,
             sc: final_sc_lvl
-        });
+        };
 
         // This should be stored in the starting level of the symbol table, not the
         // scope opened to store the class methods/props (which is why we close the
@@ -387,11 +381,11 @@ impl<'l, 's> Parser<'l, 's> {
                            true,
                            TyRec::new_from_tkn(class_tkn.clone()),
                            class_tkn.clone(),
-                           ast.clone(),
+                           Some(ast.clone()),
                            None);
         self.symtab.store(&class_tkn.get_name(), sym);
 
-        ast
+        Ok(ast)
     }
 
     /// Parses a statement. This function does not perform any scope management, which
@@ -875,7 +869,7 @@ impl<'l, 's> Parser<'l, 's> {
                         let mut expected_params = None;
 
                         for mtod_ast in methods {
-                            match mtod_ast.unwrap() {
+                            match mtod_ast {
                                 Ast::FnDecl{ident_tkn, fn_params, ret_ty:_, fn_body:_, sc:_} => {
                                     if ident_tkn.get_name() == fn_tkn.clone().unwrap().get_name() {
                                         expected_params = Some(fn_params);

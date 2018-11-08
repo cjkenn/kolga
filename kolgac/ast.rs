@@ -78,8 +78,8 @@ pub enum Ast {
 
     ClassDecl {
         ident_tkn: Token,
-        methods: Vec<Option<Ast>>,
-        props: Vec<Option<Ast>>,
+        methods: Vec<Ast>,
+        props: Vec<Ast>,
         prop_pos: HashMap<String, usize>,
         sc: usize
     },
