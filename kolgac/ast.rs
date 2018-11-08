@@ -9,35 +9,35 @@ pub enum Ast {
     },
 
     BlckStmt {
-        stmts: Vec<Option<Ast>>,
+        stmts: Vec<Ast>,
         sc: usize
     },
 
     // Condition expr, if block stmt, else if exprs, else stmts
-    IfStmt(Box<Option<Ast>>,
-           Box<Option<Ast>>,
-           Vec<Option<Ast>>,
+    IfStmt(Box<Ast>,
+           Box<Ast>,
+           Vec<Ast>,
            Box<Option<Ast>>
     ),
 
     // Condition expr, stmts
-    ElifStmt(Box<Option<Ast>>, Box<Option<Ast>>),
+    ElifStmt(Box<Ast>, Box<Ast>),
 
     // Condition expr, stmts
-    WhileStmt(Box<Option<Ast>>, Box<Option<Ast>>),
+    WhileStmt(Box<Ast>, Box<Ast>),
 
     ForStmt{
-        for_var_decl: Box<Option<Ast>>,
-        for_cond_expr: Box<Option<Ast>>,
-        for_step_expr: Box<Option<Ast>>,
-        stmts: Box<Option<Ast>>
+        for_var_decl: Box<Ast>,
+        for_cond_expr: Box<Ast>,
+        for_step_expr: Box<Ast>,
+        stmts: Box<Ast>
     },
 
     // Return expr, if any
     RetStmt(Box<Option<Ast>>),
 
     // expr
-    ExprStmt(Box<Option<Ast>>),
+    ExprStmt(Box<Ast>),
 
     VarDecl {
         ty_rec: TyRec,
@@ -51,23 +51,26 @@ pub enum Ast {
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
-        value: Box<Option<Ast>>
+        value: Box<Ast>
     },
 
     // Operator token, lhs ast, rhs ast
-    Logical(Token, Box<Option<Ast>>, Box<Option<Ast>>),
+    Logical(Token, Box<Ast>, Box<Ast>),
 
     // Operator token, lhs ast, rhs ast
-    Binary(Token, Box<Option<Ast>>, Box<Option<Ast>>),
+    Binary(Token, Box<Ast>, Box<Ast>),
 
     // Operator token, rhs ast
-    Unary(Token, Box<Option<Ast>>),
+    Unary {
+        op: Token,
+        rhs: Box<Ast>,
+    },
 
     FnDecl {
         ident_tkn: Token,
         fn_params: Vec<TyRec>,
         ret_ty: TyRec,
-        fn_body: Box<Option<Ast>>,
+        fn_body: Box<Ast>,
         sc: usize
     },
 
@@ -78,8 +81,8 @@ pub enum Ast {
 
     ClassDecl {
         ident_tkn: Token,
-        methods: Vec<Option<Ast>>,
-        props: Vec<Option<Ast>>,
+        methods: Vec<Ast>,
+        props: Vec<Ast>,
         prop_pos: HashMap<String, usize>,
         sc: usize
     },

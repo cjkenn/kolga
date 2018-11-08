@@ -49,82 +49,76 @@ impl<'t, 's> TyCheck<'t, 's> {
             // ignore var declaration without assign (nothing to check)
             Ast::VarDecl{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_} => (),
             Ast::VarAssign{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
-                self.check_var_assign(stmt, final_sc);
+                self.check_var_assign(&stmt, final_sc);
             },
-            Ast::ExprStmt(ref maybe_ast) => {
-                let ast = maybe_ast.clone().unwrap();
-                match ast {
+            Ast::ExprStmt(ast) => {
+                match *ast.clone() {
                     Ast::FnCall{fn_tkn:_, fn_params:_} => {
-                        self.check_fn_params(ast, final_sc);
+                        self.check_fn_params(*ast, final_sc);
                         ()
                     },
                     Ast::ClassFnCall{class_tkn:_, class_name:_, fn_tkn:_, fn_params:_, sc} => {
-                        self.check_fn_params(ast, sc);
+                        self.check_fn_params(*ast, sc);
                         ()
                     },
                     _ => {
-                        self.check_expr(ast, final_sc);
+                        let astptr = *ast;
+                        self.check_expr(&astptr, final_sc);
                         ()
                     }
                 };
             },
-            Ast::IfStmt(expr_ast, maybe_stmt_ast, elif_stmts, maybe_el_stmts) => {
-                self.check_expr(expr_ast.clone().unwrap(), final_sc);
-                self.check_stmt(maybe_stmt_ast.clone().unwrap(), final_sc);
+            Ast::IfStmt(expr_ast, stmt_ast, elif_stmts, maybe_el_stmts) => {
+                let expr = *expr_ast;
+                self.check_expr(&expr, final_sc);
+                self.check_stmt(*stmt_ast, final_sc);
 
                 for stmt in &elif_stmts {
-                    self.check_stmt(stmt.clone().unwrap(), final_sc);
+                    self.check_stmt(stmt.clone(), final_sc);
                 }
 
                 if maybe_el_stmts.is_some() {
                     self.check_stmt(maybe_el_stmts.clone().unwrap(), final_sc);
                 }
             },
-            Ast::WhileStmt(maybe_expr_ast, maybe_stmts) => {
-                self.check_expr(maybe_expr_ast.clone().unwrap(), final_sc);
-                self.check_stmt(maybe_stmts.clone().unwrap(), final_sc);
+            Ast::WhileStmt(expr_ast, stmts) => {
+                let expr = *expr_ast;
+                self.check_expr(&expr, final_sc);
+                self.check_stmt(*stmts, final_sc);
             },
-            Ast::ElifStmt(maybe_expr_ast, maybe_stmt_ast) => {
-                self.check_expr(maybe_expr_ast.clone().unwrap(), final_sc);
-                self.check_stmt(maybe_stmt_ast.clone().unwrap(), final_sc);
+            Ast::ElifStmt(expr_ast, stmt_ast) => {
+                let expr = *expr_ast;
+                self.check_expr(&expr, final_sc);
+                self.check_stmt(*stmt_ast, final_sc);
             },
             Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
-                if for_var_decl.is_some() {
-                    self.check_stmt(for_var_decl.clone().unwrap(), final_sc);
-                }
-
-                if for_cond_expr.is_some() {
-                    self.check_stmt(for_cond_expr.clone().unwrap(), final_sc);
-                }
-
-                if for_step_expr.is_some() {
-                    self.check_stmt(for_step_expr.clone().unwrap(), final_sc);
-                }
-
-                self.check_stmt(stmts.clone().unwrap(), final_sc);
+                self.check_stmt(*for_var_decl, final_sc);
+                self.check_stmt(*for_cond_expr, final_sc);
+                self.check_stmt(*for_step_expr, final_sc);
+                self.check_stmt(*stmts, final_sc);
             },
             Ast::BlckStmt{stmts, sc} => {
                 for stmt in &stmts {
-                    self.check_stmt(stmt.clone().unwrap(), sc);
+                    self.check_stmt(stmt.clone(), sc);
                 }
             },
             Ast::FnDecl{ident_tkn, fn_params: _, ret_ty, fn_body, sc} => {
                 let fn_ty = ret_ty.ty.unwrap();
-                let fn_stmts = fn_body.unwrap();
+                let fn_stmts = *fn_body;
                 match fn_stmts {
                     Ast::BlckStmt{stmts, sc: inner_sc} => {
                         self.check_fn_stmts(&ident_tkn, fn_ty, stmts, inner_sc);
                     },
-                    _ => self.check_stmt(fn_stmts.clone(), sc)
+                    _ => self.check_stmt(fn_stmts, sc)
                 };
             },
             Ast::ClassDecl{ident_tkn:_, methods, props, prop_pos:_,sc} => {
                 for prop_stmt in props {
-                    self.check_stmt(prop_stmt.clone().unwrap(), sc);
+                    self.check_stmt(prop_stmt.clone(), sc);
                 }
 
                 for stmt in &methods {
-                    self.check_stmt(stmt.clone().unwrap(), sc);
+                    self.check_stmt(stmt.clone(), sc);
                 }
             },
             _ => {
@@ -133,11 +127,11 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_fn_stmts(&mut self, fn_tkn: &Token, fn_ret_ty: TyName, stmts: Vec<Option<Ast>>, sc_lvl: usize) {
+    fn check_fn_stmts(&mut self, fn_tkn: &Token, fn_ret_ty: TyName, stmts: Vec<Ast>, sc_lvl: usize) {
         let mut has_ret_stmt = false;
 
         for maybe_stmt in &stmts {
-            let stmt = maybe_stmt.clone().unwrap();
+            let stmt = maybe_stmt.clone();
             match stmt {
                 Ast::RetStmt(maybe_expr) => {
                     has_ret_stmt = true;
@@ -146,7 +140,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                             self.ty_mismatch(&fn_tkn, &fn_ret_ty, &TyName::Void);
                         }
                     } else {
-                        let rhs_ty = self.check_expr(maybe_expr.clone().unwrap(), sc_lvl);
+                        let rhs_ty = self.check_expr(&maybe_expr.clone().unwrap(), sc_lvl);
                         if fn_ret_ty != rhs_ty {
                             self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
                         }
@@ -163,26 +157,22 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_expr(&mut self, expr: Ast, final_sc: usize) -> TyName {
+    fn check_expr(&mut self, expr: &Ast, final_sc: usize) -> TyName {
         match expr {
             Ast::VarAssign{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
                 self.check_var_assign(expr, final_sc)
             },
-            Ast::Unary(op_tkn, maybe_rhs) => {
-                let rhs = maybe_rhs.unwrap();
-
+            Ast::Unary{op, rhs} => {
                 if rhs.is_primary() {
                     let rhs_ty_rec = rhs.extract_primary_ty_rec();
-                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
+                    return self.reduce_unary_ty(op.clone(), rhs_ty_rec.ty.unwrap());
                 } else {
                     let rhs_ty = self.check_expr(rhs, final_sc);
-                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty);
+                    return self.reduce_unary_ty(op.clone(), rhs_ty);
                 }
             },
-            Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) |
-            Ast::Logical(op_tkn, maybe_lhs, maybe_rhs) => {
-                let lhs = maybe_lhs.unwrap();
-                let rhs = maybe_rhs.unwrap();
+            Ast::Binary(op_tkn, lhs, rhs) |
+            Ast::Logical(op_tkn, lhs, rhs) => {
                 let lhs_ty_name = self.check_expr(lhs, final_sc);
                 let rhs_ty_name = self.check_expr(rhs, final_sc);
 
@@ -221,7 +211,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let mut prop_ty = None;
                 // TODO: this is O(n) and not efficient (should store props in a map)
                 for prop in props {
-                    match prop.clone().unwrap() {
+                    match prop.clone() {
                         Ast::VarDecl{ref ty_rec, ref ident_tkn, is_imm:_, is_global:_}
                         if ident_tkn.get_name() == prop_name => {
                             prop_ty = Some(ty_rec.ty.clone().unwrap());
@@ -253,7 +243,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let mut passed_in_param_tys = Vec::new();
 
                 for ast in &fn_params {
-                    passed_in_param_tys.push(self.check_expr(ast.clone(), 0));
+                    passed_in_param_tys.push(self.check_expr(&ast, 0));
                 }
 
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
@@ -272,7 +262,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let mut passed_in_param_tys = Vec::new();
 
                 for ast in &fn_params {
-                    passed_in_param_tys.push(self.check_expr(ast.clone(), 0));
+                    passed_in_param_tys.push(self.check_expr(&ast, 0));
                 }
 
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
@@ -354,13 +344,13 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_var_assign(&mut self, stmt: Ast, sc: usize) -> TyName {
+    fn check_var_assign(&mut self, stmt: &Ast, sc: usize) -> TyName {
         match stmt {
             Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
-                let lhs_ty = ty_rec.ty.unwrap();
-                let rhs = value.unwrap();
+                let lhs_ty = ty_rec.ty.clone().unwrap();
+                let rhs = value;
+                let rhs_ty = self.check_expr(&rhs, sc);
 
-                let rhs_ty = self.check_expr(rhs, sc);
                 if lhs_ty != rhs_ty {
                     self.ty_mismatch(&ident_tkn, &lhs_ty, &rhs_ty);
                 }

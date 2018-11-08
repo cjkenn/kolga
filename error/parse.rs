@@ -10,11 +10,11 @@ pub enum ParseErrTy {
     InvalidForStmt,
     InvalidClassProp,
     ImmDecl(String),
-    TknMismatch(String, String),
-    FnParamCntExceeded(usize),
-    WrongFnParamCnt(usize, usize),
-    UndeclaredSym(String),
-    UnassignedVar(String)
+    TknMismatch(String, String), // not continuable
+    FnParamCntExceeded(usize), // not continuable
+    WrongFnParamCnt(usize, usize), // continuable
+    UndeclaredSym(String), // continuable
+    UnassignedVar(String) // continuable
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +30,14 @@ impl ParseErr {
             line: line,
             pos: pos,
             ty: ty
+        }
+    }
+
+    pub fn continuable(self) -> bool {
+        match self.ty {
+            ParseErrTy::TknMismatch(_,_) => false,
+            ParseErrTy::FnParamCntExceeded(_) => false,
+            _ => true
         }
     }
 }
