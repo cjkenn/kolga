@@ -162,30 +162,30 @@ impl<'t, 's> TyCheck<'t, 's> {
             Ast::VarAssign{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
                 self.check_var_assign(expr, final_sc)
             },
-            Ast::Unary{op, rhs} => {
+            Ast::UnaryExpr{ty_rec:_,  op_tkn, rhs} => {
                 if rhs.is_primary() {
                     let rhs_ty_rec = rhs.extract_primary_ty_rec();
-                    return self.reduce_unary_ty(op.clone(), rhs_ty_rec.ty.unwrap());
+                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
                 } else {
                     let rhs_ty = self.check_expr(rhs, final_sc);
-                    return self.reduce_unary_ty(op.clone(), rhs_ty);
+                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty);
                 }
             },
-            Ast::Binary(op_tkn, lhs, rhs) |
-            Ast::Logical(op_tkn, lhs, rhs) => {
+            Ast::BinaryExpr{ty_rec:_, op_tkn, lhs, rhs} |
+            Ast::LogicalExpr{ty_rec: _, op_tkn, lhs, rhs} => {
                 let lhs_ty_name = self.check_expr(lhs, final_sc);
                 let rhs_ty_name = self.check_expr(rhs, final_sc);
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             },
-            Ast::Primary(prim_ty_rec) => {
-                match prim_ty_rec.tkn.ty {
+            Ast::PrimaryExpr{ty_rec} => {
+                match ty_rec.tkn.ty {
                     TknTy::Ident(ref name) => {
                         let sym = self.symtab.retrieve_from_finalized_sc(name, final_sc).unwrap();
                         return sym.ty_rec.ty.clone().unwrap();
                     },
                     _ => {
-                        return prim_ty_rec.ty.clone().unwrap();
+                        return ty_rec.ty.clone().unwrap();
                     }
                 }
             },

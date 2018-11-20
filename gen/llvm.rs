@@ -403,13 +403,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// to terminate on.
     fn gen_expr(&mut self, expr: &Ast) -> Option<LLVMValueRef> {
         match expr {
-            Ast::Primary(prim_ty_rec) => self.gen_primary(&prim_ty_rec),
-            Ast::Binary(op_tkn, maybe_lhs, maybe_rhs) |
-            Ast::Logical(op_tkn, maybe_lhs, maybe_rhs) => {
+            Ast::PrimaryExpr{ty_rec} => self.gen_primary(&ty_rec),
+            Ast::BinaryExpr{ty_rec:_, op_tkn, lhs, rhs} |
+            Ast::LogicalExpr{ty_rec:_, op_tkn, lhs, rhs} => {
                 // Recursively generate the LLVMValueRef's for the LHS and RHS. This is just
                 // a single call for each if they are primary expressions.
-                let mb_lhs_llvm_val = self.gen_expr(&maybe_lhs.clone());
-                let mb_rhs_llvm_val = self.gen_expr(&maybe_rhs.clone());
+                let mb_lhs_llvm_val = self.gen_expr(&lhs.clone());
+                let mb_rhs_llvm_val = self.gen_expr(&rhs.clone());
 
                 if mb_lhs_llvm_val.is_none() || mb_rhs_llvm_val.is_none() {
                     return None;
@@ -422,14 +422,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // LHS and RHS values.
                 self.llvm_val_from_op(&op_tkn.ty, lhs_llvm_val, rhs_llvm_val)
             },
-            Ast::Unary{op, rhs} => {
+            Ast::UnaryExpr{ty_rec:_, op_tkn, rhs} => {
                 let mb_rhs_llvm_val = self.gen_expr(&rhs);
                 if mb_rhs_llvm_val.is_none() {
                     return None;
                 }
 
                 let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
-                match op.ty {
+                match op_tkn.ty {
                     TknTy::Minus => {
                         unsafe { Some(LLVMBuildFNeg(self.builder, rhs_llvm_val, self.c_str("tmpneg"))) }
                     },
@@ -895,7 +895,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // TODO: error checking here
                 let class_ty = self.classtab.retrieve(&name).unwrap();
                 unsafe { LLVMPointerType(class_ty, 0) }
-            }
+            },
+            TyName::Symbolic(_) => panic!("llvm gen: Uninferred type found!")
         }
     }
 

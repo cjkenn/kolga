@@ -7,6 +7,7 @@ pub enum TyName {
     Num,
     Bool,
     Void,
+    Symbolic(String),
     Class(String)
 }
 
@@ -33,7 +34,8 @@ impl fmt::Display for TyName {
             TyName::Num => "number".to_string(),
             TyName::Bool => "bool".to_string(),
             TyName::Void => "void".to_string(),
-            TyName::Class(name) => format!("class '{}'", name)
+            TyName::Class(name) => format!("class '{}'", name),
+            TyName::Symbolic(name) => format!("symbolic '{}'", name)
         };
 
         write!(f, "{}", display_ty)
@@ -65,6 +67,13 @@ impl TyRec {
         TyRec {
             ty: ty,
             tkn: tkn.clone(),
+        }
+    }
+
+    pub fn empty(tkn: &Token) -> TyRec {
+        TyRec {
+            ty: None,
+            tkn: tkn.clone()
         }
     }
 }

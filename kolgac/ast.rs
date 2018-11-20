@@ -54,15 +54,23 @@ pub enum Ast {
         value: Box<Ast>
     },
 
-    // Operator token, lhs ast, rhs ast
-    Logical(Token, Box<Ast>, Box<Ast>),
+    LogicalExpr {
+        ty_rec: TyRec,
+        op_tkn: Token,
+        lhs: Box<Ast>,
+        rhs: Box<Ast>
+    },
 
-    // Operator token, lhs ast, rhs ast
-    Binary(Token, Box<Ast>, Box<Ast>),
+    BinaryExpr {
+        ty_rec: TyRec,
+        op_tkn: Token,
+        lhs: Box<Ast>,
+        rhs: Box<Ast>
+    },
 
-    // Operator token, rhs ast
-    Unary {
-        op: Token,
+    UnaryExpr {
+        ty_rec: TyRec,
+        op_tkn: Token,
         rhs: Box<Ast>,
     },
 
@@ -110,21 +118,22 @@ pub enum Ast {
         sc: usize
     },
 
-    // Identifier/Literal token
-    Primary(TyRec)
+    PrimaryExpr {
+        ty_rec: TyRec
+    }
 }
 
 impl Ast {
     pub fn is_primary(&self) -> bool {
         match self {
-            Ast::Primary(_) => true,
+            Ast::PrimaryExpr{ty_rec: _} => true,
             _ => false
         }
     }
 
     pub fn extract_primary_ty_rec(&self) -> TyRec {
         match self {
-            Ast::Primary(tyrec) => tyrec.clone(),
+            Ast::PrimaryExpr{ty_rec} => ty_rec.clone(),
             _ => panic!()
         }
     }

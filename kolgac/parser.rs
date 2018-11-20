@@ -546,8 +546,8 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.assign_expr()?;
 
                 match ast.clone() {
-                    Ast::Primary(tyrec) => {
-                        match tyrec.tkn.ty {
+                    Ast::PrimaryExpr{ty_rec} => {
+                        match ty_rec.tkn.ty {
                             TknTy::Ident(name) => {
                                 let maybe_sym = self.symtab.retrieve(&name);
                                 if maybe_sym.is_none() {
@@ -569,7 +569,7 @@ impl<'l, 's> Parser<'l, 's> {
                             },
                             _ => {
                                 return Err(
-                                    self.error(ParseErrTy::InvalidAssign(tyrec.tkn.ty.clone().to_string()))
+                                    self.error(ParseErrTy::InvalidAssign(ty_rec.tkn.ty.clone().to_string()))
                                 );
                             }
                         };
@@ -604,7 +604,12 @@ impl<'l, 's> Parser<'l, 's> {
                     let op = self.currtkn.clone();
                     self.consume();
                     let rhs = self.logicand_expr()?;
-                    ast = Ast::Logical(op, Box::new(ast), Box::new(rhs));
+                    ast = Ast::LogicalExpr {
+                        ty_rec: TyRec::empty(&op),
+                        op_tkn: op,
+                        lhs: Box::new(ast),
+                        rhs: Box::new(rhs)
+                    };
                 },
                 _ => break
             }
@@ -621,7 +626,12 @@ impl<'l, 's> Parser<'l, 's> {
                     let op = self.currtkn.clone();
                     self.consume();
                     let rhs = self.eq_expr()?;
-                    ast = Ast::Logical(op, Box::new(ast), Box::new(rhs));
+                    ast = Ast::LogicalExpr {
+                        ty_rec: TyRec::empty(&op),
+                        op_tkn: op,
+                        lhs: Box::new(ast),
+                        rhs: Box::new(rhs)
+                    };
                 },
                 _ => break
             }
@@ -638,7 +648,12 @@ impl<'l, 's> Parser<'l, 's> {
                     let op = self.currtkn.clone();
                     self.consume();
                     let rhs = self.cmp_expr()?;
-                    ast = Ast::Binary(op, Box::new(ast), Box::new(rhs));
+                    ast = Ast::BinaryExpr {
+                        ty_rec: TyRec::empty(&op),
+                        op_tkn: op,
+                        lhs: Box::new(ast),
+                        rhs: Box::new(rhs)
+                    };
                 },
                 _ => break
             }
@@ -655,7 +670,12 @@ impl<'l, 's> Parser<'l, 's> {
                     let op = self.currtkn.clone();
                     self.consume();
                     let rhs = self.addsub_expr()?;
-                    ast = Ast::Binary(op, Box::new(ast), Box::new(rhs));
+                    ast = Ast::BinaryExpr {
+                        ty_rec: TyRec::empty(&op),
+                        op_tkn: op,
+                        lhs: Box::new(ast),
+                        rhs: Box::new(rhs)
+                    };
                 },
                 _ => break
             }
@@ -672,7 +692,12 @@ impl<'l, 's> Parser<'l, 's> {
                     let op = self.currtkn.clone();
                     self.consume();
                     let rhs = self.muldiv_expr()?;
-                    ast = Ast::Binary(op, Box::new(ast), Box::new(rhs));
+                    ast = Ast::BinaryExpr {
+                        ty_rec: TyRec::empty(&op),
+                        op_tkn: op,
+                        lhs: Box::new(ast),
+                        rhs: Box::new(rhs)
+                    };
                 },
                 _ => break
             }
@@ -689,7 +714,12 @@ impl<'l, 's> Parser<'l, 's> {
                     let op = self.currtkn.clone();
                     self.consume();
                     let rhs = self.unary_expr()?;
-                    ast = Ast::Binary(op, Box::new(ast), Box::new(rhs));
+                    ast = Ast::BinaryExpr {
+                        ty_rec: TyRec::empty(&op),
+                        op_tkn: op,
+                        lhs: Box::new(ast),
+                        rhs: Box::new(rhs)
+                    };
                 },
                 _ => break
             }
@@ -705,8 +735,9 @@ impl<'l, 's> Parser<'l, 's> {
                 self.consume();
                 let rhs = self.unary_expr()?;
 
-                return Ok(Ast::Unary{
-                    op: op,
+                return Ok(Ast::UnaryExpr {
+                    ty_rec: TyRec::empty(&op),
+                    op_tkn: op,
                     rhs: Box::new(rhs)
                 });
             },
@@ -717,7 +748,7 @@ impl<'l, 's> Parser<'l, 's> {
     fn fncall_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.primary_expr()?;
         let ident_tkn = match ast.clone() {
-            Ast::Primary(tyrec) => Some(tyrec.tkn),
+            Ast::PrimaryExpr{ty_rec} => Some(ty_rec.tkn),
             _ => None
         };
 
@@ -906,7 +937,9 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::True |
             TknTy::False |
             TknTy::Null => {
-                let ast = Ok(Ast::Primary(TyRec::new_from_tkn(self.currtkn.clone())));
+                let ast = Ok(Ast::PrimaryExpr {
+                    ty_rec: TyRec::new_from_tkn(self.currtkn.clone())
+                });
                 self.consume();
                 ast
             },
@@ -937,7 +970,9 @@ impl<'l, 's> Parser<'l, 's> {
 
                 let mut ty_rec = sym.ty_rec.clone();
                 ty_rec.tkn = self.currtkn.clone();
-                let ast = Ok(Ast::Primary(ty_rec.clone()));
+                let ast = Ok(Ast::PrimaryExpr{
+                    ty_rec: ty_rec.clone()
+                });
                 self.consume();
                 ast
             },
