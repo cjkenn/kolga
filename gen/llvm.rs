@@ -146,8 +146,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             },
-            Ast::IfStmt(if_cond, then_stmts, else_if_stmts, mb_else_stmts) => {
-                self.if_stmt(if_cond, then_stmts, else_if_stmts, mb_else_stmts)
+            Ast::IfStmt{cond_expr, if_stmts, elif_exprs, el_stmts} => {
+                self.if_stmt(cond_expr, if_stmts, elif_exprs, el_stmts)
             },
             Ast::WhileStmt(mb_cond_expr, mb_stmts) => {
                 self.while_stmt(mb_cond_expr, mb_stmts)

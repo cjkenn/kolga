@@ -454,10 +454,11 @@ impl<'l, 's> Parser<'l, 's> {
             };
         }
 
-        Ok(Ast::IfStmt(Box::new(if_cond),
-                     Box::new(if_blck),
-                     else_ifs,
-                     Box::new(else_blck)))
+        Ok(Ast::IfStmt {
+            cond_expr: Box::new(if_cond),
+            if_stmts: Box::new(if_blck),
+            elif_exprs: else_ifs,
+            el_stmts: Box::new(else_blck)})
     }
 
     fn while_stmt(&mut self) -> Result<Ast, ParseErr> {

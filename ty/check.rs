@@ -68,17 +68,17 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 };
             },
-            Ast::IfStmt(expr_ast, stmt_ast, elif_stmts, maybe_el_stmts) => {
-                let expr = *expr_ast;
+            Ast::IfStmt{cond_expr, if_stmts, elif_exprs, el_stmts} => {
+                let expr = *cond_expr;
                 self.check_expr(&expr, final_sc);
-                self.check_stmt(*stmt_ast, final_sc);
+                self.check_stmt(*if_stmts, final_sc);
 
-                for stmt in &elif_stmts {
+                for stmt in &elif_exprs {
                     self.check_stmt(stmt.clone(), final_sc);
                 }
 
-                if maybe_el_stmts.is_some() {
-                    self.check_stmt(maybe_el_stmts.clone().unwrap(), final_sc);
+                if el_stmts.is_some() {
+                    self.check_stmt(el_stmts.clone().unwrap(), final_sc);
                 }
             },
             Ast::WhileStmt(expr_ast, stmts) => {

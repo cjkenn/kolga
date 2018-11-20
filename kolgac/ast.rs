@@ -13,12 +13,12 @@ pub enum Ast {
         sc: usize
     },
 
-    // Condition expr, if block stmt, else if exprs, else stmts
-    IfStmt(Box<Ast>,
-           Box<Ast>,
-           Vec<Ast>,
-           Box<Option<Ast>>
-    ),
+    IfStmt {
+        cond_expr: Box<Ast>,
+        if_stmts: Box<Ast>,
+        elif_exprs: Vec<Ast>,
+        el_stmts: Box<Option<Ast>>
+    },
 
     // Condition expr, stmts
     ElifStmt(Box<Ast>, Box<Ast>),

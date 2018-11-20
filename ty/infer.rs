@@ -45,17 +45,29 @@ impl TyInfer {
     fn assign_ast(&mut self, ast: &mut Ast) {
         match *ast {
             Ast::ExprStmt(ref mut ast) => self.assign_ast(ast),
-            Ast::BlckStmt{ ref mut stmts, .. } => {
+            Ast::BlckStmt{ref mut stmts, ..} => {
                 for stmt in stmts.iter_mut() {
                     self.assign_ast(stmt);
                 }
             },
-            Ast::LogicalExpr{ ref mut ty_rec, .. }   |
-            Ast::BinaryExpr{ ref mut ty_rec, .. }    |
-            Ast::UnaryExpr{ ref mut ty_rec, .. }     |
-            Ast::VarDeclExpr{ ref mut ty_rec, .. }   |
-            Ast::VarAssignExpr{ ref mut ty_rec, .. } |
-            Ast::PrimaryExpr{ ref mut ty_rec } => {
+            Ast::IfStmt{ref mut cond_expr, ref mut if_stmts, ref mut elif_exprs, ref mut el_stmts} => {
+                self.assign_ast(cond_expr);
+                self.assign_ast(if_stmts);
+
+                for stmt in elif_exprs.iter_mut() {
+                    self.assign_ast(stmt);
+                }
+
+                if el_stmts.is_some() {
+                    self.assign_ast(el_stmts);
+                };
+            },
+            Ast::LogicalExpr{ref mut ty_rec, ..}   |
+            Ast::BinaryExpr{ref mut ty_rec, ..}    |
+            Ast::UnaryExpr{ref mut ty_rec, ..}     |
+            Ast::VarDeclExpr{ref mut ty_rec, ..}   |
+            Ast::VarAssignExpr{ref mut ty_rec, ..} |
+            Ast::PrimaryExpr{ref mut ty_rec} => {
                 ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
             },
             _ => ()
