@@ -76,4 +76,8 @@ impl TyRec {
             tkn: tkn.clone()
         }
     }
+
+    pub fn update(&mut self, tyn: Option<TyName>) {
+        self.ty = tyn
+    }
 }
