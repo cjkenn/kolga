@@ -8,7 +8,8 @@ use std::env;
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
 use kolgac::symtab::SymbolTable;
-use ty::TyManager;
+use ty::infer::TyInfer;
+use ty::check::TyCheck;
 use gen::llvm::CodeGenerator;
 use gen::valtab::ValTab;
 use error::KolgaErr;
@@ -52,21 +53,24 @@ fn main() {
         return;
     }
 
-    let ast = parse_result.ast.unwrap();
+    // The ast is made mutable so that type inference can write to ast nodes with
+    // type information later on.
+    let mut ast = parse_result.ast.unwrap();
 
+    // Open a new scope for ty inference and checking, because we need
+    // a mutable reference to the ast in order to build the types in place.
     // We can be assured that all ast values are Some, since None is only returned
-    // if there are parsing errors
-    let mut ty_manager = TyManager::new(&ast, &mut symtab);
+    // if there are parsing errors.
+    {
+        let _result = TyInfer::new().infer(&mut ast);
+        let check_result = TyCheck::new(&ast, &mut symtab).check();
+        if check_result.len() > 0 {
+            for err in &check_result {
+                err.emit();
+            }
 
-    // TODO: infer before checking
-
-    let ty_result = ty_manager.check();
-    if ty_result.len() > 0 {
-        for err in &ty_result {
-            err.emit();
+            return;
         }
-
-        return;
     }
 
     let mut valtab = ValTab::new();

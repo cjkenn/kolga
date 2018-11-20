@@ -126,7 +126,7 @@ pub enum Ast {
 impl Ast {
     pub fn is_primary(&self) -> bool {
         match self {
-            Ast::PrimaryExpr{ty_rec: _} => true,
+            Ast::PrimaryExpr{..} => true,
             _ => false
         }
     }

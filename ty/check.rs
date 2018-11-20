@@ -47,13 +47,13 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn check_stmt(&mut self, stmt: Ast, final_sc: usize) {
         match stmt {
             // ignore var declaration without assign (nothing to check)
-            Ast::VarDeclExpr{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_} => (),
-            Ast::VarAssignExpr{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
+            Ast::VarDeclExpr{ .. } => (),
+            Ast::VarAssignExpr{ .. } => {
                 self.check_var_assign(&stmt, final_sc);
             },
             Ast::ExprStmt(ast) => {
                 match *ast.clone() {
-                    Ast::FnCall{fn_tkn:_, fn_params:_} => {
+                    Ast::FnCall{ .. } => {
                         self.check_fn_params(*ast, final_sc);
                         ()
                     },

@@ -1,73 +1,62 @@
 use kolgac::ast::Ast;
-use kolgac::symtab::SymbolTable;
 use kolgac::ty_rec::{TyName, TyRec};
 use error::ty::TypeErr;
 
-pub struct TyInfer<'t, 's> {
-    ast: &'t Ast,
-    sym_tab: &'s SymbolTable,
+pub struct TyInfer {
     ty_count: usize,
     errors: Vec<TypeErr>
 }
 
-impl<'t, 's> TyInfer<'t, 's> {
-    pub fn new(ast: &'t Ast, st: &'s mut SymbolTable) -> TyInfer<'t, 's> {
+impl TyInfer {
+    pub fn new() -> TyInfer {
         TyInfer {
-            ast: ast,
-            sym_tab: st,
             ty_count: 0,
             errors: Vec::new()
         }
     }
 
-    pub fn infer(&mut self) -> Vec<TypeErr> {
-        self.assign();
-        self.gen_eq();
-        self.unify();
+    pub fn infer(&mut self, ast: &mut Ast) -> Vec<TypeErr> {
+        match ast {
+            Ast::Prog{stmts} => {
+                self.assign(stmts);
+                self.gen_eq(stmts);
+                self.unify(stmts);
+            },
+            _ => panic!("invalid ast found in type infer!")
+        };
 
         self.errors.clone()
     }
 
-    fn assign(&mut self) {
-        match self.ast {
-            Ast::Prog{stmts} => {
-                for stmt in stmts {
-                    self.assign_stmt(stmt);
-                }
-            },
-            _ => ()
+    fn assign(&mut self, stmts: &mut Vec<Ast>) {
+        for stmt in stmts.iter_mut() {
+            self.assign_ast(stmt);
         }
     }
 
-    fn gen_eq(&mut self) {
+    fn gen_eq(&mut self, stmts: &mut Vec<Ast>) {
         unimplemented!()
     }
 
-    fn unify(&mut self) {
+    fn unify(&mut self, stmts: &mut Vec<Ast>) {
         unimplemented!()
     }
 
-    fn assign_stmt(&mut self, stmt: &Ast) {
-        match stmt {
-            Ast::ExprStmt(ast) => {
-                match *ast.clone() {
-                    Ast::FnCall{fn_tkn:_, fn_params:_} => (),
-                    Ast::ClassFnCall{class_tkn:_, class_name:_, fn_tkn:_, fn_params:_, sc:_} => (),
-                    _ => {
-                        self.assign_expr(&mut ast.clone());
-                        ()
-                    }
+    fn assign_ast(&mut self, ast: &mut Ast) {
+        match *ast {
+            Ast::ExprStmt(ref mut ast) => self.assign_ast(ast),
+            Ast::BlckStmt{ ref mut stmts, .. } => {
+                for stmt in stmts.iter_mut() {
+                    self.assign_ast(stmt);
                 }
             },
-            _ => ()
-        }
-    }
-
-    fn assign_expr(&mut self, expr: &mut Ast) {
-        match expr {
-            Ast::LogicalExpr{ref mut ty_rec, op_tkn:_, lhs:_, rhs:_} |
-            Ast::BinaryExpr{ref mut ty_rec, op_tkn:_, lhs:_, rhs:_} => {
-                self.set_ty(ty_rec);
+            Ast::LogicalExpr{ ref mut ty_rec, .. }   |
+            Ast::BinaryExpr{ ref mut ty_rec, .. }    |
+            Ast::UnaryExpr{ ref mut ty_rec, .. }     |
+            Ast::VarDeclExpr{ ref mut ty_rec, .. }   |
+            Ast::VarAssignExpr{ ref mut ty_rec, .. } |
+            Ast::PrimaryExpr{ ref mut ty_rec } => {
+                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
             },
             _ => ()
         }
@@ -76,7 +65,6 @@ impl<'t, 's> TyInfer<'t, 's> {
     fn set_ty(&mut self, ty_rec: &mut TyRec) {
         let new_ty = self.curr_symbolic_ty();
         ty_rec.update(Some(TyName::Symbolic(new_ty)));
-
     }
 
     fn curr_symbolic_ty(&mut self) -> String {

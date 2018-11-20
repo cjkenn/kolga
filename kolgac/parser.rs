@@ -13,7 +13,7 @@ const FN_PARAM_MAX_LEN: usize = 64;
 
 pub struct ParserResult {
     /// The resulting AST from parsing
-    pub ast: Option<Box<Ast>>,
+    pub ast: Option<Ast>,
 
     /// Vector of any parser errors
     pub error: Vec<ParseErr>
@@ -73,7 +73,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         let head = Ast::Prog{stmts: stmts};
         ParserResult {
-            ast: Some(Box::new(head)),
+            ast: Some(head),
             error: self.errors.clone()
         }
     }
