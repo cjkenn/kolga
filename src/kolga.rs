@@ -8,7 +8,7 @@ use std::env;
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
 use kolgac::symtab::SymbolTable;
-use ty::check::TyCheck;
+use ty::TyManager;
 use gen::llvm::CodeGenerator;
 use gen::valtab::ValTab;
 use error::KolgaErr;
@@ -56,9 +56,13 @@ fn main() {
 
     // We can be assured that all ast values are Some, since None is only returned
     // if there are parsing errors
-    let tyresult = TyCheck::new(&ast, &mut symtab).check();
-    if tyresult.len() > 0 {
-        for err in &tyresult {
+    let mut ty_manager = TyManager::new(&ast, &mut symtab);
+
+    // TODO: infer before checking
+
+    let ty_result = ty_manager.check();
+    if ty_result.len() > 0 {
+        for err in &ty_result {
             err.emit();
         }
 
