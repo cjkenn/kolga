@@ -232,7 +232,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                 Vec::new()
             },
-            Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global, value} => {
+            Ast::VarAssignExpr{ty_rec, ident_tkn, is_imm:_, is_global, value} => {
                 match is_global {
                     true => {
                         let c_name = self.c_str(&ident_tkn.get_name());
@@ -292,7 +292,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             },
-            Ast::VarDecl{ty_rec, ident_tkn, is_imm:_, is_global} => {
+            Ast::VarDeclExpr{ty_rec, ident_tkn, is_imm:_, is_global} => {
                 match is_global {
                     true => {
                         unsafe {
@@ -326,7 +326,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         // So, we want the llvm type of the props, but we
                         // don't want to generate any code for them yet.
                         match &pr.clone() {
-                            Ast::VarDecl{ty_rec, ident_tkn:_, is_imm:_, is_global:_} => {
+                            Ast::VarDeclExpr{ty_rec, ident_tkn:_, is_imm:_, is_global:_} => {
                                 let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                                 prop_tys.push(llvm_ty);
                             },
@@ -516,7 +516,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                        self.c_str("")))
                 }
             },
-            Ast::VarAssign{ty_rec:_, ident_tkn, is_imm:_, is_global:_, value} => {
+            Ast::VarAssignExpr{ty_rec:_, ident_tkn, is_imm:_, is_global:_, value} => {
                 // This is a variable re-assign, not a new declaration and assign. Thus,
                 // we look up the alloca instruction from the value table, and build
                 // a new store instruction for it. We don't need to update the value table

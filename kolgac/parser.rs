@@ -156,7 +156,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Ok(Ast::VarAssign{
+                Ok(Ast::VarAssignExpr {
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -185,7 +185,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let name = &ident_tkn.clone().unwrap().get_name();
                     self.symtab.store(name, cl_sym);
 
-                    return Ok(Ast::VarAssign{
+                    return Ok(Ast::VarAssignExpr {
                         ty_rec: cl_ty_rec,
                         ident_tkn: ident_tkn.clone().unwrap(),
                         is_imm: is_imm,
@@ -205,7 +205,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
 
-                Ok(Ast::VarDecl{
+                Ok(Ast::VarDeclExpr {
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -339,7 +339,7 @@ impl<'l, 's> Parser<'l, 's> {
                 TknTy::Let => {
                     let prop_ast = self.var_decl()?;
                     match prop_ast.clone() {
-                        Ast::VarDecl{ty_rec:_,ident_tkn, is_imm:_, is_global:_} => {
+                        Ast::VarDeclExpr{ty_rec:_,ident_tkn, is_imm:_, is_global:_} => {
                             prop_map.insert(ident_tkn.get_name(), prop_ctr);
                         },
                         _ => {
@@ -559,7 +559,7 @@ impl<'l, 's> Parser<'l, 's> {
                                     return Err(self.error(ParseErrTy::InvalidImmAssign(name)));
                                 }
 
-                                return Ok(Ast::VarAssign{
+                                return Ok(Ast::VarAssignExpr {
                                     ty_rec: sym.ty_rec.clone(),
                                     ident_tkn: sym.ident_tkn.clone(),
                                     is_imm: sym.imm,

@@ -47,8 +47,8 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn check_stmt(&mut self, stmt: Ast, final_sc: usize) {
         match stmt {
             // ignore var declaration without assign (nothing to check)
-            Ast::VarDecl{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_} => (),
-            Ast::VarAssign{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
+            Ast::VarDeclExpr{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_} => (),
+            Ast::VarAssignExpr{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
                 self.check_var_assign(&stmt, final_sc);
             },
             Ast::ExprStmt(ast) => {
@@ -159,7 +159,7 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_expr(&mut self, expr: &Ast, final_sc: usize) -> TyName {
         match expr {
-            Ast::VarAssign{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
+            Ast::VarAssignExpr{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
                 self.check_var_assign(expr, final_sc)
             },
             Ast::UnaryExpr{ty_rec:_,  op_tkn, rhs} => {
@@ -212,11 +212,11 @@ impl<'t, 's> TyCheck<'t, 's> {
                 // TODO: this is O(n) and not efficient (should store props in a map)
                 for prop in props {
                     match prop.clone() {
-                        Ast::VarDecl{ref ty_rec, ref ident_tkn, is_imm:_, is_global:_}
+                        Ast::VarDeclExpr{ref ty_rec, ref ident_tkn, is_imm:_, is_global:_}
                         if ident_tkn.get_name() == prop_name => {
                             prop_ty = Some(ty_rec.ty.clone().unwrap());
                         },
-                        Ast::VarAssign{ref ty_rec, ref ident_tkn, is_imm:_, is_global:_, value:_}
+                        Ast::VarAssignExpr{ref ty_rec, ref ident_tkn, is_imm:_, is_global:_, value:_}
                         if ident_tkn.get_name() == prop_name  => {
                             prop_ty = Some(ty_rec.ty.clone().unwrap());
                         },
@@ -346,7 +346,7 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_var_assign(&mut self, stmt: &Ast, sc: usize) -> TyName {
         match stmt {
-            Ast::VarAssign{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
+            Ast::VarAssignExpr{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
                 let lhs_ty = ty_rec.ty.clone().unwrap();
                 let rhs = value;
                 let rhs_ty = self.check_expr(&rhs, sc);

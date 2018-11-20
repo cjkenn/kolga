@@ -39,14 +39,14 @@ pub enum Ast {
     // expr
     ExprStmt(Box<Ast>),
 
-    VarDecl {
+    VarDeclExpr {
         ty_rec: TyRec,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool
     },
 
-    VarAssign {
+    VarAssignExpr {
         ty_rec: TyRec,
         ident_tkn: Token,
         is_imm: bool,
