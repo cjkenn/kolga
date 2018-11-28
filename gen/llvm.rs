@@ -608,11 +608,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                if_cond: &Box<Ast>,
                then_stmts: &Box<Ast>,
                else_if_stmts: &Vec<Ast>,
-               mb_else_stmts: &Box<Option<Ast>>) -> Vec<LLVMValueRef> {
+               else_stmts: &Vec<Ast>) -> Vec<LLVMValueRef> {
         let mut return_stmt_vec = Vec::new();
         unsafe {
             let has_elif = else_if_stmts.len() > 0;
-            let has_else = mb_else_stmts.is_some();
+            let has_else = else_stmts.len() > 0 && else_stmts.len() < 2;
 
             // Set up our required blocks. We need an initial block to start building
             // from (insert_bb), and a block representing the then branch (then_bb), which
@@ -757,7 +757,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             if has_else {
                 LLVMMoveBasicBlockAfter(else_bb, final_elif_bb);
                 LLVMPositionBuilderAtEnd(self.builder, else_bb);
-                let mut else_expr_vals = self.gen_stmt(&mb_else_stmts.clone().unwrap());
+                let mut else_expr_vals = self.gen_stmt(&else_stmts[0]);
                 return_stmt_vec.extend(else_expr_vals.clone());
 
                 LLVMBuildBr(self.builder, merge_bb);

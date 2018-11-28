@@ -77,8 +77,8 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone(), final_sc);
                 }
 
-                if el_stmts.is_some() {
-                    self.check_stmt(el_stmts.clone().unwrap(), final_sc);
+                for stmt in &el_stmts {
+                    self.check_stmt(stmt.clone(), final_sc);
                 }
             },
             Ast::WhileStmt(expr_ast, stmts) => {

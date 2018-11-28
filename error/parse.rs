@@ -8,6 +8,7 @@ pub enum ParseErrTy {
     InvalidImmAssign(String),
     InvalidTy(String),
     InvalidForStmt,
+    InvalidIfStmt,
     InvalidClassProp,
     ImmDecl(String),
     TknMismatch(String, String), // not continuable
@@ -68,6 +69,9 @@ impl KolgaErr for ParseErr {
             },
             ParseErrTy::InvalidForStmt => {
                 format!("{} Invalid for loop: must start with a variable declaration", str_pos)
+            },
+            ParseErrTy::InvalidIfStmt => {
+                format!("{} Invalid if statement: cannot contain more than one else condition", str_pos)
             },
             ParseErrTy::InvalidClassProp => {
                 format!("{} Invalid class property declaration", str_pos)

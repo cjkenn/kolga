@@ -19,8 +19,8 @@ impl TyInfer {
         match ast {
             Ast::Prog{stmts} => {
                 self.assign(stmts);
-                self.gen_eq(stmts);
-                self.unify(stmts);
+                //self.gen_eq(stmts);
+                //self.unify(stmts);
             },
             _ => panic!("invalid ast found in type infer!")
         };
@@ -50,7 +50,10 @@ impl TyInfer {
                     self.assign_ast(stmt);
                 }
             },
-            Ast::IfStmt{ref mut cond_expr, ref mut if_stmts, ref mut elif_exprs, ref mut el_stmts} => {
+            Ast::IfStmt{ ref mut cond_expr,
+                         ref mut if_stmts,
+                         ref mut elif_exprs,
+                         ref mut el_stmts } => {
                 self.assign_ast(cond_expr);
                 self.assign_ast(if_stmts);
 
@@ -58,15 +61,29 @@ impl TyInfer {
                     self.assign_ast(stmt);
                 }
 
-                if el_stmts.is_some() {
-                    self.assign_ast(el_stmts);
-                };
+                for stmt in el_stmts.iter_mut() {
+                    self.assign_ast(stmt);
+                }
             },
-            Ast::LogicalExpr{ref mut ty_rec, ..}   |
-            Ast::BinaryExpr{ref mut ty_rec, ..}    |
-            Ast::UnaryExpr{ref mut ty_rec, ..}     |
+            Ast::LogicalExpr{ ref mut ty_rec, op_tkn:_, ref mut lhs, ref mut rhs } |
+            Ast::BinaryExpr{ ref mut ty_rec, op_tkn:_, ref mut lhs, ref mut rhs } => {
+                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
+                self.assign_ast(lhs);
+                self.assign_ast(rhs);
+            },
+            Ast::UnaryExpr{ ref mut ty_rec, op_tkn:_, ref mut rhs } => {
+                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
+                self.assign_ast(rhs);
+            },
+            Ast::VarAssignExpr{ ref mut ty_rec,
+                                ident_tkn:_,
+                                is_imm:_,
+                                is_global:_,
+                                ref mut value } => {
+                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
+                self.assign_ast(value);
+            },
             Ast::VarDeclExpr{ref mut ty_rec, ..}   |
-            Ast::VarAssignExpr{ref mut ty_rec, ..} |
             Ast::PrimaryExpr{ref mut ty_rec} => {
                 ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
             },

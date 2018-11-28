@@ -66,7 +66,7 @@ fn main() {
         let check_result = TyCheck::new(&ast, &mut symtab).check();
         if check_result.len() > 0 {
             for err in &check_result {
-                err.emit();
+               err.emit();
             }
 
             return;

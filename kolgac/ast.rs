@@ -17,7 +17,7 @@ pub enum Ast {
         cond_expr: Box<Ast>,
         if_stmts: Box<Ast>,
         elif_exprs: Vec<Ast>,
-        el_stmts: Box<Option<Ast>>
+        el_stmts: Vec<Ast>
     },
 
     // Condition expr, stmts

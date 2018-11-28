@@ -434,8 +434,9 @@ impl<'l, 's> Parser<'l, 's> {
 
         let if_cond = self.expr()?;
         let if_blck = self.block_stmt()?;
-        let mut else_blck = None;
+        let mut else_blck = Vec::new();
         let mut else_ifs = Vec::new();
+        let mut else_cnt = 0;
 
         loop {
             match self.currtkn.ty {
@@ -446,19 +447,25 @@ impl<'l, 's> Parser<'l, 's> {
                     else_ifs.push(Ast::ElifStmt(Box::new(elif_ast), Box::new(elif_blck)));
                 },
                 TknTy::Else => {
+                    else_cnt = else_cnt + 1;
                     self.consume();
                     let blck = self.block_stmt()?;
-                    else_blck = Some(blck);
+                    else_blck.push(blck);
                 },
                 _ => break
             };
+        }
+
+        if else_cnt > 1 {
+            self.error(ParseErrTy::InvalidIfStmt);
         }
 
         Ok(Ast::IfStmt {
             cond_expr: Box::new(if_cond),
             if_stmts: Box::new(if_blck),
             elif_exprs: else_ifs,
-            el_stmts: Box::new(else_blck)})
+            el_stmts: else_blck
+        })
     }
 
     fn while_stmt(&mut self) -> Result<Ast, ParseErr> {
