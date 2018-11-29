@@ -153,7 +153,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 elif_exprs,
                 el_stmts,
             } => self.if_stmt(cond_expr, if_stmts, elif_exprs, el_stmts),
-            Ast::WhileStmt(mb_cond_expr, mb_stmts) => self.while_stmt(mb_cond_expr, mb_stmts),
+            Ast::WhileStmt { cond_expr, stmts } => self.while_stmt(cond_expr, stmts),
             Ast::ForStmt {
                 for_var_decl,
                 for_cond_expr,
@@ -813,7 +813,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let mut final_elif_bb = then_bb;
             for (idx, stmt) in else_if_stmts.iter().enumerate() {
                 match stmt.clone() {
-                    Ast::ElifStmt(mb_cond, mb_stmts) => {
+                    Ast::ElifStmt { cond_expr, stmts } => {
                         // Get the conditional block from the vector made above. Create a seperate
                         // block to the elif code to live in, that we can branch to from the
                         // elif conditioanl block.
@@ -829,7 +829,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                         LLVMMoveBasicBlockAfter(elif_code_bb, elif_cond_bb);
 
-                        let elif_cond_val = self.gen_expr(&mb_cond.clone());
+                        let elif_cond_val = self.gen_expr(&cond_expr.clone());
                         if elif_cond_val.is_none() {
                             self.error(GenErrTy::InvalidAst);
                             continue;
@@ -858,7 +858,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                         // Evaluate the elif block statements and branch to the merge block
                         // from inside the elif block.
-                        let mut elif_expr_vals = self.gen_stmt(&mb_stmts.clone());
+                        let mut elif_expr_vals = self.gen_stmt(&stmts.clone());
                         return_stmt_vec.extend(elif_expr_vals.clone());
                         LLVMBuildBr(self.builder, merge_bb);
                         let mut elif_end_bb = LLVMGetInsertBlock(self.builder);

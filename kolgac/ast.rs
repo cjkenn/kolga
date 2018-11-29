@@ -20,11 +20,15 @@ pub enum Ast {
         el_stmts: Vec<Ast>,
     },
 
-    // Condition expr, stmts
-    ElifStmt(Box<Ast>, Box<Ast>),
+    ElifStmt {
+        cond_expr: Box<Ast>,
+        stmts: Box<Ast>,
+    },
 
-    // Condition expr, stmts
-    WhileStmt(Box<Ast>, Box<Ast>),
+    WhileStmt {
+        cond_expr: Box<Ast>,
+        stmts: Box<Ast>,
+    },
 
     ForStmt {
         for_var_decl: Box<Ast>,

@@ -471,7 +471,11 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let elif_ast = self.expr()?;
                     let elif_blck = self.block_stmt()?;
-                    else_ifs.push(Ast::ElifStmt(Box::new(elif_ast), Box::new(elif_blck)));
+                    let stmt_ast = Ast::ElifStmt {
+                        cond_expr: Box::new(elif_ast),
+                        stmts: Box::new(elif_blck),
+                    };
+                    else_ifs.push(stmt_ast);
                 }
                 TknTy::Else => {
                     else_cnt = else_cnt + 1;
@@ -500,7 +504,11 @@ impl<'l, 's> Parser<'l, 's> {
         // TODO: skip expr for infinite loop when we have a break stmt
         let while_cond = self.expr()?;
         let while_stmts = self.block_stmt()?;
-        Ok(Ast::WhileStmt(Box::new(while_cond), Box::new(while_stmts)))
+
+        Ok(Ast::WhileStmt {
+            cond_expr: Box::new(while_cond),
+            stmts: Box::new(while_stmts),
+        })
     }
 
     fn for_stmt(&mut self) -> Result<Ast, ParseErr> {

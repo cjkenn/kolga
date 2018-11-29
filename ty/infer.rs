@@ -67,6 +67,31 @@ impl TyInfer {
                     self.assign_ast(stmt);
                 }
             }
+            Ast::ElifStmt {
+                ref mut cond_expr,
+                ref mut stmts,
+            } => {
+                self.assign_ast(cond_expr);
+                self.assign_ast(stmts);
+            }
+            Ast::ForStmt {
+                ref mut for_var_decl,
+                ref mut for_cond_expr,
+                ref mut for_step_expr,
+                ref mut stmts,
+            } => {
+                self.assign_ast(for_var_decl);
+                self.assign_ast(for_cond_expr);
+                self.assign_ast(for_step_expr);
+                self.assign_ast(stmts);
+            }
+            Ast::WhileStmt {
+                ref mut cond_expr,
+                ref mut stmts,
+            } => {
+                self.assign_ast(cond_expr);
+                self.assign_ast(stmts);
+            }
             Ast::LogicalExpr {
                 ref mut ty_rec,
                 op_tkn: _,
@@ -104,6 +129,7 @@ impl TyInfer {
             Ast::VarDeclExpr { ref mut ty_rec, .. } | Ast::PrimaryExpr { ref mut ty_rec } => {
                 ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
             }
+            Ast::ClassDecl { .. } => unimplemented!(),
             _ => (),
         }
     }

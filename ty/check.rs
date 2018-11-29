@@ -92,15 +92,15 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone(), final_sc);
                 }
             }
-            Ast::WhileStmt(expr_ast, stmts) => {
-                let expr = *expr_ast;
+            Ast::WhileStmt { cond_expr, stmts } => {
+                let expr = *cond_expr;
                 self.check_expr(&expr, final_sc);
                 self.check_stmt(*stmts, final_sc);
             }
-            Ast::ElifStmt(expr_ast, stmt_ast) => {
-                let expr = *expr_ast;
+            Ast::ElifStmt { cond_expr, stmts } => {
+                let expr = *cond_expr;
                 self.check_expr(&expr, final_sc);
-                self.check_stmt(*stmt_ast, final_sc);
+                self.check_stmt(*stmts, final_sc);
             }
             Ast::ForStmt {
                 for_var_decl,
