@@ -1,16 +1,16 @@
 use std::rc::Rc;
 
+use error::ty::{TypeErr, TypeErrTy};
 use kolgac::ast::Ast;
-use kolgac::token::{Token, TknTy};
-use kolgac::symtab::SymbolTable;
-use kolgac::ty_rec::TyName;
 use kolgac::sym::Sym;
-use error::ty::{TypeErrTy, TypeErr};
+use kolgac::symtab::SymbolTable;
+use kolgac::token::{TknTy, Token};
+use kolgac::ty_rec::TyName;
 
 pub struct TyCheck<'t, 's> {
     ast: &'t Ast,
     symtab: &'s mut SymbolTable,
-    errors: Vec<TypeErr>
+    errors: Vec<TypeErr>,
 }
 
 impl<'t, 's> TyCheck<'t, 's> {
@@ -18,7 +18,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         TyCheck {
             ast: ast,
             symtab: symtab,
-            errors: Vec::new()
+            errors: Vec::new(),
         }
     }
 
@@ -27,13 +27,13 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// checking.
     pub fn check(&mut self) -> Vec<TypeErr> {
         match self.ast {
-            Ast::Prog{stmts} => {
+            Ast::Prog { stmts } => {
                 for stmt in stmts {
                     // Pass in 0 for the global scope.
                     self.check_stmt(stmt.clone(), 0);
                 }
-            },
-            _ => ()
+            }
+            _ => (),
         }
 
         self.errors.clone()
@@ -47,28 +47,39 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn check_stmt(&mut self, stmt: Ast, final_sc: usize) {
         match stmt {
             // ignore var declaration without assign (nothing to check)
-            Ast::VarDeclExpr{ .. } => (),
-            Ast::VarAssignExpr{ .. } => {
+            Ast::VarDeclExpr { .. } => (),
+            Ast::VarAssignExpr { .. } => {
                 self.check_var_assign(&stmt, final_sc);
-            },
+            }
             Ast::ExprStmt(ast) => {
                 match *ast.clone() {
-                    Ast::FnCall{ .. } => {
+                    Ast::FnCall { .. } => {
                         self.check_fn_params(*ast, final_sc);
                         ()
-                    },
-                    Ast::ClassFnCall{class_tkn:_, class_name:_, fn_tkn:_, fn_params:_, sc} => {
+                    }
+                    Ast::ClassFnCall {
+                        class_tkn: _,
+                        class_name: _,
+                        fn_tkn: _,
+                        fn_params: _,
+                        sc,
+                    } => {
                         self.check_fn_params(*ast, sc);
                         ()
-                    },
+                    }
                     _ => {
                         let astptr = *ast;
                         self.check_expr(&astptr, final_sc);
                         ()
                     }
                 };
-            },
-            Ast::IfStmt{cond_expr, if_stmts, elif_exprs, el_stmts} => {
+            }
+            Ast::IfStmt {
+                cond_expr,
+                if_stmts,
+                elif_exprs,
+                el_stmts,
+            } => {
                 let expr = *cond_expr;
                 self.check_expr(&expr, final_sc);
                 self.check_stmt(*if_stmts, final_sc);
@@ -80,39 +91,59 @@ impl<'t, 's> TyCheck<'t, 's> {
                 for stmt in &el_stmts {
                     self.check_stmt(stmt.clone(), final_sc);
                 }
-            },
+            }
             Ast::WhileStmt(expr_ast, stmts) => {
                 let expr = *expr_ast;
                 self.check_expr(&expr, final_sc);
                 self.check_stmt(*stmts, final_sc);
-            },
+            }
             Ast::ElifStmt(expr_ast, stmt_ast) => {
                 let expr = *expr_ast;
                 self.check_expr(&expr, final_sc);
                 self.check_stmt(*stmt_ast, final_sc);
-            },
-            Ast::ForStmt{for_var_decl, for_cond_expr, for_step_expr, stmts} => {
+            }
+            Ast::ForStmt {
+                for_var_decl,
+                for_cond_expr,
+                for_step_expr,
+                stmts,
+            } => {
                 self.check_stmt(*for_var_decl, final_sc);
                 self.check_stmt(*for_cond_expr, final_sc);
                 self.check_stmt(*for_step_expr, final_sc);
                 self.check_stmt(*stmts, final_sc);
-            },
-            Ast::BlckStmt{stmts, sc} => {
+            }
+            Ast::BlckStmt { stmts, sc } => {
                 for stmt in &stmts {
                     self.check_stmt(stmt.clone(), sc);
                 }
-            },
-            Ast::FnDecl{ident_tkn, fn_params: _, ret_ty, fn_body, sc} => {
+            }
+            Ast::FnDecl {
+                ident_tkn,
+                fn_params: _,
+                ret_ty,
+                fn_body,
+                sc,
+            } => {
                 let fn_ty = ret_ty.ty.unwrap();
                 let fn_stmts = *fn_body;
                 match fn_stmts {
-                    Ast::BlckStmt{stmts, sc: inner_sc} => {
+                    Ast::BlckStmt {
+                        stmts,
+                        sc: inner_sc,
+                    } => {
                         self.check_fn_stmts(&ident_tkn, fn_ty, stmts, inner_sc);
-                    },
-                    _ => self.check_stmt(fn_stmts, sc)
+                    }
+                    _ => self.check_stmt(fn_stmts, sc),
                 };
-            },
-            Ast::ClassDecl{ident_tkn:_, methods, props, prop_pos:_,sc} => {
+            }
+            Ast::ClassDecl {
+                ident_tkn: _,
+                methods,
+                props,
+                prop_pos: _,
+                sc,
+            } => {
                 for prop_stmt in props {
                     self.check_stmt(prop_stmt.clone(), sc);
                 }
@@ -120,14 +151,18 @@ impl<'t, 's> TyCheck<'t, 's> {
                 for stmt in &methods {
                     self.check_stmt(stmt.clone(), sc);
                 }
-            },
-            _ => {
-                panic!("{:?} Unrecognized statement type found!", stmt)
             }
+            _ => panic!("{:?} Unrecognized statement type found!", stmt),
         }
     }
 
-    fn check_fn_stmts(&mut self, fn_tkn: &Token, fn_ret_ty: TyName, stmts: Vec<Ast>, sc_lvl: usize) {
+    fn check_fn_stmts(
+        &mut self,
+        fn_tkn: &Token,
+        fn_ret_ty: TyName,
+        stmts: Vec<Ast>,
+        sc_lvl: usize,
+    ) {
         let mut has_ret_stmt = false;
 
         for maybe_stmt in &stmts {
@@ -145,24 +180,34 @@ impl<'t, 's> TyCheck<'t, 's> {
                             self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
                         }
                     }
-                },
-                _ => self.check_stmt(stmt, sc_lvl)
+                }
+                _ => self.check_stmt(stmt, sc_lvl),
             };
         }
 
         if fn_ret_ty != TyName::Void && !has_ret_stmt {
-            self.error(fn_tkn.line,
-                       fn_tkn.pos,
-                       TypeErrTy::InvalidRet(fn_tkn.get_name(), fn_ret_ty.to_string()));
+            self.error(
+                fn_tkn.line,
+                fn_tkn.pos,
+                TypeErrTy::InvalidRet(fn_tkn.get_name(), fn_ret_ty.to_string()),
+            );
         }
     }
 
     fn check_expr(&mut self, expr: &Ast, final_sc: usize) -> TyName {
         match expr {
-            Ast::VarAssignExpr{ty_rec:_, ident_tkn:_, is_imm:_, is_global:_, value:_} => {
-                self.check_var_assign(expr, final_sc)
-            },
-            Ast::UnaryExpr{ty_rec:_,  op_tkn, rhs} => {
+            Ast::VarAssignExpr {
+                ty_rec: _,
+                ident_tkn: _,
+                is_imm: _,
+                is_global: _,
+                value: _,
+            } => self.check_var_assign(expr, final_sc),
+            Ast::UnaryExpr {
+                ty_rec: _,
+                op_tkn,
+                rhs,
+            } => {
                 if rhs.is_primary() {
                     let rhs_ty_rec = rhs.extract_primary_ty_rec();
                     return self.reduce_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
@@ -170,35 +215,53 @@ impl<'t, 's> TyCheck<'t, 's> {
                     let rhs_ty = self.check_expr(rhs, final_sc);
                     return self.reduce_unary_ty(op_tkn.clone(), rhs_ty);
                 }
-            },
-            Ast::BinaryExpr{ty_rec:_, op_tkn, lhs, rhs} |
-            Ast::LogicalExpr{ty_rec: _, op_tkn, lhs, rhs} => {
+            }
+            Ast::BinaryExpr {
+                ty_rec: _,
+                op_tkn,
+                lhs,
+                rhs,
+            }
+            | Ast::LogicalExpr {
+                ty_rec: _,
+                op_tkn,
+                lhs,
+                rhs,
+            } => {
                 let lhs_ty_name = self.check_expr(lhs, final_sc);
                 let rhs_ty_name = self.check_expr(rhs, final_sc);
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
-            },
-            Ast::PrimaryExpr{ty_rec} => {
-                match ty_rec.tkn.ty {
-                    TknTy::Ident(ref name) => {
-                        let sym = self.symtab.retrieve_from_finalized_sc(name, final_sc).unwrap();
-                        return sym.ty_rec.ty.clone().unwrap();
-                    },
-                    _ => {
-                        return ty_rec.ty.clone().unwrap();
-                    }
+            }
+            Ast::PrimaryExpr { ty_rec } => match ty_rec.tkn.ty {
+                TknTy::Ident(ref name) => {
+                    let sym = self
+                        .symtab
+                        .retrieve_from_finalized_sc(name, final_sc)
+                        .unwrap();
+                    return sym.ty_rec.ty.clone().unwrap();
+                }
+                _ => {
+                    return ty_rec.ty.clone().unwrap();
                 }
             },
-            Ast::ClassDecl{ident_tkn, methods:_, props:_, prop_pos:_, sc:_} => {
+            Ast::ClassDecl {
+                ident_tkn,
+                methods: _,
+                props: _,
+                prop_pos: _,
+                sc: _,
+            } => {
                 let sym = self.symtab.retrieve(&ident_tkn.get_name()).unwrap();
                 sym.ty_rec.ty.clone().unwrap()
-            },
-            Ast::ClassPropAccess{ident_tkn:_, prop_name, idx:_, owner_class} => {
-                self.extract_prop_ty(&owner_class, prop_name.clone())
-            },
-            _ => {
-                panic!("Unrecognized expression type found!")
             }
+            Ast::ClassPropAccess {
+                ident_tkn: _,
+                prop_name,
+                idx: _,
+                owner_class,
+            } => self.extract_prop_ty(&owner_class, prop_name.clone()),
+            _ => panic!("Unrecognized expression type found!"),
         }
     }
 
@@ -207,20 +270,39 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// available props until we find the name of the expected prop (the second param).
     fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name: String) -> TyName {
         match class_decl_ast {
-            Ast::ClassDecl{ident_tkn:_, methods:_, props, prop_pos:_, sc:_} => {
+            Ast::ClassDecl {
+                ident_tkn: _,
+                methods: _,
+                props,
+                prop_pos: _,
+                sc: _,
+            } => {
                 let mut prop_ty = None;
                 // TODO: this is O(n) and not efficient (should store props in a map)
                 for prop in props {
                     match prop.clone() {
-                        Ast::VarDeclExpr{ref ty_rec, ref ident_tkn, is_imm:_, is_global:_}
-                        if ident_tkn.get_name() == prop_name => {
+                        Ast::VarDeclExpr {
+                            ref ty_rec,
+                            ref ident_tkn,
+                            is_imm: _,
+                            is_global: _,
+                        }
+                            if ident_tkn.get_name() == prop_name =>
+                        {
                             prop_ty = Some(ty_rec.ty.clone().unwrap());
-                        },
-                        Ast::VarAssignExpr{ref ty_rec, ref ident_tkn, is_imm:_, is_global:_, value:_}
-                        if ident_tkn.get_name() == prop_name  => {
+                        }
+                        Ast::VarAssignExpr {
+                            ref ty_rec,
+                            ref ident_tkn,
+                            is_imm: _,
+                            is_global: _,
+                            value: _,
+                        }
+                            if ident_tkn.get_name() == prop_name =>
+                        {
                             prop_ty = Some(ty_rec.ty.clone().unwrap());
-                        },
-                        _ => ()
+                        }
+                        _ => (),
                     };
                 }
 
@@ -229,14 +311,14 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 return prop_ty.unwrap();
-            },
-            _ => panic!("Cannot extract property type from this ast")
+            }
+            _ => panic!("Cannot extract property type from this ast"),
         }
     }
 
     fn check_fn_params(&mut self, fn_call_ast: Ast, final_sc: usize) {
         match fn_call_ast {
-            Ast::FnCall{fn_tkn, fn_params} => {
+            Ast::FnCall { fn_tkn, fn_params } => {
                 let fn_sym = self.find_fn_sym(&fn_tkn.clone(), final_sc);
                 let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
 
@@ -249,13 +331,17 @@ impl<'t, 's> TyCheck<'t, 's> {
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
                     let ty_name = mb_ty_rec.clone().ty.unwrap();
                     if passed_in_param_tys[idx] != ty_name {
-                        self.ty_mismatch(&fn_tkn.clone(),
-                                         &passed_in_param_tys[idx],
-                                         &ty_name);
+                        self.ty_mismatch(&fn_tkn.clone(), &passed_in_param_tys[idx], &ty_name);
                     }
                 }
-            },
-            Ast::ClassFnCall{class_tkn:_, class_name:_, fn_tkn, fn_params, sc} => {
+            }
+            Ast::ClassFnCall {
+                class_tkn: _,
+                class_name: _,
+                fn_tkn,
+                fn_params,
+                sc,
+            } => {
                 let fn_sym = self.find_fn_sym(&fn_tkn.clone(), sc);
                 let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
 
@@ -268,13 +354,11 @@ impl<'t, 's> TyCheck<'t, 's> {
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
                     let ty_name = mb_ty_rec.clone().ty.unwrap();
                     if passed_in_param_tys[idx] != ty_name {
-                        self.ty_mismatch(&fn_tkn.clone(),
-                                         &passed_in_param_tys[idx],
-                                         &ty_name);
+                        self.ty_mismatch(&fn_tkn.clone(), &passed_in_param_tys[idx], &ty_name);
                     }
                 }
-            },
-            _ => ()
+            }
+            _ => (),
         }
     }
 
@@ -286,14 +370,14 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.ty_mismatch(&op_tkn, &TyName::Num, &rhs_ty);
                 }
                 TyName::Num
-            },
+            }
             TknTy::Bang => {
                 if rhs_ty != TyName::Bool {
                     self.ty_mismatch(&op_tkn, &TyName::Bool, &rhs_ty);
                 }
                 TyName::Bool
-            },
-            _ => panic!("Unimplemented unary operator found!")
+            }
+            _ => panic!("Unimplemented unary operator found!"),
         }
     }
 
@@ -315,7 +399,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 TyName::Num
-            },
+            }
             TknTy::Gt | TknTy::GtEq | TknTy::Lt | TknTy::LtEq | TknTy::EqEq | TknTy::BangEq => {
                 if lhs_ty != rhs_ty {
                     self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
@@ -327,7 +411,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 TyName::Bool
-            },
+            }
             TknTy::And | TknTy::Or | TknTy::AmpAmp | TknTy::PipePipe => {
                 if lhs_ty != rhs_ty {
                     self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
@@ -339,14 +423,20 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 TyName::Bool
-            },
-            _ => panic!("Unimplemented binary operator found!")
+            }
+            _ => panic!("Unimplemented binary operator found!"),
         }
     }
 
     fn check_var_assign(&mut self, stmt: &Ast, sc: usize) -> TyName {
         match stmt {
-            Ast::VarAssignExpr{ty_rec, ident_tkn, is_imm:_, is_global:_, value} => {
+            Ast::VarAssignExpr {
+                ty_rec,
+                ident_tkn,
+                is_imm: _,
+                is_global: _,
+                value,
+            } => {
                 let lhs_ty = ty_rec.ty.clone().unwrap();
                 let rhs = value;
                 let rhs_ty = self.check_expr(&rhs, sc);
@@ -356,13 +446,17 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 return lhs_ty;
-            },
-            _ => panic!("Invalid ast found when checking variable assignment")
+            }
+            _ => panic!("Invalid ast found when checking variable assignment"),
         }
     }
 
     fn ty_mismatch(&mut self, tkn: &Token, lhs: &TyName, rhs: &TyName) {
-        self.error(tkn.line, tkn.pos, TypeErrTy::TyMismatch(lhs.to_string(), rhs.to_string()));
+        self.error(
+            tkn.line,
+            tkn.pos,
+            TypeErrTy::TyMismatch(lhs.to_string(), rhs.to_string()),
+        );
     }
 
     fn op_mismatch(&mut self, tkn: &Token, lhs: &TyName, rhs: &TyName) {
@@ -378,7 +472,8 @@ impl<'t, 's> TyCheck<'t, 's> {
             op_desired.0.to_string(),
             op_desired.1.to_string(),
             lhs.to_string(),
-            rhs.to_string());
+            rhs.to_string(),
+        );
 
         self.error(tkn.line, tkn.pos, err_ty);
     }

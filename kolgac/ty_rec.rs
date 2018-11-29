@@ -1,5 +1,5 @@
 use std::fmt;
-use token::{Token, TknTy};
+use token::{TknTy, Token};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TyName {
@@ -8,21 +8,21 @@ pub enum TyName {
     Bool,
     Void,
     Symbolic(String),
-    Class(String)
+    Class(String),
 }
 
 impl TyName {
     pub fn is_numerical(&self) -> bool {
         match self {
             TyName::Num => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_bool(&self) -> bool {
         match self {
             TyName::Bool => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -35,7 +35,7 @@ impl fmt::Display for TyName {
             TyName::Bool => "bool".to_string(),
             TyName::Void => "void".to_string(),
             TyName::Class(name) => format!("class '{}'", name),
-            TyName::Symbolic(name) => format!("symbolic '{}'", name)
+            TyName::Symbolic(name) => format!("symbolic '{}'", name),
         };
 
         write!(f, "{}", display_ty)
@@ -45,7 +45,7 @@ impl fmt::Display for TyName {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TyRec {
     pub ty: Option<TyName>,
-    pub tkn: Token
+    pub tkn: Token,
 }
 
 impl TyRec {
@@ -61,7 +61,7 @@ impl TyRec {
             TknTy::Bang => Some(TyName::Bool),
             TknTy::Void => Some(TyName::Void),
             TknTy::Ident(ref ident) => Some(TyName::Class(ident.clone())),
-            _ => None
+            _ => None,
         };
 
         TyRec {
@@ -73,7 +73,7 @@ impl TyRec {
     pub fn empty(tkn: &Token) -> TyRec {
         TyRec {
             ty: None,
-            tkn: tkn.clone()
+            tkn: tkn.clone(),
         }
     }
 

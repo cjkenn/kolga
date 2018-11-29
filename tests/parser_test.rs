@@ -1,17 +1,17 @@
 extern crate kolgac;
 
+use kolgac::lexer::Lexer;
+use kolgac::parser::Parser;
+use kolgac::symtab::SymbolTable;
 use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
 use std::io::{BufRead, BufReader};
-use kolgac::lexer::Lexer;
-use kolgac::symtab::SymbolTable;
-use kolgac::parser::Parser;
+use std::path::PathBuf;
 
 struct ParseExpect {
     pub is_pass: bool,
     pub line: usize,
-    pub pos: usize
+    pub pos: usize,
 }
 
 #[test]
@@ -28,7 +28,7 @@ fn parser() {
             Err(e) => {
                 println!("Error parsing test expectations: {:?}", e);
                 return;
-            },
+            }
             Ok(expectation) => {
                 run_parser_test(path, expectation);
             }
@@ -47,19 +47,23 @@ fn run_parser_test(path: PathBuf, expct: ParseExpect) {
     match expct.is_pass {
         true => {
             if parse_result.error.len() > 0 {
-                assert!(false,
-                        "FAIL: {:?} expected successful parse, found error:\n{:?}",
-                        path.file_stem().unwrap(),
-                        parse_result.error[0].ty);
+                assert!(
+                    false,
+                    "FAIL: {:?} expected successful parse, found error:\n{:?}",
+                    path.file_stem().unwrap(),
+                    parse_result.error[0].ty
+                );
             } else {
                 println!("PASS: parse {:?}", path.file_stem().unwrap());
             }
-        },
+        }
         false => {
             if parse_result.error.len() == 0 {
-                assert!(false,
-                        "FAIL: {:?} expected error, found none",
-                        path.file_stem().unwrap());
+                assert!(
+                    false,
+                    "FAIL: {:?} expected error, found none",
+                    path.file_stem().unwrap()
+                );
             } else {
                 assert_eq!(parse_result.error[0].line, expct.line);
                 assert_eq!(parse_result.error[0].pos, expct.pos);
@@ -76,7 +80,7 @@ fn parse_expectations(expectations: String) -> Result<ParseExpect, &'static str>
     }
 
     if parts.len() < 2 {
-       return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
     }
 
     if !parts[0].contains("expect") {
@@ -88,10 +92,10 @@ fn parse_expectations(expectations: String) -> Result<ParseExpect, &'static str>
     }
 
     if parts[1] == "pass" {
-        return Ok(ParseExpect{
+        return Ok(ParseExpect {
             is_pass: true,
             line: 0,
-            pos: 0
+            pos: 0,
         });
     }
 
@@ -109,10 +113,9 @@ fn parse_expectations(expectations: String) -> Result<ParseExpect, &'static str>
         return Err("Position number in expectations must be valid int");
     }
 
-    Ok(ParseExpect{
+    Ok(ParseExpect {
         is_pass: false,
         line: line.unwrap(),
-        pos: pos.unwrap()
+        pos: pos.unwrap(),
     })
-
 }

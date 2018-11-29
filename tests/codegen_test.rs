@@ -1,8 +1,8 @@
 extern crate gen;
 extern crate kolgac;
 
-use std::fs::File;
 use std::fs;
+use std::fs::File;
 use std::io::prelude::*;
 
 use gen::llvm::CodeGenerator;
@@ -22,17 +22,26 @@ fn run(input_filename: &str, output_filename: &str, expected_filename: &str) {
     codegen.gen_ir();
     codegen.print_ir(String::from(output_filename));
 
-    diff_files(String::from(output_filename), String::from(expected_filename));
+    diff_files(
+        String::from(output_filename),
+        String::from(expected_filename),
+    );
     fs::remove_file(output_filename).ok();
 }
 
 fn diff_files(filename1: String, filename2: String) {
     let mut file1 = String::new();
-    File::open(filename1).unwrap().read_to_string(&mut file1).ok();
+    File::open(filename1)
+        .unwrap()
+        .read_to_string(&mut file1)
+        .ok();
     let lines1: Vec<&str> = file1.split('\n').collect();
 
     let mut file2 = String::new();
-    File::open(filename2).unwrap().read_to_string(&mut file2).ok();
+    File::open(filename2)
+        .unwrap()
+        .read_to_string(&mut file2)
+        .ok();
     let lines2: Vec<&str> = file2.split('\n').collect();
     println!("{:?}", lines1);
     println!("{:?}", lines2);
@@ -40,7 +49,13 @@ fn diff_files(filename1: String, filename2: String) {
 
     for (idx, line1) in lines1.iter().enumerate() {
         let line2 = &lines2[idx];
-        assert!(line1 == line2, "Line [{}]: Expected {:?}, but found {:?}", idx, line1, line2);
+        assert!(
+            line1 == line2,
+            "Line [{}]: Expected {:?}, but found {:?}",
+            idx,
+            line1,
+            line2
+        );
     }
 }
 

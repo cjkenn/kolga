@@ -1,18 +1,18 @@
+extern crate error;
+extern crate gen;
 extern crate kolgac;
 extern crate ty;
-extern crate gen;
-extern crate error;
 
-use std::fs::File;
-use std::env;
+use error::KolgaErr;
+use gen::llvm::CodeGenerator;
+use gen::valtab::ValTab;
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
 use kolgac::symtab::SymbolTable;
-use ty::infer::TyInfer;
+use std::env;
+use std::fs::File;
 use ty::check::TyCheck;
-use gen::llvm::CodeGenerator;
-use gen::valtab::ValTab;
-use error::KolgaErr;
+use ty::infer::TyInfer;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -42,7 +42,6 @@ fn main() {
         let mut lexer = Lexer::new(infile);
         let mut parser = Parser::new(&mut lexer, &mut symtab);
         parse_result = parser.parse();
-
     }
 
     if parse_result.error.len() > 0 {
@@ -66,7 +65,7 @@ fn main() {
         let check_result = TyCheck::new(&ast, &mut symtab).check();
         if check_result.len() > 0 {
             for err in &check_result {
-               err.emit();
+                err.emit();
             }
 
             return;

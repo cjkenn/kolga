@@ -5,18 +5,16 @@ pub enum GenErrTy {
     InvalidAst,
     InvalidFn(String),
     InvalidFnParam,
-    InvalidClass(String)
+    InvalidClass(String),
 }
 
 pub struct GenErr {
-    pub ty: GenErrTy
+    pub ty: GenErrTy,
 }
 
 impl GenErr {
     pub fn new(ty: GenErrTy) -> GenErr {
-        GenErr {
-            ty: ty
-        }
+        GenErr { ty: ty }
     }
 }
 
@@ -27,18 +25,10 @@ impl KolgaErr for GenErr {
 
     fn to_msg(&self) -> String {
         match self.ty {
-            GenErrTy::InvalidAst => {
-                format!("Code generation failed for provided AST")
-            },
-            GenErrTy::InvalidFn(ref found) => {
-                format!("'{}' is not a valid function", found)
-            },
-            GenErrTy::InvalidFnParam => {
-                format!("Invalid function parameter")
-            },
-            GenErrTy::InvalidClass(ref found) => {
-                format!("'{}' is not a valid class", found)
-            }
+            GenErrTy::InvalidAst => format!("Code generation failed for provided AST"),
+            GenErrTy::InvalidFn(ref found) => format!("'{}' is not a valid function", found),
+            GenErrTy::InvalidFnParam => format!("Invalid function parameter"),
+            GenErrTy::InvalidClass(ref found) => format!("'{}' is not a valid class", found),
         }
     }
 }

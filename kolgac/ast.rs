@@ -1,23 +1,23 @@
+use std::collections::HashMap;
 use token::Token;
 use ty_rec::TyRec;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
     Prog {
-        stmts: Vec<Ast>
+        stmts: Vec<Ast>,
     },
 
     BlckStmt {
         stmts: Vec<Ast>,
-        sc: usize
+        sc: usize,
     },
 
     IfStmt {
         cond_expr: Box<Ast>,
         if_stmts: Box<Ast>,
         elif_exprs: Vec<Ast>,
-        el_stmts: Vec<Ast>
+        el_stmts: Vec<Ast>,
     },
 
     // Condition expr, stmts
@@ -26,11 +26,11 @@ pub enum Ast {
     // Condition expr, stmts
     WhileStmt(Box<Ast>, Box<Ast>),
 
-    ForStmt{
+    ForStmt {
         for_var_decl: Box<Ast>,
         for_cond_expr: Box<Ast>,
         for_step_expr: Box<Ast>,
-        stmts: Box<Ast>
+        stmts: Box<Ast>,
     },
 
     // Return expr, if any
@@ -43,7 +43,7 @@ pub enum Ast {
         ty_rec: TyRec,
         ident_tkn: Token,
         is_imm: bool,
-        is_global: bool
+        is_global: bool,
     },
 
     VarAssignExpr {
@@ -51,21 +51,21 @@ pub enum Ast {
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
-        value: Box<Ast>
+        value: Box<Ast>,
     },
 
     LogicalExpr {
         ty_rec: TyRec,
         op_tkn: Token,
         lhs: Box<Ast>,
-        rhs: Box<Ast>
+        rhs: Box<Ast>,
     },
 
     BinaryExpr {
         ty_rec: TyRec,
         op_tkn: Token,
         lhs: Box<Ast>,
-        rhs: Box<Ast>
+        rhs: Box<Ast>,
     },
 
     UnaryExpr {
@@ -79,12 +79,12 @@ pub enum Ast {
         fn_params: Vec<TyRec>,
         ret_ty: TyRec,
         fn_body: Box<Ast>,
-        sc: usize
+        sc: usize,
     },
 
     FnCall {
         fn_tkn: Token,
-        fn_params: Vec<Ast>
+        fn_params: Vec<Ast>,
     },
 
     ClassDecl {
@@ -92,14 +92,14 @@ pub enum Ast {
         methods: Vec<Ast>,
         props: Vec<Ast>,
         prop_pos: HashMap<String, usize>,
-        sc: usize
+        sc: usize,
     },
 
     ClassPropAccess {
         ident_tkn: Token,
         prop_name: String,
         idx: usize,
-        owner_class: Box<Ast>
+        owner_class: Box<Ast>,
     },
 
     ClassPropSet {
@@ -107,7 +107,7 @@ pub enum Ast {
         prop_name: String,
         idx: usize,
         owner_class: Box<Ast>,
-        assign_val: Box<Ast>
+        assign_val: Box<Ast>,
     },
 
     ClassFnCall {
@@ -115,33 +115,36 @@ pub enum Ast {
         class_name: String,
         fn_tkn: Token,
         fn_params: Vec<Ast>,
-        sc: usize
+        sc: usize,
     },
 
     PrimaryExpr {
-        ty_rec: TyRec
-    }
+        ty_rec: TyRec,
+    },
 }
 
 impl Ast {
     pub fn is_primary(&self) -> bool {
         match self {
-            Ast::PrimaryExpr{..} => true,
-            _ => false
+            Ast::PrimaryExpr { .. } => true,
+            _ => false,
         }
     }
 
     pub fn extract_primary_ty_rec(&self) -> TyRec {
         match self {
-            Ast::PrimaryExpr{ty_rec} => ty_rec.clone(),
-            _ => panic!()
+            Ast::PrimaryExpr { ty_rec } => ty_rec.clone(),
+            _ => panic!(),
         }
     }
 
     pub fn extract_params(&self) -> Vec<Ast> {
         match self {
-            Ast::FnCall{fn_tkn:_, fn_params} => fn_params.clone(),
-            _ => Vec::new()
+            Ast::FnCall {
+                fn_tkn: _,
+                fn_params,
+            } => fn_params.clone(),
+            _ => Vec::new(),
         }
     }
 }

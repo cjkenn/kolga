@@ -1,17 +1,15 @@
-use llvm_sys::prelude::{LLVMPassManagerRef, LLVMModuleRef, LLVMValueRef};
 use llvm_sys::core::*;
+use llvm_sys::prelude::{LLVMModuleRef, LLVMPassManagerRef, LLVMValueRef};
 use llvm_sys::transforms::scalar::*;
 
 pub struct FPM {
     /// A reference to the actual function pass manager
-    fpm: LLVMPassManagerRef
+    fpm: LLVMPassManagerRef,
 }
 
 impl Drop for FPM {
     fn drop(&mut self) {
-        unsafe {
-            LLVMDisposePassManager(self.fpm)
-        }
+        unsafe { LLVMDisposePassManager(self.fpm) }
     }
 }
 
@@ -20,7 +18,7 @@ impl FPM {
     pub fn new(module: LLVMModuleRef) -> FPM {
         unsafe {
             FPM {
-                fpm: LLVMCreateFunctionPassManagerForModule(module)
+                fpm: LLVMCreateFunctionPassManagerForModule(module),
             }
         }
     }

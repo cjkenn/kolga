@@ -1,28 +1,28 @@
+use error::ty::TypeErr;
 use kolgac::ast::Ast;
 use kolgac::ty_rec::{TyName, TyRec};
-use error::ty::TypeErr;
 
 pub struct TyInfer {
     ty_count: usize,
-    errors: Vec<TypeErr>
+    errors: Vec<TypeErr>,
 }
 
 impl TyInfer {
     pub fn new() -> TyInfer {
         TyInfer {
             ty_count: 0,
-            errors: Vec::new()
+            errors: Vec::new(),
         }
     }
 
     pub fn infer(&mut self, ast: &mut Ast) -> Vec<TypeErr> {
         match ast {
-            Ast::Prog{stmts} => {
+            Ast::Prog { stmts } => {
                 self.assign(stmts);
                 //self.gen_eq(stmts);
                 //self.unify(stmts);
-            },
-            _ => panic!("invalid ast found in type infer!")
+            }
+            _ => panic!("invalid ast found in type infer!"),
         };
 
         self.errors.clone()
@@ -45,15 +45,17 @@ impl TyInfer {
     fn assign_ast(&mut self, ast: &mut Ast) {
         match *ast {
             Ast::ExprStmt(ref mut ast) => self.assign_ast(ast),
-            Ast::BlckStmt{ref mut stmts, ..} => {
+            Ast::BlckStmt { ref mut stmts, .. } => {
                 for stmt in stmts.iter_mut() {
                     self.assign_ast(stmt);
                 }
-            },
-            Ast::IfStmt{ ref mut cond_expr,
-                         ref mut if_stmts,
-                         ref mut elif_exprs,
-                         ref mut el_stmts } => {
+            }
+            Ast::IfStmt {
+                ref mut cond_expr,
+                ref mut if_stmts,
+                ref mut elif_exprs,
+                ref mut el_stmts,
+            } => {
                 self.assign_ast(cond_expr);
                 self.assign_ast(if_stmts);
 
@@ -64,30 +66,45 @@ impl TyInfer {
                 for stmt in el_stmts.iter_mut() {
                     self.assign_ast(stmt);
                 }
-            },
-            Ast::LogicalExpr{ ref mut ty_rec, op_tkn:_, ref mut lhs, ref mut rhs } |
-            Ast::BinaryExpr{ ref mut ty_rec, op_tkn:_, ref mut lhs, ref mut rhs } => {
+            }
+            Ast::LogicalExpr {
+                ref mut ty_rec,
+                op_tkn: _,
+                ref mut lhs,
+                ref mut rhs,
+            }
+            | Ast::BinaryExpr {
+                ref mut ty_rec,
+                op_tkn: _,
+                ref mut lhs,
+                ref mut rhs,
+            } => {
                 ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
                 self.assign_ast(lhs);
                 self.assign_ast(rhs);
-            },
-            Ast::UnaryExpr{ ref mut ty_rec, op_tkn:_, ref mut rhs } => {
+            }
+            Ast::UnaryExpr {
+                ref mut ty_rec,
+                op_tkn: _,
+                ref mut rhs,
+            } => {
                 ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
                 self.assign_ast(rhs);
-            },
-            Ast::VarAssignExpr{ ref mut ty_rec,
-                                ident_tkn:_,
-                                is_imm:_,
-                                is_global:_,
-                                ref mut value } => {
+            }
+            Ast::VarAssignExpr {
+                ref mut ty_rec,
+                ident_tkn: _,
+                is_imm: _,
+                is_global: _,
+                ref mut value,
+            } => {
                 ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
                 self.assign_ast(value);
-            },
-            Ast::VarDeclExpr{ref mut ty_rec, ..}   |
-            Ast::PrimaryExpr{ref mut ty_rec} => {
+            }
+            Ast::VarDeclExpr { ref mut ty_rec, .. } | Ast::PrimaryExpr { ref mut ty_rec } => {
                 ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
-            },
-            _ => ()
+            }
+            _ => (),
         }
     }
 

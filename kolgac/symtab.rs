@@ -23,7 +23,7 @@ pub struct SymbolTable {
     /// The finalized symbol table. We initialize a finalized global scope when
     /// we create the table, because we expect the global scope to be
     /// finalized after parsing.
-    finalized: Vec<Scope>
+    finalized: Vec<Scope>,
 }
 
 impl SymbolTable {
@@ -32,7 +32,7 @@ impl SymbolTable {
             curr_level: 0,
             table: vec![HashMap::new()],
             finalized_level: 0,
-            finalized: vec![HashMap::new()]
+            finalized: vec![HashMap::new()],
         }
     }
 
@@ -103,9 +103,13 @@ impl SymbolTable {
 
         while curr >= 0 {
             match self.table[curr].get(key) {
-                Some(val) => { return Some(Rc::clone(&val)); },
-                None if curr == 0 => { break; },
-                None => ()
+                Some(val) => {
+                    return Some(Rc::clone(&val));
+                }
+                None if curr == 0 => {
+                    break;
+                }
+                None => (),
             };
             curr = curr - 1;
         }
@@ -119,7 +123,7 @@ impl SymbolTable {
     pub fn retrieve_from_finalized_sc(&self, key: &str, level: usize) -> Option<Rc<Sym>> {
         match self.finalized[level].get(key) {
             Some(val) => Some(Rc::clone(&val)),
-            None => None
+            None => None,
         }
     }
 }

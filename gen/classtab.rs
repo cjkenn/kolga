@@ -1,14 +1,14 @@
-use std::collections::HashMap;
 use llvm_sys::prelude::LLVMTypeRef;
+use std::collections::HashMap;
 
 pub struct ClassTab {
-    table: HashMap<String, LLVMTypeRef>
+    table: HashMap<String, LLVMTypeRef>,
 }
 
 impl ClassTab {
     pub fn new() -> ClassTab {
         ClassTab {
-            table: HashMap::new()
+            table: HashMap::new(),
         }
     }
 
@@ -19,7 +19,7 @@ impl ClassTab {
     pub fn retrieve(&self, key: &str) -> Option<LLVMTypeRef> {
         match self.table.get(key) {
             Some(val) => Some(*val),
-            None => None
+            None => None,
         }
     }
 }

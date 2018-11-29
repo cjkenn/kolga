@@ -61,61 +61,52 @@ pub enum TknTy {
     Null,
     Void,
 
-    Eof
+    Eof,
 }
 
 impl TknTy {
     pub fn is_bin_op(&self) -> bool {
         match self {
-            TknTy::Plus |
-            TknTy::Minus |
-            TknTy::Star |
-            TknTy::Slash |
-            TknTy::Percent |
-            TknTy::EqEq |
-            TknTy::BangEq |
-            TknTy::Gt |
-            TknTy::Lt |
-            TknTy::GtEq |
-            TknTy::LtEq => true,
-            _ => false
+            TknTy::Plus
+            | TknTy::Minus
+            | TknTy::Star
+            | TknTy::Slash
+            | TknTy::Percent
+            | TknTy::EqEq
+            | TknTy::BangEq
+            | TknTy::Gt
+            | TknTy::Lt
+            | TknTy::GtEq
+            | TknTy::LtEq => true,
+            _ => false,
         }
     }
 
     pub fn is_numerical_op(&self) -> bool {
         match self {
-            TknTy::Plus |
-            TknTy::Minus |
-            TknTy::Star |
-            TknTy::Slash |
-            TknTy::Percent => true,
-            _ => false
+            TknTy::Plus | TknTy::Minus | TknTy::Star | TknTy::Slash | TknTy::Percent => true,
+            _ => false,
         }
     }
 
     pub fn is_cmp_op(&self) -> bool {
         match self {
-            TknTy::EqEq |
-            TknTy::BangEq |
-            TknTy::Gt |
-            TknTy::Lt |
-            TknTy::GtEq |
-            TknTy::LtEq => true,
-            _ => false
+            TknTy::EqEq | TknTy::BangEq | TknTy::Gt | TknTy::Lt | TknTy::GtEq | TknTy::LtEq => true,
+            _ => false,
         }
     }
 
     pub fn is_logical_op(&self) -> bool {
         match self {
             TknTy::AmpAmp | TknTy::PipePipe | TknTy::Or | TknTy::And => true,
-             _ => false
+            _ => false,
         }
     }
 
     pub fn is_unary_op(&self) -> bool {
         match self {
             TknTy::Minus | TknTy::Bang => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -175,7 +166,7 @@ impl fmt::Debug for TknTy {
             TknTy::And => "and".to_string(),
             TknTy::Null => "null".to_string(),
             TknTy::Void => "void".to_string(),
-            TknTy::Eof => "EOF".to_string()
+            TknTy::Eof => "EOF".to_string(),
         };
 
         write!(f, "{}", pretty_ty)
@@ -237,7 +228,7 @@ impl fmt::Display for TknTy {
             TknTy::And => "and".to_string(),
             TknTy::Null => "null".to_string(),
             TknTy::Void => "void".to_string(),
-            TknTy::Eof => "EOF".to_string()
+            TknTy::Eof => "EOF".to_string(),
         };
 
         write!(f, "{}", pretty_ty)
@@ -248,7 +239,7 @@ impl fmt::Display for TknTy {
 pub struct Token {
     pub ty: TknTy,
     pub line: usize,
-    pub pos: usize
+    pub pos: usize,
 }
 
 impl Token {
@@ -256,36 +247,36 @@ impl Token {
         Token {
             ty: ty,
             line: line,
-            pos: pos
+            pos: pos,
         }
     }
 
     pub fn is_ty(&self) -> bool {
-        self.ty == TknTy::Num ||
-            self.ty == TknTy::String ||
-            self.ty == TknTy::Bool ||
-            self.ty == TknTy::Void
+        self.ty == TknTy::Num
+            || self.ty == TknTy::String
+            || self.ty == TknTy::Bool
+            || self.ty == TknTy::Void
     }
 
     pub fn get_name(&self) -> String {
         match self.ty {
             TknTy::Ident(ref name) => name.to_string(),
             TknTy::Str(ref name) => name.to_string(),
-            _ => panic!("{:?} Wrong token type!", self)
+            _ => panic!("{:?} Wrong token type!", self),
         }
     }
 
     pub fn get_val(&self) -> f64 {
         match self.ty {
             TknTy::Val(v) => v,
-            _ => panic!("{:?} Wrong token type!", self)
+            _ => panic!("{:?} Wrong token type!", self),
         }
     }
 
     pub fn is_ident(&self) -> bool {
         match self.ty {
             TknTy::Ident(_) => true,
-            _ => false
+            _ => false,
         }
     }
 }

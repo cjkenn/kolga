@@ -1,15 +1,15 @@
-extern crate llvm_sys;
-extern crate kolgac;
 extern crate error;
+extern crate kolgac;
+extern crate llvm_sys;
 
 macro_rules! c_str {
-    ($s:expr) => (
+    ($s:expr) => {
         concat!($s, "\0").as_ptr() as *const i8
-    );
+    };
 }
 
-pub mod llvm;
-pub mod valtab;
 pub mod classtab;
 pub mod fpm;
+pub mod llvm;
 pub mod obj;
+pub mod valtab;

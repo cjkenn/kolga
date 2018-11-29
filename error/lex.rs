@@ -3,13 +3,13 @@ use KolgaErr;
 #[derive(Debug, Clone)]
 pub enum LexErrTy {
     UnknownChar(char),
-    UnterminatedStr(String)
+    UnterminatedStr(String),
 }
 
 pub struct LexErr {
     pub line: usize,
     pub pos: usize,
-    pub ty: LexErrTy
+    pub ty: LexErrTy,
 }
 
 impl LexErr {
@@ -17,7 +17,7 @@ impl LexErr {
         LexErr {
             line: line,
             pos: pos,
-            ty: ty
+            ty: ty,
         }
     }
 }
@@ -31,9 +31,7 @@ impl KolgaErr for LexErr {
         let str_pos = format!("[Line {}:{}]", self.line, self.pos);
 
         match self.ty {
-            LexErrTy::UnknownChar(ref ch) => {
-                format!("{} Unrecognized character '{}'", str_pos, ch)
-            },
+            LexErrTy::UnknownChar(ref ch) => format!("{} Unrecognized character '{}'", str_pos, ch),
             LexErrTy::UnterminatedStr(ref found) => {
                 format!("{} Unterminated string literal '{}'", str_pos, found)
             }

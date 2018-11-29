@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use llvm_sys::prelude::LLVMValueRef;
+use std::collections::HashMap;
 
 type Scope = HashMap<String, LLVMValueRef>;
 
@@ -8,14 +8,14 @@ type Scope = HashMap<String, LLVMValueRef>;
 // codegen, then we use the same symbol table throughout.
 pub struct ValTab {
     curr_level: usize,
-    table: Vec<Scope>
+    table: Vec<Scope>,
 }
 
 impl ValTab {
     pub fn new() -> ValTab {
         ValTab {
             curr_level: 0,
-            table: vec![HashMap::new()]
+            table: vec![HashMap::new()],
         }
     }
 
@@ -38,9 +38,13 @@ impl ValTab {
 
         while curr >= 0 {
             match self.table[curr].get(key) {
-                Some(val) => { return Some(*val); },
-                None if curr == 0 => { break; },
-                None => ()
+                Some(val) => {
+                    return Some(*val);
+                }
+                None if curr == 0 => {
+                    break;
+                }
+                None => (),
             };
             curr = curr - 1;
         }

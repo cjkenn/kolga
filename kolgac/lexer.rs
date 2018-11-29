@@ -1,10 +1,10 @@
-use std::io::{BufReader, BufRead, Seek, SeekFrom};
-use std::fs::File;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 
 use error::lex::{LexErr, LexErrTy};
 use error::KolgaErr;
-use token::{Token, TknTy};
+use token::{TknTy, Token};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -27,14 +27,16 @@ pub struct Lexer {
     reserved: HashMap<String, TknTy>,
 
     /// Number of cumulative bytes read by the reader in this lexer
-    bytes_read: usize
+    bytes_read: usize,
 }
 
 impl Lexer {
     pub fn new(infile: File) -> Lexer {
         let mut reader = BufReader::new(infile);
         let mut buf = String::new();
-        let init_bytes = reader.read_line(&mut buf).expect("reading from buffer won't fail");
+        let init_bytes = reader
+            .read_line(&mut buf)
+            .expect("reading from buffer won't fail");
 
         let buffer: Vec<char> = buf.chars().collect();
         let currch = if buffer.len() == 0 {
@@ -43,33 +45,35 @@ impl Lexer {
             Some(buffer[0])
         };
 
-        let r: HashMap<String, TknTy> =
-            [
-                (String::from("let"), TknTy::Let),
-                (String::from("imm"), TknTy::Imm),
-                (String::from("fn"), TknTy::Fn),
-                (String::from("return"), TknTy::Return),
-                (String::from("class"), TknTy::Class),
-                (String::from("this"), TknTy::This),
-                (String::from("if"), TknTy::If),
-                (String::from("elif"), TknTy::Elif),
-                (String::from("then"), TknTy::Then),
-                (String::from("el"), TknTy::Else),
-                (String::from("else"), TknTy::Else),
-                (String::from("while"), TknTy::While),
-                (String::from("in"), TknTy::In),
-                (String::from("for"), TknTy::For),
-                (String::from("num"), TknTy::Num),
-                (String::from("string"), TknTy::String),
-                (String::from("str"), TknTy::String),
-                (String::from("bool"), TknTy::Bool),
-                (String::from("true"), TknTy::True),
-                (String::from("false"), TknTy::False),
-                (String::from("or"), TknTy::Or),
-                (String::from("and"), TknTy::And),
-                (String::from("null"), TknTy::Null),
-                (String::from("void"), TknTy::Void)
-            ].iter().cloned().collect();
+        let r: HashMap<String, TknTy> = [
+            (String::from("let"), TknTy::Let),
+            (String::from("imm"), TknTy::Imm),
+            (String::from("fn"), TknTy::Fn),
+            (String::from("return"), TknTy::Return),
+            (String::from("class"), TknTy::Class),
+            (String::from("this"), TknTy::This),
+            (String::from("if"), TknTy::If),
+            (String::from("elif"), TknTy::Elif),
+            (String::from("then"), TknTy::Then),
+            (String::from("el"), TknTy::Else),
+            (String::from("else"), TknTy::Else),
+            (String::from("while"), TknTy::While),
+            (String::from("in"), TknTy::In),
+            (String::from("for"), TknTy::For),
+            (String::from("num"), TknTy::Num),
+            (String::from("string"), TknTy::String),
+            (String::from("str"), TknTy::String),
+            (String::from("bool"), TknTy::Bool),
+            (String::from("true"), TknTy::True),
+            (String::from("false"), TknTy::False),
+            (String::from("or"), TknTy::Or),
+            (String::from("and"), TknTy::And),
+            (String::from("null"), TknTy::Null),
+            (String::from("void"), TknTy::Void),
+        ]
+            .iter()
+            .cloned()
+            .collect();
 
         Lexer {
             curr: currch,
@@ -78,7 +82,7 @@ impl Lexer {
             reader: reader,
             buffer: buffer,
             reserved: r,
-            bytes_read: init_bytes
+            bytes_read: init_bytes,
         }
     }
 
@@ -123,9 +127,9 @@ impl Lexer {
                         }
                         return self.lex();
                     }
-                    _ => self.consume(TknTy::Slash)
+                    _ => self.consume(TknTy::Slash),
                 }
-            },
+            }
             '=' => {
                 let nextch = self.peek();
                 match nextch {
@@ -134,9 +138,9 @@ impl Lexer {
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TknTy::Eq)
+                    _ => self.consume(TknTy::Eq),
                 }
-            },
+            }
             '<' => {
                 let nextch = self.peek();
                 match nextch {
@@ -145,9 +149,9 @@ impl Lexer {
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TknTy::Lt)
+                    _ => self.consume(TknTy::Lt),
                 }
-            },
+            }
             '>' => {
                 let nextch = self.peek();
                 match nextch {
@@ -156,9 +160,9 @@ impl Lexer {
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TknTy::Gt)
+                    _ => self.consume(TknTy::Gt),
                 }
-            },
+            }
             '!' => {
                 let nextch = self.peek();
                 match nextch {
@@ -167,20 +171,20 @@ impl Lexer {
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TknTy::Bang)
+                    _ => self.consume(TknTy::Bang),
                 }
-            },
+            }
             '&' => {
                 let nextch = self.peek();
-                 match nextch {
+                match nextch {
                     Some(ch) if ch == '&' => {
                         let tkn = self.consume(TknTy::AmpAmp);
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TknTy::Amp)
-                 }
-            },
+                    _ => self.consume(TknTy::Amp),
+                }
+            }
             '|' => {
                 let nextch = self.peek();
                 match nextch {
@@ -189,9 +193,9 @@ impl Lexer {
                         self.advance();
                         tkn
                     }
-                    _ => self.consume(TknTy::Pipe)
-                 }
-            },
+                    _ => self.consume(TknTy::Pipe),
+                }
+            }
             _ if ch.is_digit(10) => self.lex_num(),
             _ if ch.is_alphabetic() => self.lex_ident(),
             _ => {
@@ -247,7 +251,7 @@ impl Lexer {
                         lit.push(ch);
                         self.advance();
                     }
-                },
+                }
                 None => {
                     LexErr::new(self.linenum, self.pos, LexErrTy::UnterminatedStr(lit)).emit();
                     return self.eof_tkn();
@@ -342,11 +346,11 @@ impl Lexer {
 
     /// Return the next char in the buffer, if any.
     fn peek(&mut self) -> Option<char> {
-        if self.pos >= self.buffer.len()-1 {
+        if self.pos >= self.buffer.len() - 1 {
             return None;
         }
 
-       Some(self.buffer[self.pos+1])
+        Some(self.buffer[self.pos + 1])
     }
 
     /// Move the char position ahead by 1. If we are at the end of the current
@@ -355,10 +359,10 @@ impl Lexer {
     fn advance(&mut self) {
         let on_new_line = match self.curr {
             Some(ch) if ch == '\n' => true,
-            _ => false
+            _ => false,
         };
 
-        if self.pos == self.buffer.len()-1 || on_new_line {
+        if self.pos == self.buffer.len() - 1 || on_new_line {
             self.next_line();
         } else {
             self.pos = self.pos + 1;
@@ -374,7 +378,10 @@ impl Lexer {
     /// Read the next line of the input file into the buffer.
     fn next_line(&mut self) {
         let mut buf = String::new();
-        let line_bytes = self.reader.read_line(&mut buf).expect("file reader should not fail");
+        let line_bytes = self
+            .reader
+            .read_line(&mut buf)
+            .expect("file reader should not fail");
         self.buffer = buf.chars().collect();
         self.bytes_read = self.bytes_read + line_bytes;
 
