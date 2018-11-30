@@ -2,6 +2,13 @@ use std::collections::HashMap;
 use token::Token;
 use ty_rec::TyRec;
 
+/// AST represents an AST node in our parse tree. Each node can contain different fields and
+/// should be represented by an anonymous struct to better document those fields, so that we know
+/// what each of the members of the enum type is supposed to represent.
+/// Nodes can be statements or expressions. Expr nodes imply that some value in the node
+/// can be "used", ie. that node has a type. Thus, expr nodes should contain a TyRec field
+/// with type information. Statement nodes generally wrap other statements or expressions,
+/// so their containing (child) nodes may have Types but not the statement nodes themselves.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
     Prog {
@@ -37,11 +44,13 @@ pub enum Ast {
         stmts: Box<Ast>,
     },
 
-    // Return expr, if any
-    RetStmt(Box<Option<Ast>>),
+    RetStmt {
+        ret_expr: Option<Box<Ast>>,
+    },
 
-    // expr
-    ExprStmt(Box<Ast>),
+    ExprStmt {
+        expr: Box<Ast>,
+    },
 
     VarDeclExpr {
         ty_rec: TyRec,
@@ -78,6 +87,11 @@ pub enum Ast {
         rhs: Box<Ast>,
     },
 
+    PrimaryExpr {
+        ty_rec: TyRec,
+    },
+
+    // TODO: statement or expr
     FnDecl {
         ident_tkn: Token,
         fn_params: Vec<TyRec>,
@@ -86,11 +100,13 @@ pub enum Ast {
         sc: usize,
     },
 
+    // TODO: statement or expr
     FnCall {
         fn_tkn: Token,
         fn_params: Vec<Ast>,
     },
 
+    // TODO: statement or expr
     ClassDecl {
         ident_tkn: Token,
         methods: Vec<Ast>,
@@ -99,6 +115,7 @@ pub enum Ast {
         sc: usize,
     },
 
+    // TODO: statement or expr
     ClassPropAccess {
         ident_tkn: Token,
         prop_name: String,
@@ -106,6 +123,7 @@ pub enum Ast {
         owner_class: Box<Ast>,
     },
 
+    // TODO: statement or expr
     ClassPropSet {
         ident_tkn: Token,
         prop_name: String,
@@ -114,16 +132,13 @@ pub enum Ast {
         assign_val: Box<Ast>,
     },
 
+    // TODO: statement or expr
     ClassFnCall {
         class_tkn: Token,
         class_name: String,
         fn_tkn: Token,
         fn_params: Vec<Ast>,
         sc: usize,
-    },
-
-    PrimaryExpr {
-        ty_rec: TyRec,
     },
 }
 

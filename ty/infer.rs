@@ -64,7 +64,7 @@ impl TyInfer {
 
     fn assign_ast(&mut self, ast: &mut Ast) {
         match *ast {
-            Ast::ExprStmt(ref mut ast) => self.assign_ast(ast),
+            Ast::ExprStmt { ref mut expr } => self.assign_ast(ast),
             Ast::BlckStmt { ref mut stmts, .. } => {
                 for stmt in stmts.iter_mut() {
                     self.assign_ast(stmt);

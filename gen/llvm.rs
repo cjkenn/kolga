@@ -136,8 +136,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                 generated
             }
-            Ast::ExprStmt(maybe_ast) => {
-                let ast = maybe_ast.clone();
+            Ast::ExprStmt { expr } => {
+                let ast = expr.clone();
                 let val = self.gen_expr(&ast);
                 match val {
                     Some(exprval) => vec![exprval],
@@ -221,12 +221,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         Ast::BlckStmt { stmts, sc: _ } => {
                             for stmt in stmts {
                                 match stmt.clone() {
-                                    Ast::RetStmt(mb_expr) => {
-                                        if mb_expr.is_none() {
+                                    Ast::RetStmt { ret_expr } => {
+                                        if ret_expr.is_none() {
                                             // Use a null ptr when we return void
                                             LLVMBuildRet(self.builder, ptr::null_mut());
                                         } else {
-                                            let llvm_val = self.gen_expr(&mb_expr.clone().unwrap());
+                                            let llvm_val =
+                                                self.gen_expr(&ret_expr.clone().unwrap());
                                             LLVMBuildRet(self.builder, llvm_val.unwrap());
                                         }
                                     }

@@ -559,12 +559,14 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty {
             TknTy::Semicolon => {
                 self.consume();
-                Ok(Ast::RetStmt(Box::new(None)))
+                Ok(Ast::RetStmt { ret_expr: None })
             }
             _ => {
                 let ret_expr = self.expr()?;
                 self.expect(TknTy::Semicolon)?;
-                Ok(Ast::RetStmt(Box::new(Some(ret_expr))))
+                Ok(Ast::RetStmt {
+                    ret_expr: Some(Box::new(ret_expr)),
+                })
             }
         }
     }
@@ -572,7 +574,9 @@ impl<'l, 's> Parser<'l, 's> {
     fn expr_stmt(&mut self) -> Result<Ast, ParseErr> {
         let expr = self.expr()?;
         self.expect(TknTy::Semicolon)?;
-        Ok(Ast::ExprStmt(Box::new(expr)))
+        Ok(Ast::ExprStmt {
+            expr: Box::new(expr),
+        })
     }
 
     fn expr(&mut self) -> Result<Ast, ParseErr> {
@@ -1032,7 +1036,7 @@ impl<'l, 's> Parser<'l, 's> {
                 // If was have no assign value, but we are looking at a param
                 // or function decl sym, we can return the sym. But no assign value on
                 // any other type requires a check that we are assigning to it, otherwise
-                // we are trying to access an udnefined variable.
+                // we are trying to access an undefined variable.
                 // Fn is here to support recursive calls.
                 if sym.assign_val.is_none()
                     && (sym.sym_ty != SymTy::Param && sym.sym_ty != SymTy::Fn)

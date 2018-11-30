@@ -51,10 +51,10 @@ impl<'t, 's> TyCheck<'t, 's> {
             Ast::VarAssignExpr { .. } => {
                 self.check_var_assign(&stmt, final_sc);
             }
-            Ast::ExprStmt(ast) => {
-                match *ast.clone() {
+            Ast::ExprStmt { expr } => {
+                match *expr.clone() {
                     Ast::FnCall { .. } => {
-                        self.check_fn_params(*ast, final_sc);
+                        self.check_fn_params(*expr, final_sc);
                         ()
                     }
                     Ast::ClassFnCall {
@@ -64,11 +64,11 @@ impl<'t, 's> TyCheck<'t, 's> {
                         fn_params: _,
                         sc,
                     } => {
-                        self.check_fn_params(*ast, sc);
+                        self.check_fn_params(*expr, sc);
                         ()
                     }
                     _ => {
-                        let astptr = *ast;
+                        let astptr = *expr;
                         self.check_expr(&astptr, final_sc);
                         ()
                     }
@@ -168,14 +168,14 @@ impl<'t, 's> TyCheck<'t, 's> {
         for maybe_stmt in &stmts {
             let stmt = maybe_stmt.clone();
             match stmt {
-                Ast::RetStmt(maybe_expr) => {
+                Ast::RetStmt { ret_expr } => {
                     has_ret_stmt = true;
-                    if maybe_expr.is_none() {
+                    if ret_expr.is_none() {
                         if fn_ret_ty != TyName::Void {
                             self.ty_mismatch(&fn_tkn, &fn_ret_ty, &TyName::Void);
                         }
                     } else {
-                        let rhs_ty = self.check_expr(&maybe_expr.clone().unwrap(), sc_lvl);
+                        let rhs_ty = self.check_expr(&ret_expr.clone().unwrap(), sc_lvl);
                         if fn_ret_ty != rhs_ty {
                             self.ty_mismatch(&fn_tkn, &fn_ret_ty, &rhs_ty);
                         }
