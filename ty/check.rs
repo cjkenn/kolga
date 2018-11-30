@@ -233,7 +233,7 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             }
-            Ast::PrimaryExpr { ty_rec } => match ty_rec.tkn.ty {
+            Ast::PrimaryExpr { tkn, ty } => match tkn.ty {
                 TknTy::Ident(ref name) => {
                     let sym = self
                         .symtab
@@ -242,7 +242,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     return sym.ty_rec.ty.clone().unwrap();
                 }
                 _ => {
-                    return ty_rec.ty.clone().unwrap();
+                    return ty.clone();
                 }
             },
             Ast::ClassDecl {

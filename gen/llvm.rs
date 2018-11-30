@@ -466,7 +466,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// to terminate on.
     fn gen_expr(&mut self, expr: &Ast) -> Option<LLVMValueRef> {
         match expr {
-            Ast::PrimaryExpr { ty_rec } => self.gen_primary(&ty_rec),
+            // TODO: Ast::PrimaryExpr { ty_rec } => self.gen_primary(&ty_rec),
             Ast::BinaryExpr {
                 ty_rec: _,
                 op_tkn,

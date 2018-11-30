@@ -7,7 +7,7 @@ use std::rc::Rc;
 use sym::{Sym, SymTy};
 use symtab::SymbolTable;
 use token::{TknTy, Token};
-use ty_rec::{TyName, TyRec};
+use types::KolgaTy;
 
 const FN_PARAM_MAX_LEN: usize = 64;
 
@@ -178,7 +178,7 @@ impl<'l, 's> Parser<'l, 's> {
                         .symtab
                         .retrieve(&var_ty_tkn.clone().unwrap().get_name())
                         .unwrap();
-                    let cl_ty_rec = TyRec::new_from_tkn(var_ty_tkn.clone().unwrap());
+                    let cl_ty = KolgaTy::new(&var_ty_tkn.clone().unwrap().ty);
                     let cl_assign = class_sym.assign_val.clone();
                     let cl_sym = Sym::new(
                         SymTy::Var,
@@ -193,7 +193,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.symtab.store(name, cl_sym);
 
                     return Ok(Ast::VarAssignExpr {
-                        ty_rec: cl_ty_rec,
+                        ty: cl_ty,
                         ident_tkn: ident_tkn.clone().unwrap(),
                         is_imm: is_imm,
                         is_global: self.symtab.is_global(),
@@ -201,7 +201,7 @@ impl<'l, 's> Parser<'l, 's> {
                     });
                 }
 
-                let ty_rec = TyRec::new_from_tkn(var_ty_tkn.unwrap());
+                let ty = TyRec::new(&var_ty_tkn.unwrap().ty);
                 let sym = Sym::new(
                     SymTy::Var,
                     is_imm,
@@ -215,7 +215,7 @@ impl<'l, 's> Parser<'l, 's> {
                 self.symtab.store(name, sym);
 
                 Ok(Ast::VarDeclExpr {
-                    ty_rec: ty_rec,
+                    ty: ty,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
                     is_global: self.symtab.is_global(),
@@ -593,8 +593,8 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.assign_expr()?;
 
                 match ast.clone() {
-                    Ast::PrimaryExpr { ty_rec } => {
-                        match ty_rec.tkn.ty {
+                    Ast::PrimaryExpr { tkn, .. } => {
+                        match tkn.ty {
                             TknTy::Ident(name) => {
                                 let maybe_sym = self.symtab.retrieve(&name);
                                 if maybe_sym.is_none() {
@@ -615,9 +615,8 @@ impl<'l, 's> Parser<'l, 's> {
                                 });
                             }
                             _ => {
-                                return Err(self.error(ParseErrTy::InvalidAssign(
-                                    ty_rec.tkn.ty.clone().to_string(),
-                                )));
+                                return Err(self
+                                    .error(ParseErrTy::InvalidAssign(tkn.ty.clone().to_string())));
                             }
                         };
                     }
@@ -802,7 +801,7 @@ impl<'l, 's> Parser<'l, 's> {
     fn fncall_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.primary_expr()?;
         let ident_tkn = match ast.clone() {
-            Ast::PrimaryExpr { ty_rec } => Some(ty_rec.tkn),
+            Ast::PrimaryExpr { tkn, .. } => Some(tkn),
             _ => None,
         };
 
@@ -1019,7 +1018,8 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty.clone() {
             TknTy::Str(_) | TknTy::Val(_) | TknTy::True | TknTy::False | TknTy::Null => {
                 let ast = Ok(Ast::PrimaryExpr {
-                    ty_rec: TyRec::new_from_tkn(self.currtkn.clone()),
+                    tkn: self.currtkn.clone(),
+                    ty: KolgaTy::new(&self.currtkn.ty),
                 });
                 self.consume();
                 ast
@@ -1054,7 +1054,8 @@ impl<'l, 's> Parser<'l, 's> {
                 let mut ty_rec = sym.ty_rec.clone();
                 ty_rec.tkn = self.currtkn.clone();
                 let ast = Ok(Ast::PrimaryExpr {
-                    ty_rec: ty_rec.clone(),
+                    tkn: self.currtkn.clone(),
+                    ty: KolgaTy::new(&self.currtkn.ty),
                 });
                 self.consume();
                 ast

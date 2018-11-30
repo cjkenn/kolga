@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use token::Token;
-use ty_rec::TyRec;
+use types::KolgaTy;
 
 /// AST represents an AST node in our parse tree. Each node can contain different fields and
 /// should be represented by an anonymous struct to better document those fields, so that we know
@@ -53,14 +53,14 @@ pub enum Ast {
     },
 
     VarDeclExpr {
-        ty_rec: TyRec,
+        ty: Option<KolgaTy>,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
     },
 
     VarAssignExpr {
-        ty_rec: TyRec,
+        ty: Option<KolgaTy>,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
@@ -68,34 +68,35 @@ pub enum Ast {
     },
 
     LogicalExpr {
-        ty_rec: TyRec,
+        ty: Option<KolgaTy>,
         op_tkn: Token,
         lhs: Box<Ast>,
         rhs: Box<Ast>,
     },
 
     BinaryExpr {
-        ty_rec: TyRec,
+        ty: Option<KolgaTy>,
         op_tkn: Token,
         lhs: Box<Ast>,
         rhs: Box<Ast>,
     },
 
     UnaryExpr {
-        ty_rec: TyRec,
+        ty: Option<KolgaTy>,
         op_tkn: Token,
         rhs: Box<Ast>,
     },
 
     PrimaryExpr {
-        ty_rec: TyRec,
+        tkn: Token,
+        ty: Option<KolgaTy>,
     },
 
     // TODO: statement or expr
     FnDecl {
+        ty: Option<KolgaTy>,
         ident_tkn: Token,
         fn_params: Vec<TyRec>,
-        ret_ty: TyRec,
         fn_body: Box<Ast>,
         sc: usize,
     },
@@ -147,13 +148,6 @@ impl Ast {
         match self {
             Ast::PrimaryExpr { .. } => true,
             _ => false,
-        }
-    }
-
-    pub fn extract_primary_ty_rec(&self) -> TyRec {
-        match self {
-            Ast::PrimaryExpr { ty_rec } => ty_rec.clone(),
-            _ => panic!(),
         }
     }
 
