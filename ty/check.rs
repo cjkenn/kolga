@@ -138,6 +138,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 };
             }
             Ast::ClassDecl {
+                ty_rec: _,
                 ident_tkn: _,
                 methods,
                 props,
@@ -233,28 +234,8 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             }
-            Ast::PrimaryExpr { ty_rec } => match ty_rec.tkn.ty {
-                TknTy::Ident(ref name) => {
-                    let sym = self
-                        .symtab
-                        .retrieve_from_finalized_sc(name, final_sc)
-                        .unwrap();
-                    return sym.ty_rec.ty.clone().unwrap();
-                }
-                _ => {
-                    return ty_rec.ty.clone().unwrap();
-                }
-            },
-            Ast::ClassDecl {
-                ident_tkn,
-                methods: _,
-                props: _,
-                prop_pos: _,
-                sc: _,
-            } => {
-                let sym = self.symtab.retrieve(&ident_tkn.get_name()).unwrap();
-                sym.ty_rec.ty.clone().unwrap()
-            }
+            Ast::PrimaryExpr { ty_rec } => ty_rec.ty.clone().unwrap(),
+            Ast::ClassDecl { ty_rec, .. } => ty_rec.ty.clone().unwrap(),
             Ast::ClassPropAccess {
                 ident_tkn: _,
                 prop_name,
@@ -265,12 +246,13 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    /// Given a class declaration, retrieve the type of a property in the class. Because
+    /// Given a class declaration, find the type of a property in the class. Because
     /// a class does not maintain a mapping of properties (right now), we loop through all
     /// available props until we find the name of the expected prop (the second param).
     fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name: String) -> TyName {
         match class_decl_ast {
             Ast::ClassDecl {
+                ty_rec: _,
                 ident_tkn: _,
                 methods: _,
                 props,

@@ -362,8 +362,7 @@ impl<'l, 's> Parser<'l, 's> {
                         Ast::VarDeclExpr {
                             ty_rec: _,
                             ident_tkn,
-                            is_imm: _,
-                            is_global: _,
+                            ..
                         } => {
                             prop_map.insert(ident_tkn.get_name(), prop_ctr);
                         }
@@ -392,6 +391,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         let final_sc_lvl = self.symtab.finalize_sc();
         let ast = Ast::ClassDecl {
+            ty_rec: TyRec::new_from_tkn(class_tkn.clone()),
             ident_tkn: class_tkn.clone(),
             methods: methods,
             props: props,
@@ -837,6 +837,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let (sc_lvl, class_name) =
                     match class_sym.clone().unwrap().assign_val.clone().unwrap() {
                         Ast::ClassDecl {
+                            ty_rec: _,
                             ident_tkn,
                             methods: _,
                             props: _,
@@ -877,6 +878,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let owner = class_ptr.assign_val.clone().unwrap();
                 let pos = match &owner {
                     Ast::ClassDecl {
+                        ty_rec: _,
                         ident_tkn: _,
                         methods: _,
                         props: _,
@@ -935,6 +937,7 @@ impl<'l, 's> Parser<'l, 's> {
 
                 let params = match class_decl_ast {
                     Ast::ClassDecl {
+                        ty_rec: _,
                         ident_tkn: _,
                         methods,
                         props: _,

@@ -108,6 +108,7 @@ pub enum Ast {
 
     // TODO: statement or expr
     ClassDecl {
+        ty_rec: TyRec,
         ident_tkn: Token,
         methods: Vec<Ast>,
         props: Vec<Ast>,

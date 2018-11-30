@@ -64,7 +64,7 @@ impl TyInfer {
 
     fn assign_ast(&mut self, ast: &mut Ast) {
         match *ast {
-            Ast::ExprStmt { ref mut expr } => self.assign_ast(ast),
+            Ast::ExprStmt { ref mut expr } => self.assign_ast(expr),
             Ast::BlckStmt { ref mut stmts, .. } => {
                 for stmt in stmts.iter_mut() {
                     self.assign_ast(stmt);
@@ -154,7 +154,9 @@ impl TyInfer {
         }
     }
 
-    fn generate_ty_eq(&self, stmt: &Ast) -> TyEq {}
+    fn generate_ty_eq(&self, stmt: &Ast) -> TyEq {
+        unimplemented!()
+    }
 
     fn set_ty(&mut self, ty_rec: &mut TyRec) {
         let new_ty = self.curr_symbolic_ty();
