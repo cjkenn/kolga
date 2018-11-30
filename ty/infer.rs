@@ -2,6 +2,17 @@ use error::ty::TypeErr;
 use kolgac::ast::Ast;
 use kolgac::ty_rec::{TyName, TyRec};
 
+struct TyEq {
+    pub lhs: TyRec,
+    pub rhs: TyRec,
+}
+
+impl TyEq {
+    pub fn new(lhs: TyRec, rhs: TyRec) -> TyEq {
+        TyEq { lhs: lhs, rhs: rhs }
+    }
+}
+
 pub struct TyInfer {
     ty_count: usize,
     errors: Vec<TypeErr>,
@@ -19,8 +30,12 @@ impl TyInfer {
         match ast {
             Ast::Prog { stmts } => {
                 self.assign(stmts);
-                //self.gen_eq(stmts);
-                //self.unify(stmts);
+                let ty_eqs = self.ty_eq(stmts);
+                // TODO: unify should return a map from var name to TyRec. We should then
+                // iterate this map and set all the TyRecords in the symbol table to these
+                // values in the map. The symbol table and ast ty records need to be kept
+                // in sync though
+                // self.unify(stmts);
             }
             _ => panic!("invalid ast found in type infer!"),
         };
@@ -34,8 +49,13 @@ impl TyInfer {
         }
     }
 
-    fn gen_eq(&mut self, stmts: &mut Vec<Ast>) {
-        unimplemented!()
+    fn ty_eq(&mut self, stmts: &mut Vec<Ast>) -> Vec<TyEq> {
+        let mut ty_eqs = Vec::new();
+        for stmt in stmts.iter() {
+            ty_eqs.push(self.generate_ty_eq(stmt));
+        }
+
+        ty_eqs
     }
 
     fn unify(&mut self, stmts: &mut Vec<Ast>) {
@@ -133,6 +153,8 @@ impl TyInfer {
             _ => (),
         }
     }
+
+    fn generate_ty_eq(&self, stmt: &Ast) -> TyEq {}
 
     fn set_ty(&mut self, ty_rec: &mut TyRec) {
         let new_ty = self.curr_symbolic_ty();
