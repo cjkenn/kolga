@@ -27,7 +27,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// checking.
     pub fn check(&mut self) -> Vec<TypeErr> {
         match self.ast {
-            Ast::Prog { stmts } => {
+            Ast::Prog { num: _, stmts } => {
                 for stmt in stmts {
                     // Pass in 0 for the global scope.
                     self.check_stmt(stmt.clone(), 0);
@@ -51,13 +51,14 @@ impl<'t, 's> TyCheck<'t, 's> {
             Ast::VarAssignExpr { .. } => {
                 self.check_var_assign(&stmt, final_sc);
             }
-            Ast::ExprStmt { expr } => {
+            Ast::ExprStmt { num: _, expr } => {
                 match *expr.clone() {
                     Ast::FnCall { .. } => {
                         self.check_fn_params(*expr, final_sc);
                         ()
                     }
                     Ast::ClassFnCall {
+                        num: _,
                         class_tkn: _,
                         class_name: _,
                         fn_tkn: _,
@@ -75,6 +76,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 };
             }
             Ast::IfStmt {
+                num: _,
                 cond_expr,
                 if_stmts,
                 elif_exprs,
@@ -92,17 +94,26 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone(), final_sc);
                 }
             }
-            Ast::WhileStmt { cond_expr, stmts } => {
+            Ast::WhileStmt {
+                num: _,
+                cond_expr,
+                stmts,
+            } => {
                 let expr = *cond_expr;
                 self.check_expr(&expr, final_sc);
                 self.check_stmt(*stmts, final_sc);
             }
-            Ast::ElifStmt { cond_expr, stmts } => {
+            Ast::ElifStmt {
+                num: _,
+                cond_expr,
+                stmts,
+            } => {
                 let expr = *cond_expr;
                 self.check_expr(&expr, final_sc);
                 self.check_stmt(*stmts, final_sc);
             }
             Ast::ForStmt {
+                num: _,
                 for_var_decl,
                 for_cond_expr,
                 for_step_expr,
@@ -113,12 +124,13 @@ impl<'t, 's> TyCheck<'t, 's> {
                 self.check_stmt(*for_step_expr, final_sc);
                 self.check_stmt(*stmts, final_sc);
             }
-            Ast::BlckStmt { stmts, sc } => {
+            Ast::BlckStmt { num: _, stmts, sc } => {
                 for stmt in &stmts {
                     self.check_stmt(stmt.clone(), sc);
                 }
             }
             Ast::FnDecl {
+                num: _,
                 ident_tkn,
                 fn_params: _,
                 ret_ty,
@@ -129,6 +141,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 let fn_stmts = *fn_body;
                 match fn_stmts {
                     Ast::BlckStmt {
+                        num: _,
                         stmts,
                         sc: inner_sc,
                     } => {
@@ -138,6 +151,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 };
             }
             Ast::ClassDecl {
+                num: _,
                 ty_rec: _,
                 ident_tkn: _,
                 methods,
@@ -169,7 +183,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         for maybe_stmt in &stmts {
             let stmt = maybe_stmt.clone();
             match stmt {
-                Ast::RetStmt { ret_expr } => {
+                Ast::RetStmt { num: _, ret_expr } => {
                     has_ret_stmt = true;
                     if ret_expr.is_none() {
                         if fn_ret_ty != KolgaTy::Void {
@@ -197,20 +211,15 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_expr(&mut self, expr: &Ast, final_sc: usize) -> KolgaTy {
         match expr {
-            Ast::VarAssignExpr {
-                ty_rec: _,
-                ident_tkn: _,
-                is_imm: _,
-                is_global: _,
-                value: _,
-            } => self.check_var_assign(expr, final_sc),
+            Ast::VarAssignExpr { .. } => self.check_var_assign(expr, final_sc),
             Ast::UnaryExpr {
+                num: _,
                 ty_rec: _,
                 op_tkn,
                 rhs,
             } => {
                 if rhs.is_primary() {
-                    let rhs_ty_rec = rhs.extract_primary_ty_rec();
+                    let rhs_ty_rec = rhs.get_ty_rec().unwrap();
                     return self.reduce_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
                 } else {
                     let rhs_ty = self.check_expr(rhs, final_sc);
@@ -218,12 +227,14 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
             }
             Ast::BinaryExpr {
+                num: _,
                 ty_rec: _,
                 op_tkn,
                 lhs,
                 rhs,
             }
             | Ast::LogicalExpr {
+                num: _,
                 ty_rec: _,
                 op_tkn,
                 lhs,
@@ -234,9 +245,10 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             }
-            Ast::PrimaryExpr { ty_rec } => ty_rec.ty.clone().unwrap(),
-            Ast::ClassDecl { ty_rec, .. } => ty_rec.ty.clone().unwrap(),
+            Ast::PrimaryExpr { num: _, ty_rec } => ty_rec.ty.clone().unwrap(),
+            Ast::ClassDecl { num: _, ty_rec, .. } => ty_rec.ty.clone().unwrap(),
             Ast::ClassPropAccess {
+                num: _,
                 ident_tkn: _,
                 prop_name,
                 idx: _,
@@ -252,12 +264,12 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name: String) -> KolgaTy {
         match class_decl_ast {
             Ast::ClassDecl {
+                num: _,
                 ty_rec: _,
                 ident_tkn: _,
                 methods: _,
                 props,
-                prop_pos: _,
-                sc: _,
+                ..
             } => {
                 let mut prop_ty = None;
                 // TODO: this is O(n) and not efficient (should store props in a map)
@@ -266,8 +278,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         Ast::VarDeclExpr {
                             ref ty_rec,
                             ref ident_tkn,
-                            is_imm: _,
-                            is_global: _,
+                            ..
                         }
                             if ident_tkn.get_name() == prop_name =>
                         {
@@ -276,9 +287,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         Ast::VarAssignExpr {
                             ref ty_rec,
                             ref ident_tkn,
-                            is_imm: _,
-                            is_global: _,
-                            value: _,
+                            ..
                         }
                             if ident_tkn.get_name() == prop_name =>
                         {
@@ -300,7 +309,11 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_fn_params(&mut self, fn_call_ast: Ast, final_sc: usize) {
         match fn_call_ast {
-            Ast::FnCall { fn_tkn, fn_params } => {
+            Ast::FnCall {
+                num: _,
+                fn_tkn,
+                fn_params,
+            } => {
                 let fn_sym = self.find_fn_sym(&fn_tkn.clone(), final_sc);
                 let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
 
@@ -318,6 +331,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
             }
             Ast::ClassFnCall {
+                num: _,
                 class_tkn: _,
                 class_name: _,
                 fn_tkn,
@@ -413,6 +427,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn check_var_assign(&mut self, stmt: &Ast, sc: usize) -> KolgaTy {
         match stmt {
             Ast::VarAssignExpr {
+                num: _,
                 ty_rec,
                 ident_tkn,
                 is_imm: _,

@@ -21,27 +21,20 @@ impl<'a> TypeEquation<'a> {
 }
 
 pub struct TyInfer {
-    ty_count: usize,
     errors: Vec<TypeErr>,
 }
 
 impl TyInfer {
     pub fn new() -> TyInfer {
-        TyInfer {
-            ty_count: 0,
-            errors: Vec::new(),
-        }
+        TyInfer { errors: Vec::new() }
     }
 
     pub fn infer(&mut self, ast: &mut Ast) -> Vec<TypeErr> {
         match ast {
-            Ast::Prog { stmts } => {
+            Ast::Prog { num: _, stmts } => {
                 let ty_eqs = self.ty_eq(stmts);
-                // TODO: unify should return a map from var name to TypeRecord. We should then
-                // iterate this map and set all the TypeRecordords in the symbol table to these
-                // values in the map. The symbol table and ast ty records need to be kept
-                // in sync though
-                // self.unify(stmts);
+                // TODO: unify should return a map from ast num to TypeRecord
+                self.unify(ty_eqs);
             }
             _ => panic!("invalid ast found in type infer!"),
         };
@@ -58,14 +51,14 @@ impl TyInfer {
         ty_eqs
     }
 
-    fn unify(&mut self, stmts: &mut Vec<Ast>) {
+    fn unify<'a>(&mut self, ty_eqs: Vec<TypeEquation<'a>>) {
         unimplemented!()
     }
 
     fn gen_ty_eq<'a>(&self, ast: &'a Ast) -> Vec<TypeEquation<'a>> {
         let mut ty_eqs = Vec::new();
         match *ast {
-            Ast::PrimaryExpr { ref ty_rec } => {
+            Ast::PrimaryExpr { num: _, ref ty_rec } => {
                 let lhs_ty = match ty_rec.tkn.ty {
                     TknTy::Num => Some(KolgaTy::Num),
                     TknTy::String => Some(KolgaTy::String),
@@ -85,12 +78,14 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::LogicalExpr {
+                num: _,
                 ref ty_rec,
                 ref op_tkn,
                 ref lhs,
                 ref rhs,
             }
             | Ast::BinaryExpr {
+                num: _,
                 ref ty_rec,
                 ref op_tkn,
                 ref lhs,
@@ -124,6 +119,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::UnaryExpr {
+                num: _,
                 ref ty_rec,
                 ref op_tkn,
                 ref rhs,
@@ -148,17 +144,20 @@ impl TyInfer {
 
                 ty_eqs
             }
-            Ast::ExprStmt { ref expr } => {
+            Ast::ExprStmt { num: _, ref expr } => {
                 ty_eqs.extend(self.gen_ty_eq(expr));
                 ty_eqs
             }
-            Ast::BlckStmt { ref stmts, .. } => {
+            Ast::BlckStmt {
+                num: _, ref stmts, ..
+            } => {
                 for stmt in stmts.iter() {
                     ty_eqs.extend(self.gen_ty_eq(stmt));
                 }
                 ty_eqs
             }
             Ast::IfStmt {
+                num: _,
                 ref cond_expr,
                 ref if_stmts,
                 ref elif_exprs,
@@ -184,6 +183,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::ElifStmt {
+                num: _,
                 ref cond_expr,
                 ref stmts,
             } => {
@@ -199,6 +199,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::WhileStmt {
+                num: _,
                 ref cond_expr,
                 ref stmts,
             } => {
@@ -214,6 +215,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::ForStmt {
+                num: _,
                 ref for_var_decl,
                 ref for_cond_expr,
                 ref for_step_expr,
@@ -248,6 +250,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::VarAssignExpr {
+                num: _,
                 ref ty_rec,
                 ident_tkn: _,
                 is_imm: _,
@@ -261,13 +264,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::VarDeclExpr { .. } => ty_eqs,
-            Ast::RetStmt { ret_expr } => {
-                if ret_expr.is_some() {
-                    ty_eqs.extend(self.gen_ty_eq(&ret_expr.unwrap()));
-                }
-
-                ty_eqs
-            }
+            Ast::RetStmt { .. } => unimplemented!(),
             Ast::ClassDecl { .. } => unimplemented!(),
             Ast::FnDecl { .. } => unimplemented!(),
             Ast::FnCall { .. } => unimplemented!(),

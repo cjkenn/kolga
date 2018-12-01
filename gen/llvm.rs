@@ -84,7 +84,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// to be converted to assembly later.
     pub fn gen_ir(&mut self) {
         match self.ast {
-            Ast::Prog { stmts } => {
+            Ast::Prog { num: _, stmts } => {
                 for stmt in stmts {
                     self.gen_stmt(stmt);
                 }
@@ -127,7 +127,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     // we need to know which values we generated.
     fn gen_stmt(&mut self, stmt: &Ast) -> Vec<LLVMValueRef> {
         match stmt {
-            Ast::BlckStmt { stmts, sc: _ } => {
+            Ast::BlckStmt {
+                num: _,
+                stmts,
+                sc: _,
+            } => {
                 let mut generated = Vec::new();
                 for stmt in stmts {
                     let mb_gen = self.gen_stmt(&stmt.clone());
@@ -136,7 +140,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                 generated
             }
-            Ast::ExprStmt { expr } => {
+            Ast::ExprStmt { num: _, expr } => {
                 let ast = expr.clone();
                 let val = self.gen_expr(&ast);
                 match val {
@@ -148,19 +152,26 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
             Ast::IfStmt {
+                num: _,
                 cond_expr,
                 if_stmts,
                 elif_exprs,
                 el_stmts,
             } => self.if_stmt(cond_expr, if_stmts, elif_exprs, el_stmts),
-            Ast::WhileStmt { cond_expr, stmts } => self.while_stmt(cond_expr, stmts),
+            Ast::WhileStmt {
+                num: _,
+                cond_expr,
+                stmts,
+            } => self.while_stmt(cond_expr, stmts),
             Ast::ForStmt {
+                num: _,
                 for_var_decl,
                 for_cond_expr,
                 for_step_expr,
                 stmts,
             } => self.for_stmt(for_var_decl, for_cond_expr, for_step_expr, stmts),
             Ast::FnDecl {
+                num: _,
                 ident_tkn,
                 fn_params,
                 ret_ty,
@@ -218,10 +229,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                     // TODO: this is hard to read -_-
                     match *fn_body.clone() {
-                        Ast::BlckStmt { stmts, sc: _ } => {
+                        Ast::BlckStmt {
+                            num: _,
+                            stmts,
+                            sc: _,
+                        } => {
                             for stmt in stmts {
                                 match stmt.clone() {
-                                    Ast::RetStmt { ret_expr } => {
+                                    Ast::RetStmt { num: _, ret_expr } => {
                                         if ret_expr.is_none() {
                                             // Use a null ptr when we return void
                                             LLVMBuildRet(self.builder, ptr::null_mut());
@@ -254,6 +269,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 Vec::new()
             }
             Ast::VarAssignExpr {
+                num: _,
                 ty_rec,
                 ident_tkn,
                 is_imm: _,
@@ -267,12 +283,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                         match *value.clone() {
                             Ast::ClassDecl {
+                                num: _,
                                 ty_rec: _,
                                 ident_tkn,
-                                methods: _,
-                                props: _,
-                                prop_pos: _,
-                                sc: _,
+                                ..
                             } => {
                                 let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
                                 if llvm_ty.is_none() {
@@ -326,6 +340,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
             Ast::VarDeclExpr {
+                num: _,
                 ty_rec,
                 ident_tkn,
                 is_imm: _,
@@ -351,12 +366,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 },
             },
             Ast::ClassDecl {
+                num: _,
                 ty_rec: _,
                 ident_tkn,
                 methods,
                 props,
-                prop_pos: _,
-                sc: _,
+                ..
             } => {
                 unsafe {
                     let mut prop_tys = Vec::new();
@@ -367,12 +382,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         // So, we want the llvm type of the props, but we
                         // don't want to generate any code for them yet.
                         match &pr.clone() {
-                            Ast::VarDeclExpr {
-                                ty_rec,
-                                ident_tkn: _,
-                                is_imm: _,
-                                is_global: _,
-                            } => {
+                            Ast::VarDeclExpr { num: _, ty_rec, .. } => {
                                 let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
                                 prop_tys.push(llvm_ty);
                             }
@@ -406,6 +416,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     for mtod in methods {
                         match mtod.clone() {
                             Ast::FnDecl {
+                                num,
                                 ident_tkn,
                                 fn_params,
                                 ret_ty,
@@ -436,6 +447,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 );
 
                                 let new_method = Ast::FnDecl {
+                                    num: num,
                                     ident_tkn: new_tkn,
                                     fn_params: new_params,
                                     ret_ty: ret_ty.clone(),
@@ -462,14 +474,16 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// to terminate on.
     fn gen_expr(&mut self, expr: &Ast) -> Option<LLVMValueRef> {
         match expr {
-            Ast::PrimaryExpr { ty_rec } => self.gen_primary(&ty_rec),
+            Ast::PrimaryExpr { num: _, ty_rec } => self.gen_primary(&ty_rec),
             Ast::BinaryExpr {
+                num: _,
                 ty_rec: _,
                 op_tkn,
                 lhs,
                 rhs,
             }
             | Ast::LogicalExpr {
+                num: _,
                 ty_rec: _,
                 op_tkn,
                 lhs,
@@ -492,6 +506,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 self.llvm_val_from_op(&op_tkn.ty, lhs_llvm_val, rhs_llvm_val)
             }
             Ast::UnaryExpr {
+                num: _,
                 ty_rec: _,
                 op_tkn,
                 rhs,
@@ -527,7 +542,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     _ => None,
                 }
             }
-            Ast::FnCall { fn_tkn, fn_params } => {
+            Ast::FnCall {
+                num: _,
+                fn_tkn,
+                fn_params,
+            } => {
                 // Check if the function was defined in the IR. We should always have
                 // the function defined in the IR though, since we wouldn't pass the parsing
                 // phase if we tried to call an undefined function name.
@@ -563,6 +582,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
             Ast::ClassFnCall {
+                num: _,
                 class_tkn,
                 class_name,
                 fn_tkn,
@@ -608,6 +628,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
             Ast::VarAssignExpr {
+                num: _,
                 ty_rec: _,
                 ident_tkn,
                 is_imm: _,
@@ -631,12 +652,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             }
             // Class declarations ast types can be used as rvalues when creating a class.
             Ast::ClassDecl {
+                num: _,
                 ty_rec: _,
                 ident_tkn,
-                methods: _,
-                props: _,
-                prop_pos: _,
-                sc: _,
+                ..
             } => {
                 let name = ident_tkn.get_name();
                 let llvm_struct_ty = self.classtab.retrieve(&name);
@@ -655,6 +674,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
             Ast::ClassPropAccess {
+                num: _,
                 ident_tkn,
                 prop_name,
                 idx,
@@ -811,7 +831,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let mut final_elif_bb = then_bb;
             for (idx, stmt) in else_if_stmts.iter().enumerate() {
                 match stmt.clone() {
-                    Ast::ElifStmt { cond_expr, stmts } => {
+                    Ast::ElifStmt {
+                        num: _,
+                        cond_expr,
+                        stmts,
+                    } => {
                         // Get the conditional block from the vector made above. Create a seperate
                         // block to the elif code to live in, that we can branch to from the
                         // elif conditioanl block.

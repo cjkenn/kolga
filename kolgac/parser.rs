@@ -34,6 +34,7 @@ pub struct Parser<'l, 's> {
     symtab: &'s mut SymbolTable,
     errors: Vec<ParseErr>,
     currtkn: Token,
+    node_count: usize,
 }
 
 impl<'l, 's> Parser<'l, 's> {
@@ -45,6 +46,7 @@ impl<'l, 's> Parser<'l, 's> {
             symtab: symt,
             errors: Vec::new(),
             currtkn: firsttkn,
+            node_count: 1,
         }
     }
 
@@ -71,7 +73,10 @@ impl<'l, 's> Parser<'l, 's> {
         // Finalize the global scope to access scopes in future passes.
         self.symtab.finalize_global_sc();
 
-        let head = Ast::Prog { stmts: stmts };
+        let head = Ast::Prog {
+            num: 0,
+            stmts: stmts,
+        };
         ParserResult {
             ast: Some(head),
             error: self.errors.clone(),
@@ -159,6 +164,7 @@ impl<'l, 's> Parser<'l, 's> {
                 self.symtab.store(name, sym);
 
                 Ok(Ast::VarAssignExpr {
+                    num: self.next(),
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -193,6 +199,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.symtab.store(name, cl_sym);
 
                     return Ok(Ast::VarAssignExpr {
+                        num: self.next(),
                         ty_rec: cl_ty_rec,
                         ident_tkn: ident_tkn.clone().unwrap(),
                         is_imm: is_imm,
@@ -215,6 +222,7 @@ impl<'l, 's> Parser<'l, 's> {
                 self.symtab.store(name, sym);
 
                 Ok(Ast::VarDeclExpr {
+                    num: self.next(),
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -332,6 +340,7 @@ impl<'l, 's> Parser<'l, 's> {
         self.symtab.store(name, new_sym);
 
         Ok(Ast::FnDecl {
+            num: self.next(),
             ident_tkn: fn_ident_tkn,
             fn_params: params,
             ret_ty: fn_ty_rec,
@@ -360,6 +369,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let prop_ast = self.var_decl()?;
                     match prop_ast.clone() {
                         Ast::VarDeclExpr {
+                            num: _,
                             ty_rec: _,
                             ident_tkn,
                             ..
@@ -391,6 +401,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         let final_sc_lvl = self.symtab.finalize_sc();
         let ast = Ast::ClassDecl {
+            num: self.next(),
             ty_rec: TypeRecord::new(class_tkn.clone()),
             ident_tkn: class_tkn.clone(),
             methods: methods,
@@ -449,6 +460,7 @@ impl<'l, 's> Parser<'l, 's> {
         let sc_lvl = self.symtab.finalize_sc();
 
         Ok(Ast::BlckStmt {
+            num: self.next(),
             stmts: stmts,
             sc: sc_lvl,
         })
@@ -472,6 +484,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let elif_ast = self.expr()?;
                     let elif_blck = self.block_stmt()?;
                     let stmt_ast = Ast::ElifStmt {
+                        num: self.next(),
                         cond_expr: Box::new(elif_ast),
                         stmts: Box::new(elif_blck),
                     };
@@ -492,6 +505,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         Ok(Ast::IfStmt {
+            num: self.next(),
             cond_expr: Box::new(if_cond),
             if_stmts: Box::new(if_blck),
             elif_exprs: else_ifs,
@@ -506,6 +520,7 @@ impl<'l, 's> Parser<'l, 's> {
         let while_stmts = self.block_stmt()?;
 
         Ok(Ast::WhileStmt {
+            num: self.next(),
             cond_expr: Box::new(while_cond),
             stmts: Box::new(while_stmts),
         })
@@ -547,6 +562,7 @@ impl<'l, 's> Parser<'l, 's> {
         let for_stmt = self.block_stmt()?;
 
         Ok(Ast::ForStmt {
+            num: self.next(),
             for_var_decl: Box::new(for_var_decl.unwrap()),
             for_cond_expr: Box::new(for_var_cond.unwrap()),
             for_step_expr: Box::new(for_incr_expr.unwrap()),
@@ -559,12 +575,16 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty {
             TknTy::Semicolon => {
                 self.consume();
-                Ok(Ast::RetStmt { ret_expr: None })
+                Ok(Ast::RetStmt {
+                    num: self.next(),
+                    ret_expr: None,
+                })
             }
             _ => {
                 let ret_expr = self.expr()?;
                 self.expect(TknTy::Semicolon)?;
                 Ok(Ast::RetStmt {
+                    num: self.next(),
                     ret_expr: Some(Box::new(ret_expr)),
                 })
             }
@@ -575,6 +595,7 @@ impl<'l, 's> Parser<'l, 's> {
         let expr = self.expr()?;
         self.expect(TknTy::Semicolon)?;
         Ok(Ast::ExprStmt {
+            num: self.next(),
             expr: Box::new(expr),
         })
     }
@@ -593,7 +614,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.assign_expr()?;
 
                 match ast.clone() {
-                    Ast::PrimaryExpr { ty_rec } => {
+                    Ast::PrimaryExpr { num: _, ty_rec } => {
                         match ty_rec.tkn.ty {
                             TknTy::Ident(name) => {
                                 let maybe_sym = self.symtab.retrieve(&name);
@@ -607,6 +628,7 @@ impl<'l, 's> Parser<'l, 's> {
                                 }
 
                                 return Ok(Ast::VarAssignExpr {
+                                    num: self.next(),
                                     ty_rec: sym.ty_rec.clone(),
                                     ident_tkn: sym.ident_tkn.clone(),
                                     is_imm: sym.imm,
@@ -622,12 +644,14 @@ impl<'l, 's> Parser<'l, 's> {
                         };
                     }
                     Ast::ClassPropAccess {
+                        num: _,
                         ident_tkn,
                         prop_name,
                         idx,
                         owner_class,
                     } => {
                         return Ok(Ast::ClassPropSet {
+                            num: self.next(),
                             ident_tkn: ident_tkn,
                             prop_name: prop_name,
                             idx: idx,
@@ -659,6 +683,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.logicand_expr()?;
                     ast = Ast::LogicalExpr {
+                        num: self.next(),
                         ty_rec: TypeRecord::empty(&op),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -681,6 +706,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.eq_expr()?;
                     ast = Ast::LogicalExpr {
+                        num: self.next(),
                         ty_rec: TypeRecord::empty(&op),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -703,6 +729,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.cmp_expr()?;
                     ast = Ast::BinaryExpr {
+                        num: self.next(),
                         ty_rec: TypeRecord::empty(&op),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -725,6 +752,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.addsub_expr()?;
                     ast = Ast::BinaryExpr {
+                        num: self.next(),
                         ty_rec: TypeRecord::empty(&op),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -747,6 +775,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.muldiv_expr()?;
                     ast = Ast::BinaryExpr {
+                        num: self.next(),
                         ty_rec: TypeRecord::empty(&op),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -769,6 +798,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.unary_expr()?;
                     ast = Ast::BinaryExpr {
+                        num: self.next(),
                         ty_rec: TypeRecord::empty(&op),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -790,6 +820,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.unary_expr()?;
 
                 return Ok(Ast::UnaryExpr {
+                    num: self.next(),
                     ty_rec: TypeRecord::empty(&op),
                     op_tkn: op,
                     rhs: Box::new(rhs),
@@ -802,7 +833,7 @@ impl<'l, 's> Parser<'l, 's> {
     fn fncall_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.primary_expr()?;
         let ident_tkn = match ast.clone() {
-            Ast::PrimaryExpr { ty_rec } => Some(ty_rec.tkn),
+            Ast::PrimaryExpr { num: _, ty_rec } => Some(ty_rec.tkn),
             _ => None,
         };
 
@@ -837,6 +868,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let (sc_lvl, class_name) =
                     match class_sym.clone().unwrap().assign_val.clone().unwrap() {
                         Ast::ClassDecl {
+                            num: _,
                             ty_rec: _,
                             ident_tkn,
                             methods: _,
@@ -856,6 +888,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let params = fn_ast.extract_params();
 
                 Ok(Ast::ClassFnCall {
+                    num: self.next(),
                     class_tkn: class_tkn.clone().unwrap(),
                     class_name: class_name,
                     fn_tkn: name_tkn.unwrap().clone(),
@@ -878,6 +911,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let owner = class_ptr.assign_val.clone().unwrap();
                 let pos = match &owner {
                     Ast::ClassDecl {
+                        num: _,
                         ty_rec: _,
                         ident_tkn: _,
                         methods: _,
@@ -899,6 +933,7 @@ impl<'l, 's> Parser<'l, 's> {
                 };
 
                 Ok(Ast::ClassPropAccess {
+                    num: self.next(),
                     ident_tkn: class_tkn.unwrap(),
                     prop_name: name_tkn.unwrap().get_name(),
                     idx: pos,
@@ -937,23 +972,21 @@ impl<'l, 's> Parser<'l, 's> {
 
                 let params = match class_decl_ast {
                     Ast::ClassDecl {
+                        num: _,
                         ty_rec: _,
                         ident_tkn: _,
                         methods,
-                        props: _,
-                        prop_pos: _,
-                        sc: _,
+                        ..
                     } => {
                         let mut expected_params = None;
 
                         for mtod_ast in methods {
                             match mtod_ast {
                                 Ast::FnDecl {
+                                    num: _,
                                     ident_tkn,
                                     fn_params,
-                                    ret_ty: _,
-                                    fn_body: _,
-                                    sc: _,
+                                    ..
                                 } => {
                                     if ident_tkn.get_name() == fn_tkn.clone().unwrap().get_name() {
                                         expected_params = Some(fn_params);
@@ -1013,6 +1046,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         Ok(Ast::FnCall {
+            num: self.next(),
             fn_tkn: fn_tkn.unwrap(),
             fn_params: params,
         })
@@ -1022,6 +1056,7 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty.clone() {
             TknTy::Str(_) | TknTy::Val(_) | TknTy::True | TknTy::False | TknTy::Null => {
                 let ast = Ok(Ast::PrimaryExpr {
+                    num: self.next(),
                     ty_rec: TypeRecord::new(self.currtkn.clone()),
                 });
                 self.consume();
@@ -1057,6 +1092,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let mut ty_rec = sym.ty_rec.clone();
                 ty_rec.tkn = self.currtkn.clone();
                 let ast = Ok(Ast::PrimaryExpr {
+                    num: self.next(),
                     ty_rec: ty_rec.clone(),
                 });
                 self.consume();
@@ -1128,5 +1164,11 @@ impl<'l, 's> Parser<'l, 's> {
         let err = ParseErr::new(line, pos, ty);
         self.errors.push(err.clone());
         err
+    }
+
+    /// Increments the node count and returns the number of the next node in the AST.
+    fn next(&mut self) -> usize {
+        self.node_count = self.node_count + 1;
+        self.node_count
     }
 }
