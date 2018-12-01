@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use token::Token;
-use ty_rec::TyRec;
+use ty_rec::TypeRecord;
 
 /// AST represents an AST node in our parse tree. Each node can contain different fields and
 /// should be represented by an anonymous struct to better document those fields, so that we know
 /// what each of the members of the enum type is supposed to represent.
 /// Nodes can be statements or expressions. Expr nodes imply that some value in the node
-/// can be "used", ie. that node has a type. Thus, expr nodes should contain a TyRec field
+/// can be "used", ie. that node has a type. Thus, expr nodes should contain a TypeRecord field
 /// with type information. Statement nodes generally wrap other statements or expressions,
 /// so their containing (child) nodes may have Types but not the statement nodes themselves.
 #[derive(Clone, Debug, PartialEq)]
@@ -53,14 +53,14 @@ pub enum Ast {
     },
 
     VarDeclExpr {
-        ty_rec: TyRec,
+        ty_rec: TypeRecord,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
     },
 
     VarAssignExpr {
-        ty_rec: TyRec,
+        ty_rec: TypeRecord,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
@@ -68,34 +68,34 @@ pub enum Ast {
     },
 
     LogicalExpr {
-        ty_rec: TyRec,
+        ty_rec: TypeRecord,
         op_tkn: Token,
         lhs: Box<Ast>,
         rhs: Box<Ast>,
     },
 
     BinaryExpr {
-        ty_rec: TyRec,
+        ty_rec: TypeRecord,
         op_tkn: Token,
         lhs: Box<Ast>,
         rhs: Box<Ast>,
     },
 
     UnaryExpr {
-        ty_rec: TyRec,
+        ty_rec: TypeRecord,
         op_tkn: Token,
         rhs: Box<Ast>,
     },
 
     PrimaryExpr {
-        ty_rec: TyRec,
+        ty_rec: TypeRecord,
     },
 
     // TODO: statement or expr
     FnDecl {
         ident_tkn: Token,
-        fn_params: Vec<TyRec>,
-        ret_ty: TyRec,
+        fn_params: Vec<TypeRecord>,
+        ret_ty: TypeRecord,
         fn_body: Box<Ast>,
         sc: usize,
     },
@@ -108,7 +108,7 @@ pub enum Ast {
 
     // TODO: statement or expr
     ClassDecl {
-        ty_rec: TyRec,
+        ty_rec: TypeRecord,
         ident_tkn: Token,
         methods: Vec<Ast>,
         props: Vec<Ast>,
@@ -151,7 +151,7 @@ impl Ast {
         }
     }
 
-    pub fn extract_primary_ty_rec(&self) -> TyRec {
+    pub fn extract_primary_ty_rec(&self) -> TypeRecord {
         match self {
             Ast::PrimaryExpr { ty_rec } => ty_rec.clone(),
             _ => panic!(),

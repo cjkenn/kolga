@@ -2,40 +2,38 @@ use std::fmt;
 use token::{TknTy, Token};
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum TyName {
+pub enum KolgaTy {
     String,
     Num,
     Bool,
     Void,
-    Symbolic(String),
     Class(String),
 }
 
-impl TyName {
+impl KolgaTy {
     pub fn is_numerical(&self) -> bool {
         match self {
-            TyName::Num => true,
+            KolgaTy::Num => true,
             _ => false,
         }
     }
 
     pub fn is_bool(&self) -> bool {
         match self {
-            TyName::Bool => true,
+            KolgaTy::Bool => true,
             _ => false,
         }
     }
 }
 
-impl fmt::Display for TyName {
+impl fmt::Display for KolgaTy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let display_ty = match self {
-            TyName::String => "string".to_string(),
-            TyName::Num => "number".to_string(),
-            TyName::Bool => "bool".to_string(),
-            TyName::Void => "void".to_string(),
-            TyName::Class(name) => format!("class '{}'", name),
-            TyName::Symbolic(name) => format!("symbolic '{}'", name),
+            KolgaTy::String => "string".to_string(),
+            KolgaTy::Num => "number".to_string(),
+            KolgaTy::Bool => "bool".to_string(),
+            KolgaTy::Void => "void".to_string(),
+            KolgaTy::Class(name) => format!("class '{}'", name),
         };
 
         write!(f, "{}", display_ty)
@@ -43,41 +41,37 @@ impl fmt::Display for TyName {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TyRec {
-    pub ty: Option<TyName>,
+pub struct TypeRecord {
+    pub ty: Option<KolgaTy>,
     pub tkn: Token,
 }
 
-impl TyRec {
-    pub fn new_from_tkn(tkn: Token) -> TyRec {
+impl TypeRecord {
+    pub fn new(tkn: Token) -> TypeRecord {
         let ty = match tkn.ty {
-            TknTy::Num => Some(TyName::Num),
-            TknTy::String => Some(TyName::String),
-            TknTy::Str(_) => Some(TyName::String),
-            TknTy::Val(_) => Some(TyName::Num),
-            TknTy::Bool => Some(TyName::Bool),
-            TknTy::True | TknTy::False => Some(TyName::Bool),
-            TknTy::Minus => Some(TyName::Num),
-            TknTy::Bang => Some(TyName::Bool),
-            TknTy::Void => Some(TyName::Void),
-            TknTy::Ident(ref ident) => Some(TyName::Class(ident.clone())),
+            TknTy::Num => Some(KolgaTy::Num),
+            TknTy::String => Some(KolgaTy::String),
+            TknTy::Str(_) => Some(KolgaTy::String),
+            TknTy::Val(_) => Some(KolgaTy::Num),
+            TknTy::Bool => Some(KolgaTy::Bool),
+            TknTy::True | TknTy::False => Some(KolgaTy::Bool),
+            TknTy::Minus => Some(KolgaTy::Num),
+            TknTy::Bang => Some(KolgaTy::Bool),
+            TknTy::Void => Some(KolgaTy::Void),
+            TknTy::Ident(ref ident) => Some(KolgaTy::Class(ident.clone())),
             _ => None,
         };
 
-        TyRec {
+        TypeRecord {
             ty: ty,
             tkn: tkn.clone(),
         }
     }
 
-    pub fn empty(tkn: &Token) -> TyRec {
-        TyRec {
+    pub fn empty(tkn: &Token) -> TypeRecord {
+        TypeRecord {
             ty: None,
             tkn: tkn.clone(),
         }
-    }
-
-    pub fn update(&mut self, tyn: Option<TyName>) {
-        self.ty = tyn
     }
 }

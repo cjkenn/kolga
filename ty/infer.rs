@@ -1,15 +1,22 @@
 use error::ty::TypeErr;
 use kolgac::ast::Ast;
-use kolgac::ty_rec::{TyName, TyRec};
+use kolgac::token::TknTy;
+use kolgac::ty_rec::KolgaTy;
 
-struct TyEq {
-    pub lhs: TyRec,
-    pub rhs: TyRec,
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeEquation<'a> {
+    pub lhs: Option<KolgaTy>,
+    pub rhs: Option<KolgaTy>,
+    ast: &'a Ast,
 }
 
-impl TyEq {
-    pub fn new(lhs: TyRec, rhs: TyRec) -> TyEq {
-        TyEq { lhs: lhs, rhs: rhs }
+impl<'a> TypeEquation<'a> {
+    pub fn new(lhs: Option<KolgaTy>, rhs: Option<KolgaTy>, ast: &'a Ast) -> TypeEquation<'a> {
+        TypeEquation {
+            lhs: lhs,
+            rhs: rhs,
+            ast: ast,
+        }
     }
 }
 
@@ -29,10 +36,9 @@ impl TyInfer {
     pub fn infer(&mut self, ast: &mut Ast) -> Vec<TypeErr> {
         match ast {
             Ast::Prog { stmts } => {
-                self.assign(stmts);
                 let ty_eqs = self.ty_eq(stmts);
-                // TODO: unify should return a map from var name to TyRec. We should then
-                // iterate this map and set all the TyRecords in the symbol table to these
+                // TODO: unify should return a map from var name to TypeRecord. We should then
+                // iterate this map and set all the TypeRecordords in the symbol table to these
                 // values in the map. The symbol table and ast ty records need to be kept
                 // in sync though
                 // self.unify(stmts);
@@ -43,16 +49,10 @@ impl TyInfer {
         self.errors.clone()
     }
 
-    fn assign(&mut self, stmts: &mut Vec<Ast>) {
-        for stmt in stmts.iter_mut() {
-            self.assign_ast(stmt);
-        }
-    }
-
-    fn ty_eq(&mut self, stmts: &mut Vec<Ast>) -> Vec<TyEq> {
+    fn ty_eq<'a>(&self, stmts: &'a mut Vec<Ast>) -> Vec<TypeEquation<'a>> {
         let mut ty_eqs = Vec::new();
         for stmt in stmts.iter() {
-            ty_eqs.push(self.generate_ty_eq(stmt));
+            ty_eqs.extend(self.gen_ty_eq(stmt));
         }
 
         ty_eqs
@@ -62,109 +62,115 @@ impl TyInfer {
         unimplemented!()
     }
 
-    fn assign_ast(&mut self, ast: &mut Ast) {
+    fn gen_ty_eq<'a>(&self, ast: &'a Ast) -> Vec<TypeEquation<'a>> {
+        let mut ty_eqs = Vec::new();
         match *ast {
-            Ast::ExprStmt { ref mut expr } => self.assign_ast(expr),
-            Ast::BlckStmt { ref mut stmts, .. } => {
-                for stmt in stmts.iter_mut() {
-                    self.assign_ast(stmt);
-                }
-            }
-            Ast::IfStmt {
-                ref mut cond_expr,
-                ref mut if_stmts,
-                ref mut elif_exprs,
-                ref mut el_stmts,
-            } => {
-                self.assign_ast(cond_expr);
-                self.assign_ast(if_stmts);
+            Ast::PrimaryExpr { ref ty_rec } => {
+                let lhs_ty = match ty_rec.tkn.ty {
+                    TknTy::Num => Some(KolgaTy::Num),
+                    TknTy::String => Some(KolgaTy::String),
+                    TknTy::Str(_) => Some(KolgaTy::String),
+                    TknTy::Val(_) => Some(KolgaTy::Num),
+                    TknTy::Bool => Some(KolgaTy::Bool),
+                    TknTy::True | TknTy::False => Some(KolgaTy::Bool),
+                    TknTy::Minus => Some(KolgaTy::Num),
+                    TknTy::Bang => Some(KolgaTy::Bool),
+                    TknTy::Void => Some(KolgaTy::Void),
+                    _ => None,
+                };
 
-                for stmt in elif_exprs.iter_mut() {
-                    self.assign_ast(stmt);
-                }
-
-                for stmt in el_stmts.iter_mut() {
-                    self.assign_ast(stmt);
-                }
-            }
-            Ast::ElifStmt {
-                ref mut cond_expr,
-                ref mut stmts,
-            } => {
-                self.assign_ast(cond_expr);
-                self.assign_ast(stmts);
-            }
-            Ast::ForStmt {
-                ref mut for_var_decl,
-                ref mut for_cond_expr,
-                ref mut for_step_expr,
-                ref mut stmts,
-            } => {
-                self.assign_ast(for_var_decl);
-                self.assign_ast(for_cond_expr);
-                self.assign_ast(for_step_expr);
-                self.assign_ast(stmts);
-            }
-            Ast::WhileStmt {
-                ref mut cond_expr,
-                ref mut stmts,
-            } => {
-                self.assign_ast(cond_expr);
-                self.assign_ast(stmts);
+                let rhs_ty = ty_rec.ty.clone();
+                ty_eqs.push(TypeEquation::new(lhs_ty, rhs_ty, ast));
+                ty_eqs
             }
             Ast::LogicalExpr {
                 ref mut ty_rec,
-                op_tkn: _,
+                op_tkn,
                 ref mut lhs,
                 ref mut rhs,
             }
             | Ast::BinaryExpr {
                 ref mut ty_rec,
-                op_tkn: _,
+                op_tkn,
                 ref mut lhs,
                 ref mut rhs,
             } => {
-                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
-                self.assign_ast(lhs);
-                self.assign_ast(rhs);
+                ty_eqs.extend(self.gen_ty_eq(lhs));
+                ty_eqs.extend(self.gen_ty_eq(rhs));
             }
             Ast::UnaryExpr {
                 ref mut ty_rec,
                 op_tkn: _,
                 ref mut rhs,
             } => {
-                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
-                self.assign_ast(rhs);
+                self.gen_ty_eq(rhs);
             }
-            Ast::VarAssignExpr {
-                ref mut ty_rec,
-                ident_tkn: _,
-                is_imm: _,
-                is_global: _,
-                ref mut value,
-            } => {
-                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
-                self.assign_ast(value);
+            Ast::ExprStmt { ref expr } => {
+                ty_eqs.extend(self.gen_ty_eq(expr));
+                ty_eqs
             }
-            Ast::VarDeclExpr { ref mut ty_rec, .. } | Ast::PrimaryExpr { ref mut ty_rec } => {
-                ty_rec.ty = Some(TyName::Symbolic(self.curr_symbolic_ty()));
+            Ast::BlckStmt { ref stmts, .. } => {
+                for stmt in stmts.iter() {
+                    ty_eqs.extend(self.gen_ty_eq(stmt));
+                }
+                ty_eqs
             }
-            Ast::ClassDecl { .. } => unimplemented!(),
-            _ => (),
+            //     Ast::IfStmt {
+        //         ref mut cond_expr,
+        //         ref mut if_stmts,
+        //         ref mut elif_exprs,
+        //         ref mut el_stmts,
+        //     } => {
+        //         self.gen_ty_eq(cond_expr);
+        //         self.gen_ty_eq(if_stmts);
+
+        //         for stmt in elif_exprs.iter_mut() {
+        //             self.gen_ty_eq(stmt);
+        //         }
+
+        //         for stmt in el_stmts.iter_mut() {
+        //             self.gen_ty_eq(stmt);
+        //         }
+        //     }
+        //     Ast::ElifStmt {
+        //         ref mut cond_expr,
+        //         ref mut stmts,
+        //     } => {
+        //         self.gen_ty_eq(cond_expr);
+        //         self.gen_ty_eq(stmts);
+        //     }
+        //     Ast::ForStmt {
+        //         ref mut for_var_decl,
+        //         ref mut for_cond_expr,
+        //         ref mut for_step_expr,
+        //         ref mut stmts,
+        //     } => {
+        //         self.gen_ty_eq(for_var_decl);
+        //         self.gen_ty_eq(for_cond_expr);
+        //         self.gen_ty_eq(for_step_expr);
+        //         self.gen_ty_eq(stmts);
+        //     }
+        //     Ast::WhileStmt {
+        //         ref mut cond_expr,
+        //         ref mut stmts,
+        //     } => {
+        //         self.gen_ty_eq(cond_expr);
+        //         self.gen_ty_eq(stmts);
+        //     }
+
+        //     Ast::VarAssignExpr {
+        //         ref mut ty_rec,
+        //         ident_tkn: _,
+        //         is_imm: _,
+        //         is_global: _,
+        //         ref mut value,
+        //     } => {
+        //         self.gen_ty_eq(value);
+        //     }
+            // Ast::VarDeclExpr { ref ty_rec, .. } => {}
+
+            // Ast::ClassDecl { .. } => unimplemented!(),
+            _ => ty_eqs,
         }
-    }
-
-    fn generate_ty_eq(&self, stmt: &Ast) -> TyEq {
-        unimplemented!()
-    }
-
-    fn set_ty(&mut self, ty_rec: &mut TyRec) {
-        let new_ty = self.curr_symbolic_ty();
-        ty_rec.update(Some(TyName::Symbolic(new_ty)));
-    }
-
-    fn curr_symbolic_ty(&mut self) -> String {
-        self.ty_count = self.ty_count + 1;
-        format!("T{}", self.ty_count)
     }
 }

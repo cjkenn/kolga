@@ -5,7 +5,7 @@ use kolgac::ast::Ast;
 use kolgac::sym::Sym;
 use kolgac::symtab::SymbolTable;
 use kolgac::token::{TknTy, Token};
-use kolgac::ty_rec::TyName;
+use kolgac::ty_rec::KolgaTy;
 
 pub struct TyCheck<'t, 's> {
     ast: &'t Ast,
@@ -160,7 +160,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     fn check_fn_stmts(
         &mut self,
         fn_tkn: &Token,
-        fn_ret_ty: TyName,
+        fn_ret_ty: KolgaTy,
         stmts: Vec<Ast>,
         sc_lvl: usize,
     ) {
@@ -172,8 +172,8 @@ impl<'t, 's> TyCheck<'t, 's> {
                 Ast::RetStmt { ret_expr } => {
                     has_ret_stmt = true;
                     if ret_expr.is_none() {
-                        if fn_ret_ty != TyName::Void {
-                            self.ty_mismatch(&fn_tkn, &fn_ret_ty, &TyName::Void);
+                        if fn_ret_ty != KolgaTy::Void {
+                            self.ty_mismatch(&fn_tkn, &fn_ret_ty, &KolgaTy::Void);
                         }
                     } else {
                         let rhs_ty = self.check_expr(&ret_expr.clone().unwrap(), sc_lvl);
@@ -186,7 +186,7 @@ impl<'t, 's> TyCheck<'t, 's> {
             };
         }
 
-        if fn_ret_ty != TyName::Void && !has_ret_stmt {
+        if fn_ret_ty != KolgaTy::Void && !has_ret_stmt {
             self.error(
                 fn_tkn.line,
                 fn_tkn.pos,
@@ -195,7 +195,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn check_expr(&mut self, expr: &Ast, final_sc: usize) -> TyName {
+    fn check_expr(&mut self, expr: &Ast, final_sc: usize) -> KolgaTy {
         match expr {
             Ast::VarAssignExpr {
                 ty_rec: _,
@@ -249,7 +249,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// Given a class declaration, find the type of a property in the class. Because
     /// a class does not maintain a mapping of properties (right now), we loop through all
     /// available props until we find the name of the expected prop (the second param).
-    fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name: String) -> TyName {
+    fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name: String) -> KolgaTy {
         match class_decl_ast {
             Ast::ClassDecl {
                 ty_rec: _,
@@ -345,19 +345,19 @@ impl<'t, 's> TyCheck<'t, 's> {
     }
 
     /// Reduce a unary ast to the expected type to be returned by the expression.
-    fn reduce_unary_ty(&mut self, op_tkn: Token, rhs_ty: TyName) -> TyName {
+    fn reduce_unary_ty(&mut self, op_tkn: Token, rhs_ty: KolgaTy) -> KolgaTy {
         match op_tkn.ty {
             TknTy::Minus => {
-                if rhs_ty != TyName::Num {
-                    self.ty_mismatch(&op_tkn, &TyName::Num, &rhs_ty);
+                if rhs_ty != KolgaTy::Num {
+                    self.ty_mismatch(&op_tkn, &KolgaTy::Num, &rhs_ty);
                 }
-                TyName::Num
+                KolgaTy::Num
             }
             TknTy::Bang => {
-                if rhs_ty != TyName::Bool {
-                    self.ty_mismatch(&op_tkn, &TyName::Bool, &rhs_ty);
+                if rhs_ty != KolgaTy::Bool {
+                    self.ty_mismatch(&op_tkn, &KolgaTy::Bool, &rhs_ty);
                 }
-                TyName::Bool
+                KolgaTy::Bool
             }
             _ => panic!("Unimplemented unary operator found!"),
         }
@@ -366,13 +366,13 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// Reduce a binary ast so we can check the types in it. Returns the expected type
     /// given the operator, even if there is an error. The expected type is one which we expect
     /// the given operator to evaluate to.
-    fn reduce_bin_ty(&mut self, op_tkn: Token, lhs_ty: TyName, rhs_ty: TyName) -> TyName {
+    fn reduce_bin_ty(&mut self, op_tkn: Token, lhs_ty: KolgaTy, rhs_ty: KolgaTy) -> KolgaTy {
         match op_tkn.ty {
             TknTy::Plus | TknTy::Minus | TknTy::Star | TknTy::Slash => {
                 // We can only operate on types of the same kind
                 if lhs_ty != rhs_ty {
                     self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    return TyName::Num;
+                    return KolgaTy::Num;
                 }
 
                 // Ensure that the types are correct for the given operator
@@ -380,37 +380,37 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                 }
 
-                TyName::Num
+                KolgaTy::Num
             }
             TknTy::Gt | TknTy::GtEq | TknTy::Lt | TknTy::LtEq | TknTy::EqEq | TknTy::BangEq => {
                 if lhs_ty != rhs_ty {
                     self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    return TyName::Bool;
+                    return KolgaTy::Bool;
                 }
 
                 if !lhs_ty.is_numerical() || !rhs_ty.is_numerical() {
                     self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                 }
 
-                TyName::Bool
+                KolgaTy::Bool
             }
             TknTy::And | TknTy::Or | TknTy::AmpAmp | TknTy::PipePipe => {
                 if lhs_ty != rhs_ty {
                     self.ty_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
-                    return TyName::Bool;
+                    return KolgaTy::Bool;
                 }
 
                 if !lhs_ty.is_bool() || !rhs_ty.is_bool() {
                     self.op_mismatch(&op_tkn, &lhs_ty, &rhs_ty);
                 }
 
-                TyName::Bool
+                KolgaTy::Bool
             }
             _ => panic!("Unimplemented binary operator found!"),
         }
     }
 
-    fn check_var_assign(&mut self, stmt: &Ast, sc: usize) -> TyName {
+    fn check_var_assign(&mut self, stmt: &Ast, sc: usize) -> KolgaTy {
         match stmt {
             Ast::VarAssignExpr {
                 ty_rec,
@@ -433,7 +433,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         }
     }
 
-    fn ty_mismatch(&mut self, tkn: &Token, lhs: &TyName, rhs: &TyName) {
+    fn ty_mismatch(&mut self, tkn: &Token, lhs: &KolgaTy, rhs: &KolgaTy) {
         self.error(
             tkn.line,
             tkn.pos,
@@ -441,12 +441,12 @@ impl<'t, 's> TyCheck<'t, 's> {
         );
     }
 
-    fn op_mismatch(&mut self, tkn: &Token, lhs: &TyName, rhs: &TyName) {
+    fn op_mismatch(&mut self, tkn: &Token, lhs: &KolgaTy, rhs: &KolgaTy) {
         let ty = tkn.ty.clone();
         let op_desired = if ty.is_numerical_op() {
-            (TyName::Num, TyName::Num)
+            (KolgaTy::Num, KolgaTy::Num)
         } else {
-            (TyName::Bool, TyName::Bool)
+            (KolgaTy::Bool, KolgaTy::Bool)
         };
 
         let err_ty = TypeErrTy::BinOpMismatch(
