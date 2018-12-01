@@ -167,4 +167,16 @@ impl Ast {
             _ => Vec::new(),
         }
     }
+
+    pub fn get_ty_rec(&self) -> Option<TypeRecord> {
+        match self {
+            Ast::PrimaryExpr { ty_rec }
+            | Ast::UnaryExpr { ty_rec, .. }
+            | Ast::BinaryExpr { ty_rec, .. }
+            | Ast::LogicalExpr { ty_rec, .. }
+            | Ast::VarAssignExpr { ty_rec, .. }
+            | Ast::VarDeclExpr { ty_rec, .. } => Some(ty_rec.clone()),
+            _ => None,
+        }
+    }
 }

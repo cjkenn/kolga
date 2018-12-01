@@ -81,29 +81,72 @@ impl TyInfer {
 
                 let rhs_ty = ty_rec.ty.clone();
                 ty_eqs.push(TypeEquation::new(lhs_ty, rhs_ty, ast));
+
                 ty_eqs
             }
             Ast::LogicalExpr {
-                ref mut ty_rec,
-                op_tkn,
-                ref mut lhs,
-                ref mut rhs,
+                ref ty_rec,
+                ref op_tkn,
+                ref lhs,
+                ref rhs,
             }
             | Ast::BinaryExpr {
-                ref mut ty_rec,
-                op_tkn,
-                ref mut lhs,
-                ref mut rhs,
+                ref ty_rec,
+                ref op_tkn,
+                ref lhs,
+                ref rhs,
             } => {
                 ty_eqs.extend(self.gen_ty_eq(lhs));
                 ty_eqs.extend(self.gen_ty_eq(rhs));
+                // Binary operators expect numbers as their args: strings are not supported
+                // We should be safe to uwnrap here, otherwise we have a parsing error
+                // (we're trying to put something in an expression without a type)
+                let lhs_ty_rec = lhs.get_ty_rec().unwrap();
+                let rhs_ty_rec = rhs.get_ty_rec().unwrap();
+
+                ty_eqs.push(TypeEquation::new(lhs_ty_rec.ty, Some(KolgaTy::Num), ast));
+                ty_eqs.push(TypeEquation::new(rhs_ty_rec.ty, Some(KolgaTy::Num), ast));
+
+                if op_tkn.ty.is_cmp_op() {
+                    ty_eqs.push(TypeEquation::new(
+                        ty_rec.ty.clone(),
+                        Some(KolgaTy::Bool),
+                        ast,
+                    ));
+                } else {
+                    ty_eqs.push(TypeEquation::new(
+                        ty_rec.ty.clone(),
+                        Some(KolgaTy::Num),
+                        ast,
+                    ));
+                }
+
+                ty_eqs
             }
             Ast::UnaryExpr {
-                ref mut ty_rec,
-                op_tkn: _,
-                ref mut rhs,
+                ref ty_rec,
+                ref op_tkn,
+                ref rhs,
             } => {
-                self.gen_ty_eq(rhs);
+                ty_eqs.extend(self.gen_ty_eq(rhs));
+                let rhs_ty_rec = rhs.get_ty_rec().unwrap();
+                if op_tkn.ty == TknTy::Bang {
+                    ty_eqs.push(TypeEquation::new(rhs_ty_rec.ty, Some(KolgaTy::Bool), ast));
+                    ty_eqs.push(TypeEquation::new(
+                        ty_rec.ty.clone(),
+                        Some(KolgaTy::Bool),
+                        ast,
+                    ));
+                } else {
+                    ty_eqs.push(TypeEquation::new(rhs_ty_rec.ty, Some(KolgaTy::Num), ast));
+                    ty_eqs.push(TypeEquation::new(
+                        ty_rec.ty.clone(),
+                        Some(KolgaTy::Num),
+                        ast,
+                    ));
+                }
+
+                ty_eqs
             }
             Ast::ExprStmt { ref expr } => {
                 ty_eqs.extend(self.gen_ty_eq(expr));
@@ -115,61 +158,122 @@ impl TyInfer {
                 }
                 ty_eqs
             }
-            //     Ast::IfStmt {
-        //         ref mut cond_expr,
-        //         ref mut if_stmts,
-        //         ref mut elif_exprs,
-        //         ref mut el_stmts,
-        //     } => {
-        //         self.gen_ty_eq(cond_expr);
-        //         self.gen_ty_eq(if_stmts);
+            Ast::IfStmt {
+                ref cond_expr,
+                ref if_stmts,
+                ref elif_exprs,
+                ref el_stmts,
+            } => {
+                ty_eqs.extend(self.gen_ty_eq(if_stmts));
 
-        //         for stmt in elif_exprs.iter_mut() {
-        //             self.gen_ty_eq(stmt);
-        //         }
+                let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
+                ty_eqs.push(TypeEquation::new(
+                    cond_expr_ty_rec.ty,
+                    Some(KolgaTy::Bool),
+                    ast,
+                ));
 
-        //         for stmt in el_stmts.iter_mut() {
-        //             self.gen_ty_eq(stmt);
-        //         }
-        //     }
-        //     Ast::ElifStmt {
-        //         ref mut cond_expr,
-        //         ref mut stmts,
-        //     } => {
-        //         self.gen_ty_eq(cond_expr);
-        //         self.gen_ty_eq(stmts);
-        //     }
-        //     Ast::ForStmt {
-        //         ref mut for_var_decl,
-        //         ref mut for_cond_expr,
-        //         ref mut for_step_expr,
-        //         ref mut stmts,
-        //     } => {
-        //         self.gen_ty_eq(for_var_decl);
-        //         self.gen_ty_eq(for_cond_expr);
-        //         self.gen_ty_eq(for_step_expr);
-        //         self.gen_ty_eq(stmts);
-        //     }
-        //     Ast::WhileStmt {
-        //         ref mut cond_expr,
-        //         ref mut stmts,
-        //     } => {
-        //         self.gen_ty_eq(cond_expr);
-        //         self.gen_ty_eq(stmts);
-        //     }
+                for stmt in elif_exprs.iter() {
+                    ty_eqs.extend(self.gen_ty_eq(stmt));
+                }
 
-        //     Ast::VarAssignExpr {
-        //         ref mut ty_rec,
-        //         ident_tkn: _,
-        //         is_imm: _,
-        //         is_global: _,
-        //         ref mut value,
-        //     } => {
-        //         self.gen_ty_eq(value);
-        //     }
-            // Ast::VarDeclExpr { ref ty_rec, .. } => {}
+                for stmt in el_stmts.iter() {
+                    ty_eqs.extend(self.gen_ty_eq(stmt));
+                }
 
-            // Ast::ClassDecl { .. } => unimplemented!(),
+                ty_eqs
+            }
+            Ast::ElifStmt {
+                ref cond_expr,
+                ref stmts,
+            } => {
+                ty_eqs.extend(self.gen_ty_eq(stmts));
+
+                let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
+                ty_eqs.push(TypeEquation::new(
+                    cond_expr_ty_rec.ty,
+                    Some(KolgaTy::Bool),
+                    ast,
+                ));
+
+                ty_eqs
+            }
+            Ast::WhileStmt {
+                ref cond_expr,
+                ref stmts,
+            } => {
+                ty_eqs.extend(self.gen_ty_eq(stmts));
+
+                let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
+                ty_eqs.push(TypeEquation::new(
+                    cond_expr_ty_rec.ty,
+                    Some(KolgaTy::Bool),
+                    ast,
+                ));
+
+                ty_eqs
+            }
+            Ast::ForStmt {
+                ref for_var_decl,
+                ref for_cond_expr,
+                ref for_step_expr,
+                ref stmts,
+            } => {
+                ty_eqs.extend(self.gen_ty_eq(stmts));
+
+                // The var declaration should be a number
+                let var_decl_ty_rec = for_var_decl.get_ty_rec().unwrap();
+                ty_eqs.push(TypeEquation::new(
+                    var_decl_ty_rec.ty,
+                    Some(KolgaTy::Num),
+                    ast,
+                ));
+
+                // The cond expr should be a bool
+                let cond_expr_ty_rec = for_cond_expr.get_ty_rec().unwrap();
+                ty_eqs.push(TypeEquation::new(
+                    cond_expr_ty_rec.ty,
+                    Some(KolgaTy::Bool),
+                    ast,
+                ));
+
+                // The step expression should be a number
+                let step_expr_ty_rec = for_step_expr.get_ty_rec().unwrap();
+                ty_eqs.push(TypeEquation::new(
+                    step_expr_ty_rec.ty,
+                    Some(KolgaTy::Num),
+                    ast,
+                ));
+
+                ty_eqs
+            }
+            Ast::VarAssignExpr {
+                ref ty_rec,
+                ident_tkn: _,
+                is_imm: _,
+                is_global: _,
+                ref value,
+            } => {
+                ty_eqs.extend(self.gen_ty_eq(value));
+                let val_ty_rec = value.get_ty_rec().unwrap();
+                ty_eqs.push(TypeEquation::new(ty_rec.ty.clone(), val_ty_rec.ty, ast));
+
+                ty_eqs
+            }
+            Ast::VarDeclExpr { .. } => ty_eqs,
+            Ast::RetStmt { ret_expr } => {
+                if ret_expr.is_some() {
+                    ty_eqs.extend(self.gen_ty_eq(&ret_expr.unwrap()));
+                }
+
+                ty_eqs
+            }
+            Ast::ClassDecl { .. } => unimplemented!(),
+            Ast::FnDecl { .. } => unimplemented!(),
+            Ast::FnCall { .. } => unimplemented!(),
+            Ast::ClassPropAccess { .. } => unimplemented!(),
+            Ast::ClassPropSet { .. } => unimplemented!(),
+            Ast::ClassFnCall { .. } => unimplemented!(),
             _ => ty_eqs,
         }
     }
