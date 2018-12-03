@@ -3,9 +3,6 @@ use kolgac::token::TknTy;
 use kolgac::ty_rec::KolgaTy;
 use std::collections::HashMap;
 
-/// Represents a type substitution map from AST id to a type.
-type Subst = HashMap<String, KolgaTy>;
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeEquation<'a> {
     pub lhs: KolgaTy,
@@ -34,14 +31,16 @@ impl TyInfer {
         }
     }
 
-    pub fn infer(&mut self, ast: &mut Ast) {
+    pub fn infer(&mut self, ast: &mut Ast) -> Result<(), String> {
         match ast {
             Ast::Prog { num: _, stmts } => {
                 let ty_eqs = self.ty_eq(stmts);
-                self.unify_all(ty_eqs);
+                self.unify_all(ty_eqs)?;
             }
             _ => panic!("invalid ast found in type infer!"),
         };
+
+        Ok(())
     }
 
     fn ty_eq<'a>(&self, stmts: &'a mut Vec<Ast>) -> Vec<TypeEquation<'a>> {
@@ -53,39 +52,38 @@ impl TyInfer {
         ty_eqs
     }
 
-    fn unify_all<'a>(&mut self, ty_eqs: Vec<TypeEquation<'a>>) {
+    fn unify_all<'a>(&mut self, ty_eqs: Vec<TypeEquation<'a>>) -> Result<(), String> {
         for eq in ty_eqs {
-            self.unify(eq.lhs, eq.rhs);
+            self.unify(eq.lhs, eq.rhs)?;
         }
+
+        Ok(())
     }
 
-    fn unify(&mut self, lhs: KolgaTy, rhs: KolgaTy) {
+    fn unify(&mut self, lhs: KolgaTy, rhs: KolgaTy) -> Result<(), String> {
         if lhs == rhs {
-            return;
+            return Ok(());
         }
 
         match lhs {
             KolgaTy::Symbolic(_) => {
-                self.unify_var(lhs, rhs);
-                return;
+                return self.unify_var(lhs, rhs);
             }
             _ => (),
         };
 
         match rhs {
             KolgaTy::Symbolic(_) => {
-                self.unify_var(lhs, rhs);
-                return;
+                return self.unify_var(lhs, rhs);
             }
             _ => (),
         };
 
-        // TODO: this should be an error
-        //None
+        Err(String::from("Could not infer types"))
     }
 
     // Expect lhs to be KolgaTy::Symbolic
-    fn unify_var(&mut self, lhs: KolgaTy, rhs: KolgaTy) {
+    fn unify_var(&mut self, lhs: KolgaTy, rhs: KolgaTy) -> Result<(), String> {
         let mb_lhs_name = match lhs.clone() {
             KolgaTy::Symbolic(name) => Some(name),
             _ => None,
@@ -96,31 +94,34 @@ impl TyInfer {
             _ => None,
         };
 
+        let subs_clone = self.subs.clone();
+
         let name = mb_lhs_name.unwrap();
-        let existing_ty;
         if self.subs.contains_key(&name) {
-            existing_ty = self.subs.get(&name).unwrap();
+            let existing_ty = subs_clone.get(&name).unwrap();
 
             return self.unify(existing_ty.clone(), rhs);
         }
 
         if mb_rhs_name.is_some() && self.subs.contains_key(&mb_rhs_name.clone().unwrap()) {
             let name = mb_rhs_name.unwrap();
-            let existing_ty = self.subs.get(&name).unwrap();
+            let existing_ty = subs_clone.get(&name).unwrap();
 
             return self.unify(lhs, existing_ty.clone());
         }
 
-        // if self.occurs_check(lhs, rhs) {
-        //     // TODO: error here
-        //     return None;
-        // }
+        if self.occurs_check(lhs, rhs.clone()) {
+            return Err(String::from(
+                "Could not infer types (infinite recursive type found)",
+            ));
+        }
 
         self.subs.insert(name, rhs);
+        Ok(())
     }
 
     // Expect lhs to be KolgaTy::Symbolic
-    fn occurs_check(&mut self, lhs: KolgaTy, rhs: KolgaTy) -> bool {
+    fn occurs_check(&self, lhs: KolgaTy, rhs: KolgaTy) -> bool {
         let mb_rhs_name = match rhs.clone() {
             KolgaTy::Symbolic(name) => Some(name),
             _ => None,
@@ -130,9 +131,11 @@ impl TyInfer {
             return true;
         }
 
+        let subs_clone = self.subs.clone();
+
         if mb_rhs_name.is_some() && self.subs.contains_key(&mb_rhs_name.clone().unwrap()) {
             let name = mb_rhs_name.unwrap();
-            let existing_ty = self.subs.get(&name).unwrap();
+            let existing_ty = subs_clone.get(&name).unwrap();
 
             return self.occurs_check(lhs, existing_ty.clone());
         }
