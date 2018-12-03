@@ -37,10 +37,128 @@ impl TyInfer {
                 let ty_eqs = self.ty_eq(stmts);
                 self.unify_all(ty_eqs)?;
             }
-            _ => panic!("invalid ast found in type infer!"),
+            _ => return Err(String::from("Invalid AST found in infer")),
+        };
+
+        match ast {
+            Ast::Prog { num: _, stmts } => {
+                for stmt in stmts.iter_mut() {
+                    self.update_tys(stmt);
+                }
+            }
+            _ => (),
         };
 
         Ok(())
+    }
+
+    fn update_tys(&self, ast: &mut Ast) {
+        match *ast {
+            Ast::BlckStmt {
+                num: _,
+                ref mut stmts,
+                ..
+            } => {
+                for stmt in stmts.iter_mut() {
+                    self.update_tys(stmt);
+                }
+            }
+            Ast::IfStmt {
+                num: _,
+                ref mut cond_expr,
+                ref mut if_stmts,
+                ref mut elif_exprs,
+                ref mut el_stmts,
+            } => {
+                self.update_tys(cond_expr);
+                self.update_tys(if_stmts);
+
+                for stmt in elif_exprs.iter_mut() {
+                    self.update_tys(stmt);
+                }
+
+                for stmt in el_stmts.iter_mut() {
+                    self.update_tys(stmt);
+                }
+            }
+            Ast::ElifStmt {
+                num: _,
+                ref mut cond_expr,
+                ref mut stmts,
+            } => {
+                self.update_tys(cond_expr);
+                self.update_tys(stmts);
+            }
+            Ast::WhileStmt {
+                num: _,
+                ref mut cond_expr,
+                ref mut stmts,
+            } => {
+                self.update_tys(cond_expr);
+                self.update_tys(stmts);
+            }
+            Ast::ForStmt {
+                num: _,
+                ref mut for_var_decl,
+                ref mut for_cond_expr,
+                ref mut for_step_expr,
+                ref mut stmts,
+            } => {
+                self.update_tys(for_var_decl);
+                self.update_tys(for_cond_expr);
+                self.update_tys(for_step_expr);
+                self.update_tys(stmts);
+            }
+            Ast::ExprStmt {
+                num: _,
+                ref mut expr,
+            } => {
+                self.update_tys(expr);
+            }
+            Ast::VarDeclExpr {
+                num: _,
+                ref mut ty_rec,
+                ..
+            }
+            | Ast::VarAssignExpr {
+                num: _,
+                ref mut ty_rec,
+                ..
+            }
+            | Ast::LogicalExpr {
+                num: _,
+                ref mut ty_rec,
+                ..
+            }
+            | Ast::BinaryExpr {
+                num: _,
+                ref mut ty_rec,
+                ..
+            }
+            | Ast::UnaryExpr {
+                num: _,
+                ref mut ty_rec,
+                ..
+            }
+            | Ast::PrimaryExpr {
+                num: _,
+                ref mut ty_rec,
+                ..
+            } => {
+                let potential_ty = self.subs.get(&ty_rec.name);
+                if potential_ty.is_some() {
+                    ty_rec.ty = potential_ty.unwrap().clone();
+                }
+            }
+            Ast::Prog { .. } => (),
+            Ast::RetStmt { .. } => unimplemented!(),
+            Ast::ClassDecl { .. } => unimplemented!(),
+            Ast::FnDecl { .. } => unimplemented!(),
+            Ast::FnCall { .. } => unimplemented!(),
+            Ast::ClassPropAccess { .. } => unimplemented!(),
+            Ast::ClassPropSet { .. } => unimplemented!(),
+            Ast::ClassFnCall { .. } => unimplemented!(),
+        }
     }
 
     fn ty_eq<'a>(&self, stmts: &'a mut Vec<Ast>) -> Vec<TypeEquation<'a>> {
