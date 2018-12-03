@@ -7,6 +7,7 @@ pub enum KolgaTy {
     Num,
     Bool,
     Void,
+    Symbolic(String),
     Class(String),
 }
 
@@ -34,6 +35,7 @@ impl fmt::Display for KolgaTy {
             KolgaTy::Bool => "bool".to_string(),
             KolgaTy::Void => "void".to_string(),
             KolgaTy::Class(name) => format!("class '{}'", name),
+            KolgaTy::Symbolic(name) => format!("symbolic '{}'", name),
         };
 
         write!(f, "{}", display_ty)
@@ -42,35 +44,31 @@ impl fmt::Display for KolgaTy {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeRecord {
-    pub ty: Option<KolgaTy>,
+    pub name: String,
+    pub ty: KolgaTy,
     pub tkn: Token,
 }
 
 impl TypeRecord {
-    pub fn new(tkn: Token) -> TypeRecord {
+    pub fn new(tkn: Token, sym_count: usize) -> TypeRecord {
+        let name = format!("T{}", sym_count);
         let ty = match tkn.ty {
-            TknTy::Num => Some(KolgaTy::Num),
-            TknTy::String => Some(KolgaTy::String),
-            TknTy::Str(_) => Some(KolgaTy::String),
-            TknTy::Val(_) => Some(KolgaTy::Num),
-            TknTy::Bool => Some(KolgaTy::Bool),
-            TknTy::True | TknTy::False => Some(KolgaTy::Bool),
-            TknTy::Minus => Some(KolgaTy::Num),
-            TknTy::Bang => Some(KolgaTy::Bool),
-            TknTy::Void => Some(KolgaTy::Void),
-            TknTy::Ident(ref ident) => Some(KolgaTy::Class(ident.clone())),
-            _ => None,
+            TknTy::Num => KolgaTy::Num,
+            TknTy::String => KolgaTy::String,
+            TknTy::Str(_) => KolgaTy::String,
+            TknTy::Val(_) => KolgaTy::Num,
+            TknTy::Bool => KolgaTy::Bool,
+            TknTy::True | TknTy::False => KolgaTy::Bool,
+            TknTy::Minus => KolgaTy::Num,
+            TknTy::Bang => KolgaTy::Bool,
+            TknTy::Void => KolgaTy::Void,
+            TknTy::Ident(ref ident) => KolgaTy::Class(ident.clone()),
+            _ => KolgaTy::Symbolic(name),
         };
 
         TypeRecord {
+            name: format!("T{}", sym_count),
             ty: ty,
-            tkn: tkn.clone(),
-        }
-    }
-
-    pub fn empty(tkn: &Token) -> TypeRecord {
-        TypeRecord {
-            ty: None,
             tkn: tkn.clone(),
         }
     }

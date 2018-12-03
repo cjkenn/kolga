@@ -137,7 +137,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 fn_body,
                 sc,
             } => {
-                let fn_ty = ret_ty.ty.unwrap();
+                let fn_ty = ret_ty.ty;
                 let fn_stmts = *fn_body;
                 match fn_stmts {
                     Ast::BlckStmt {
@@ -220,7 +220,7 @@ impl<'t, 's> TyCheck<'t, 's> {
             } => {
                 if rhs.is_primary() {
                     let rhs_ty_rec = rhs.get_ty_rec().unwrap();
-                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty_rec.ty.unwrap());
+                    return self.reduce_unary_ty(op_tkn.clone(), rhs_ty_rec.ty);
                 } else {
                     let rhs_ty = self.check_expr(rhs, final_sc);
                     return self.reduce_unary_ty(op_tkn.clone(), rhs_ty);
@@ -245,8 +245,8 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             }
-            Ast::PrimaryExpr { num: _, ty_rec } => ty_rec.ty.clone().unwrap(),
-            Ast::ClassDecl { num: _, ty_rec, .. } => ty_rec.ty.clone().unwrap(),
+            Ast::PrimaryExpr { num: _, ty_rec } => ty_rec.ty.clone(),
+            Ast::ClassDecl { num: _, ty_rec, .. } => ty_rec.ty.clone(),
             Ast::ClassPropAccess {
                 num: _,
                 ident_tkn: _,
@@ -282,7 +282,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         }
                             if ident_tkn.get_name() == prop_name =>
                         {
-                            prop_ty = Some(ty_rec.ty.clone().unwrap());
+                            prop_ty = Some(ty_rec.ty.clone());
                         }
                         Ast::VarAssignExpr {
                             ref ty_rec,
@@ -291,7 +291,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         }
                             if ident_tkn.get_name() == prop_name =>
                         {
-                            prop_ty = Some(ty_rec.ty.clone().unwrap());
+                            prop_ty = Some(ty_rec.ty.clone());
                         }
                         _ => (),
                     };
@@ -324,7 +324,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
-                    let ty_name = mb_ty_rec.clone().ty.unwrap();
+                    let ty_name = mb_ty_rec.clone().ty;
                     if passed_in_param_tys[idx] != ty_name {
                         self.ty_mismatch(&fn_tkn.clone(), &passed_in_param_tys[idx], &ty_name);
                     }
@@ -348,7 +348,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
-                    let ty_name = mb_ty_rec.clone().ty.unwrap();
+                    let ty_name = mb_ty_rec.clone().ty;
                     if passed_in_param_tys[idx] != ty_name {
                         self.ty_mismatch(&fn_tkn.clone(), &passed_in_param_tys[idx], &ty_name);
                     }
@@ -434,7 +434,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 is_global: _,
                 value,
             } => {
-                let lhs_ty = ty_rec.ty.clone().unwrap();
+                let lhs_ty = ty_rec.ty.clone();
                 let rhs = value;
                 let rhs_ty = self.check_expr(&rhs, sc);
 

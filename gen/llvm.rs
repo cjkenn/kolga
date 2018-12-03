@@ -426,7 +426,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 // We need to add the class declaration type to the list of
                                 // params so we obtain a pointer to it inside the method body.
                                 let fake_class_param = TypeRecord {
-                                    ty: Some(KolgaTy::Class(class_name.clone())),
+                                    name: String::new(), // hack
+                                    ty: KolgaTy::Class(class_name.clone()),
                                     tkn: class_tkn.clone(),
                                 };
 
@@ -1052,7 +1053,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
     /// Converts a TypeRecord type to an LLVMTypeRef
     fn llvm_ty_from_ty_rec(&self, ty_rec: &TypeRecord) -> LLVMTypeRef {
-        match ty_rec.ty.clone().unwrap() {
+        match ty_rec.ty.clone() {
             KolgaTy::String => self.str_ty(),
             KolgaTy::Num => self.double_ty(),
             KolgaTy::Bool => self.i8_ty(),
@@ -1063,6 +1064,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 let class_ty = self.classtab.retrieve(&name).unwrap();
                 unsafe { LLVMPointerType(class_ty, 0) }
             }
+            KolgaTy::Symbolic(_) => panic!("Found a type in codegen that wasn't inferred!"),
         }
     }
 
