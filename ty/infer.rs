@@ -3,23 +3,22 @@ use kolgac::token::TknTy;
 use kolgac::ty_rec::KolgaTy;
 use std::collections::HashMap;
 
+/// Represents an pair of types that can be unified. It's possible that the types
+/// in the pair are already the same, in which case unification isn't strictly
+/// required.
 #[derive(Clone, Debug, PartialEq)]
-pub struct TypeEquation<'a> {
+pub struct TyMatch {
     pub lhs: KolgaTy,
     pub rhs: KolgaTy,
-    ast: &'a Ast,
 }
 
-impl<'a> TypeEquation<'a> {
-    pub fn new(lhs: KolgaTy, rhs: KolgaTy, ast: &'a Ast) -> TypeEquation<'a> {
-        TypeEquation {
-            lhs: lhs,
-            rhs: rhs,
-            ast: ast,
-        }
+impl TyMatch {
+    pub fn new(lhs: KolgaTy, rhs: KolgaTy) -> TyMatch {
+        TyMatch { lhs: lhs, rhs: rhs }
     }
 }
 
+/// Used to infer types for a given AST
 pub struct TyInfer {
     subs: HashMap<String, KolgaTy>,
 }
@@ -161,7 +160,7 @@ impl TyInfer {
         }
     }
 
-    fn ty_eq<'a>(&self, stmts: &'a mut Vec<Ast>) -> Vec<TypeEquation<'a>> {
+    fn ty_eq(&self, stmts: &mut Vec<Ast>) -> Vec<TyMatch> {
         let mut ty_eqs = Vec::new();
         for stmt in stmts.iter() {
             ty_eqs.extend(self.gen_ty_eq(stmt));
@@ -170,7 +169,7 @@ impl TyInfer {
         ty_eqs
     }
 
-    fn unify_all<'a>(&mut self, ty_eqs: Vec<TypeEquation<'a>>) -> Result<(), String> {
+    fn unify_all(&mut self, ty_eqs: Vec<TyMatch>) -> Result<(), String> {
         for eq in ty_eqs {
             self.unify(eq.lhs, eq.rhs)?;
         }
@@ -261,7 +260,7 @@ impl TyInfer {
         false
     }
 
-    fn gen_ty_eq<'a>(&self, ast: &'a Ast) -> Vec<TypeEquation<'a>> {
+    fn gen_ty_eq(&self, ast: &Ast) -> Vec<TyMatch> {
         let mut ty_eqs = Vec::new();
         match *ast {
             Ast::PrimaryExpr { .. } => ty_eqs,
@@ -287,13 +286,13 @@ impl TyInfer {
                 let lhs_ty_rec = lhs.get_ty_rec().unwrap();
                 let rhs_ty_rec = rhs.get_ty_rec().unwrap();
 
-                ty_eqs.push(TypeEquation::new(lhs_ty_rec.ty, KolgaTy::Num, ast));
-                ty_eqs.push(TypeEquation::new(rhs_ty_rec.ty, KolgaTy::Num, ast));
+                ty_eqs.push(TyMatch::new(lhs_ty_rec.ty, KolgaTy::Num));
+                ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Num));
 
                 if op_tkn.ty.is_cmp_op() {
-                    ty_eqs.push(TypeEquation::new(ty_rec.ty.clone(), KolgaTy::Bool, ast));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Bool));
                 } else {
-                    ty_eqs.push(TypeEquation::new(ty_rec.ty.clone(), KolgaTy::Num, ast));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Num));
                 }
 
                 ty_eqs
@@ -307,11 +306,11 @@ impl TyInfer {
                 ty_eqs.extend(self.gen_ty_eq(rhs));
                 let rhs_ty_rec = rhs.get_ty_rec().unwrap();
                 if op_tkn.ty == TknTy::Bang {
-                    ty_eqs.push(TypeEquation::new(rhs_ty_rec.ty, KolgaTy::Bool, ast));
-                    ty_eqs.push(TypeEquation::new(ty_rec.ty.clone(), KolgaTy::Bool, ast));
+                    ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Bool));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Bool));
                 } else {
-                    ty_eqs.push(TypeEquation::new(rhs_ty_rec.ty, KolgaTy::Num, ast));
-                    ty_eqs.push(TypeEquation::new(ty_rec.ty.clone(), KolgaTy::Num, ast));
+                    ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Num));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Num));
                 }
 
                 ty_eqs
@@ -338,7 +337,7 @@ impl TyInfer {
                 ty_eqs.extend(self.gen_ty_eq(if_stmts));
 
                 let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TypeEquation::new(cond_expr_ty_rec.ty, KolgaTy::Bool, ast));
+                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
 
                 for stmt in elif_exprs.iter() {
                     ty_eqs.extend(self.gen_ty_eq(stmt));
@@ -358,7 +357,7 @@ impl TyInfer {
                 ty_eqs.extend(self.gen_ty_eq(stmts));
 
                 let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TypeEquation::new(cond_expr_ty_rec.ty, KolgaTy::Bool, ast));
+                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
 
                 ty_eqs
             }
@@ -370,7 +369,7 @@ impl TyInfer {
                 ty_eqs.extend(self.gen_ty_eq(stmts));
 
                 let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TypeEquation::new(cond_expr_ty_rec.ty, KolgaTy::Bool, ast));
+                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
 
                 ty_eqs
             }
@@ -385,15 +384,15 @@ impl TyInfer {
 
                 // The var declaration should be a number
                 let var_decl_ty_rec = for_var_decl.get_ty_rec().unwrap();
-                ty_eqs.push(TypeEquation::new(var_decl_ty_rec.ty, KolgaTy::Num, ast));
+                ty_eqs.push(TyMatch::new(var_decl_ty_rec.ty, KolgaTy::Num));
 
                 // The cond expr should be a bool
                 let cond_expr_ty_rec = for_cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TypeEquation::new(cond_expr_ty_rec.ty, KolgaTy::Bool, ast));
+                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
 
                 // The step expression should be a number
                 let step_expr_ty_rec = for_step_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TypeEquation::new(step_expr_ty_rec.ty, KolgaTy::Num, ast));
+                ty_eqs.push(TyMatch::new(step_expr_ty_rec.ty, KolgaTy::Num));
 
                 ty_eqs
             }
@@ -407,7 +406,7 @@ impl TyInfer {
             } => {
                 ty_eqs.extend(self.gen_ty_eq(value));
                 let val_ty_rec = value.get_ty_rec().unwrap();
-                ty_eqs.push(TypeEquation::new(ty_rec.ty.clone(), val_ty_rec.ty, ast));
+                ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), val_ty_rec.ty));
 
                 ty_eqs
             }

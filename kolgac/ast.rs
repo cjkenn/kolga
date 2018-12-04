@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use token::Token;
-use ty_rec::TypeRecord;
+use ty_rec::TyRecord;
 
 /// AST represents an AST node in our parse tree. Each node can contain different fields and
 /// should be represented by an anonymous struct to better document those fields, so that we know
 /// what each of the members of the enum type is supposed to represent.
 /// Nodes can be statements or expressions. Expr nodes imply that some value in the node
-/// can be "used", ie. that node has a type. Thus, expr nodes should contain a TypeRecord field
+/// can be "used", ie. that node has a type. Thus, expr nodes should contain a TyRecord field
 /// with type information. Statement nodes generally wrap other statements or expressions,
 /// so their containing (child) nodes may have Types but not the statement nodes themselves.
 /// The num field of an AST node is suitable to use as an identifier for a block.
@@ -63,7 +63,7 @@ pub enum Ast {
 
     VarDeclExpr {
         num: usize,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
@@ -71,7 +71,7 @@ pub enum Ast {
 
     VarAssignExpr {
         num: usize,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
         ident_tkn: Token,
         is_imm: bool,
         is_global: bool,
@@ -80,7 +80,7 @@ pub enum Ast {
 
     LogicalExpr {
         num: usize,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
         op_tkn: Token,
         lhs: Box<Ast>,
         rhs: Box<Ast>,
@@ -88,7 +88,7 @@ pub enum Ast {
 
     BinaryExpr {
         num: usize,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
         op_tkn: Token,
         lhs: Box<Ast>,
         rhs: Box<Ast>,
@@ -96,22 +96,22 @@ pub enum Ast {
 
     UnaryExpr {
         num: usize,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
         op_tkn: Token,
         rhs: Box<Ast>,
     },
 
     PrimaryExpr {
         num: usize,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
     },
 
     // TODO: statement or expr
     FnDecl {
         num: usize,
         ident_tkn: Token,
-        fn_params: Vec<TypeRecord>,
-        ret_ty: TypeRecord,
+        fn_params: Vec<TyRecord>,
+        ret_ty: TyRecord,
         fn_body: Box<Ast>,
         sc: usize,
     },
@@ -126,7 +126,7 @@ pub enum Ast {
     // TODO: statement or expr
     ClassDecl {
         num: usize,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
         ident_tkn: Token,
         methods: Vec<Ast>,
         props: Vec<Ast>,
@@ -183,7 +183,7 @@ impl Ast {
         }
     }
 
-    pub fn get_ty_rec(&self) -> Option<TypeRecord> {
+    pub fn get_ty_rec(&self) -> Option<TyRecord> {
         match self {
             Ast::PrimaryExpr { num: _, ty_rec }
             | Ast::UnaryExpr { num: _, ty_rec, .. }

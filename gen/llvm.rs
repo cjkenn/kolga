@@ -2,7 +2,7 @@ use classtab::ClassTab;
 use error::gen::{GenErr, GenErrTy};
 use kolgac::ast::Ast;
 use kolgac::token::{TknTy, Token};
-use kolgac::ty_rec::{KolgaTy, TypeRecord};
+use kolgac::ty_rec::{KolgaTy, TyRecord};
 use llvm_sys::core::*;
 use llvm_sys::prelude::*;
 use llvm_sys::LLVMRealPredicate;
@@ -425,7 +425,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             } => {
                                 // We need to add the class declaration type to the list of
                                 // params so we obtain a pointer to it inside the method body.
-                                let fake_class_param = TypeRecord {
+                                let fake_class_param = TyRecord {
                                     name: String::new(), // hack
                                     ty: KolgaTy::Class(class_name.clone()),
                                     tkn: class_tkn.clone(),
@@ -710,7 +710,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Generate LLVM IR for a primary expression. This returns an Option because
     /// it's possible that we cant retrieve an identifier from the value table (if it's
     /// undefined).
-    fn gen_primary(&mut self, ty_rec: &TypeRecord) -> Option<LLVMValueRef> {
+    fn gen_primary(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
             TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.double_ty(), *val)) },
             TknTy::Str(ref lit) => unsafe {
@@ -1036,7 +1036,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     fn build_entry_bb_alloca(
         &mut self,
         func: LLVMValueRef,
-        ty_rec: TypeRecord,
+        ty_rec: TyRecord,
         name: &str,
     ) -> LLVMValueRef {
         unsafe {
@@ -1051,8 +1051,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         }
     }
 
-    /// Converts a TypeRecord type to an LLVMTypeRef
-    fn llvm_ty_from_ty_rec(&self, ty_rec: &TypeRecord) -> LLVMTypeRef {
+    /// Converts a TyRecord type to an LLVMTypeRef
+    fn llvm_ty_from_ty_rec(&self, ty_rec: &TyRecord) -> LLVMTypeRef {
         match ty_rec.ty.clone() {
             KolgaTy::String => self.str_ty(),
             KolgaTy::Num => self.double_ty(),
@@ -1068,8 +1068,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         }
     }
 
-    /// Converts a vector of TypeRecords into a vector of LLVMTypeRefs
-    fn llvm_tys_from_ty_rec_arr(&self, ty_recs: &Vec<TypeRecord>) -> Vec<LLVMTypeRef> {
+    /// Converts a vector of TyRecords into a vector of LLVMTypeRefs
+    fn llvm_tys_from_ty_rec_arr(&self, ty_recs: &Vec<TyRecord>) -> Vec<LLVMTypeRef> {
         let mut llvm_tys = Vec::new();
         for ty_rec in ty_recs {
             llvm_tys.push(self.llvm_ty_from_ty_rec(&ty_rec));

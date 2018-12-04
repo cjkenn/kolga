@@ -7,7 +7,7 @@ use std::rc::Rc;
 use sym::{Sym, SymTy};
 use symtab::SymbolTable;
 use token::{TknTy, Token};
-use ty_rec::{KolgaTy, TypeRecord};
+use ty_rec::{KolgaTy, TyRecord};
 
 const FN_PARAM_MAX_LEN: usize = 64;
 
@@ -152,7 +152,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let var_val = self.expr()?;
                 self.expect(TknTy::Semicolon)?;
 
-                let ty_rec = TypeRecord::new(var_ty_tkn.unwrap(), self.next_sym());
+                let ty_rec = TyRecord::new(var_ty_tkn.unwrap(), self.next_sym());
                 let sym = Sym::new(
                     SymTy::Var,
                     is_imm,
@@ -186,7 +186,7 @@ impl<'l, 's> Parser<'l, 's> {
                         .symtab
                         .retrieve(&var_ty_tkn.clone().unwrap().get_name())
                         .unwrap();
-                    let cl_ty_rec = TypeRecord::new(var_ty_tkn.clone().unwrap(), self.next_sym());
+                    let cl_ty_rec = TyRecord::new(var_ty_tkn.clone().unwrap(), self.next_sym());
                     let cl_assign = class_sym.assign_val.clone();
                     let cl_sym = Sym::new(
                         SymTy::Var,
@@ -210,7 +210,7 @@ impl<'l, 's> Parser<'l, 's> {
                     });
                 }
 
-                let ty_rec = TypeRecord::new(var_ty_tkn.unwrap(), self.next_sym());
+                let ty_rec = TyRecord::new(var_ty_tkn.unwrap(), self.next_sym());
                 let sym = Sym::new(
                     SymTy::Var,
                     is_imm,
@@ -255,7 +255,7 @@ impl<'l, 's> Parser<'l, 's> {
             self.consume();
             self.expect(TknTy::Tilde)?;
 
-            let mut ty_rec = TypeRecord::new(self.currtkn.clone(), self.next_sym());
+            let mut ty_rec = TyRecord::new(self.currtkn.clone(), self.next_sym());
             ty_rec.tkn = ident_tkn.clone();
 
             // We must create an assign value if the parameter is a class. This is because
@@ -314,7 +314,7 @@ impl<'l, 's> Parser<'l, 's> {
         // set an actual value. This is so that when parsing the body, if we
         // encounter a recursive call, we won't report an error for trying
         // to call an undefined function.
-        let fn_ty_rec = TypeRecord::new(fn_ret_ty_tkn.clone().unwrap(), self.next_sym());
+        let fn_ty_rec = TyRecord::new(fn_ret_ty_tkn.clone().unwrap(), self.next_sym());
         let fn_sym = Sym::new(
             SymTy::Fn,
             true,
@@ -402,7 +402,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         let final_sc_lvl = self.symtab.finalize_sc();
-        let cl_ty_rec = TypeRecord::new(class_tkn.clone(), self.next_sym());
+        let cl_ty_rec = TyRecord::new(class_tkn.clone(), self.next_sym());
         let ast = Ast::ClassDecl {
             num: self.next(),
             ty_rec: cl_ty_rec.clone(),
@@ -687,7 +687,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.logicand_expr()?;
                     ast = Ast::LogicalExpr {
                         num: self.next(),
-                        ty_rec: TypeRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -710,7 +710,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.eq_expr()?;
                     ast = Ast::LogicalExpr {
                         num: self.next(),
-                        ty_rec: TypeRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -733,7 +733,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.cmp_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TypeRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -756,7 +756,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.addsub_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TypeRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -779,7 +779,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.muldiv_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TypeRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -802,7 +802,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.unary_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TypeRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -824,7 +824,7 @@ impl<'l, 's> Parser<'l, 's> {
 
                 return Ok(Ast::UnaryExpr {
                     num: self.next(),
-                    ty_rec: TypeRecord::new(op.clone(), self.next_sym()),
+                    ty_rec: TyRecord::new(op.clone(), self.next_sym()),
                     op_tkn: op,
                     rhs: Box::new(rhs),
                 });
@@ -1060,7 +1060,7 @@ impl<'l, 's> Parser<'l, 's> {
             TknTy::Str(_) | TknTy::Val(_) | TknTy::True | TknTy::False | TknTy::Null => {
                 let ast = Ok(Ast::PrimaryExpr {
                     num: self.next(),
-                    ty_rec: TypeRecord::new(self.currtkn.clone(), self.next_sym()),
+                    ty_rec: TyRecord::new(self.currtkn.clone(), self.next_sym()),
                 });
                 self.consume();
                 ast

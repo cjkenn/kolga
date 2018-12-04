@@ -43,14 +43,14 @@ impl fmt::Display for KolgaTy {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TypeRecord {
+pub struct TyRecord {
     pub name: String,
     pub ty: KolgaTy,
     pub tkn: Token,
 }
 
-impl TypeRecord {
-    pub fn new(tkn: Token, sym_count: usize) -> TypeRecord {
+impl TyRecord {
+    pub fn new(tkn: Token, sym_count: usize) -> TyRecord {
         let name = format!("T{}", sym_count);
         let ty = match tkn.ty {
             TknTy::Num => KolgaTy::Num,
@@ -66,7 +66,7 @@ impl TypeRecord {
             _ => KolgaTy::Symbolic(name),
         };
 
-        TypeRecord {
+        TyRecord {
             name: format!("T{}", sym_count),
             ty: ty,
             tkn: tkn.clone(),
