@@ -63,7 +63,7 @@ impl<'l, 's> Parser<'l, 's> {
             match self.decl() {
                 Ok(a) => stmts.push(a),
                 Err(e) => {
-                    e.emit();
+                    // TODO: could emit here and avoid check an error vector later
                     match e.continuable() {
                         true => (),
                         false => break,
@@ -108,13 +108,20 @@ impl<'l, 's> Parser<'l, 's> {
         };
 
         let ident_tkn = self.match_ident_tkn();
+        let next_tkn = self.lexer.peek_tkn();
+
         self.expect(TknTy::Tilde)?;
 
         let mut is_class_type = false;
         let mut var_err = None;
+        let mut var_ty_tkn = None;
 
-        let var_ty_tkn = if self.currtkn.is_ty() {
-            // But Void isn't a valid type for a variable, just a function that returns nothing
+        // Check for a type annotation. If there is one, set var_ty_tkn so we can use it later
+        // to create type records. If there is no type, we will try to infer one later. If the
+        // type annotation is a class identifier, we parse that to make sure the class
+        // actually exists and is valid to use as a type.
+        if self.currtkn.is_ty() {
+            // Void isn't a valid type for a variable, just a function that returns nothing
             if self.currtkn.ty == TknTy::Void {
                 let ty_str = self.currtkn.ty.to_string();
                 return Err(self.error(ParseErrTy::InvalidTy(ty_str)));
@@ -122,27 +129,29 @@ impl<'l, 's> Parser<'l, 's> {
 
             let tkn = Some(self.currtkn.clone());
             self.consume();
-            tkn
+            var_ty_tkn = tkn;
+        } else if self.currtkn.ty == TknTy::Eq || self.currtkn.ty == TknTy::Semicolon {
+            var_ty_tkn = None;
         } else {
             let ty_name = self.currtkn.get_name();
             let maybe_class_sym = self.symtab.retrieve(&ty_name);
             if maybe_class_sym.is_none() {
                 let ty_str = self.currtkn.ty.to_string();
                 var_err = Some(self.error(ParseErrTy::InvalidTy(ty_str)));
-                None
+                var_ty_tkn = None;
             } else if maybe_class_sym.unwrap().sym_ty == SymTy::Class {
                 is_class_type = true;
                 let tkn = Some(self.currtkn.clone());
                 self.consume();
-                tkn
+                var_ty_tkn = tkn;
             } else {
                 let ty_str = self.currtkn.ty.to_string();
                 var_err = Some(self.error(ParseErrTy::InvalidTy(ty_str)));
-                None
+                var_ty_tkn = None;
             }
         };
 
-        if var_ty_tkn.is_none() {
+        if var_ty_tkn.is_none() && var_err.is_some() {
             return Err(var_err.unwrap());
         }
 
@@ -152,7 +161,13 @@ impl<'l, 's> Parser<'l, 's> {
                 let var_val = self.expr()?;
                 self.expect(TknTy::Semicolon)?;
 
-                let ty_rec = TyRecord::new(var_ty_tkn.unwrap(), self.next_sym());
+                // If we don't have a type tkn, we need to infer it. So, we create our type
+                // record with a symbolic type instead.
+                let ty_rec = match var_ty_tkn {
+                    None => TyRecord::new(self.currtkn.clone(), self.next_sym()),
+                    Some(tkn) => TyRecord::new(tkn.clone(), self.next_sym()),
+                };
+
                 let sym = Sym::new(
                     SymTy::Var,
                     is_imm,
@@ -175,12 +190,19 @@ impl<'l, 's> Parser<'l, 's> {
                 })
             }
             TknTy::Semicolon => {
+                // Check if we're trying to create an immutable variable but with no
+                // value assigned to it. We treat this as an error, since we should never
+                // be able to assign to an immutable var later.
                 if is_imm {
                     let ty_str = self.currtkn.ty.to_string();
                     return Err(self.error(ParseErrTy::ImmDecl(ty_str)));
                 }
+
                 self.consume();
 
+                // If we have a class type, retrieve the class declaration from the
+                // symbol table and set the assign value of the var to that class declaration.
+                // We also create a type record for that class type.
                 if is_class_type {
                     let class_sym = self
                         .symtab
@@ -210,7 +232,14 @@ impl<'l, 's> Parser<'l, 's> {
                     });
                 }
 
-                let ty_rec = TyRecord::new(var_ty_tkn.unwrap(), self.next_sym());
+                // For a var declaration without an assignment, we require a type annotation.
+                // The inferrer isn't smart enough (yet) to infer types without this information
+                // in all cases (ie. we don't detect if there are no future uses of this var)
+                if var_ty_tkn.is_none() {
+                    return Err(self.error(ParseErrTy::TyRequired));
+                }
+
+                let ty_rec = TyRecord::new(var_ty_tkn.clone().unwrap(), self.next_sym());
                 let sym = Sym::new(
                     SymTy::Var,
                     is_imm,

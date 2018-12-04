@@ -11,11 +11,12 @@ pub enum ParseErrTy {
     InvalidIfStmt,
     InvalidClassProp,
     ImmDecl(String),
-    TknMismatch(String, String),   // not continuable
-    FnParamCntExceeded(usize),     // not continuable
-    WrongFnParamCnt(usize, usize), // continuable
-    UndeclaredSym(String),         // continuable
-    UnassignedVar(String),         // continuable
+    TknMismatch(String, String),
+    FnParamCntExceeded(usize),
+    WrongFnParamCnt(usize, usize),
+    UndeclaredSym(String),
+    UnassignedVar(String),
+    TyRequired,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ impl ParseErr {
         match self.ty {
             ParseErrTy::TknMismatch(_, _) => false,
             ParseErrTy::FnParamCntExceeded(_) => false,
+            ParseErrTy::TyRequired => false,
             _ => true,
         }
     }
@@ -101,6 +103,10 @@ impl KolgaErr for ParseErr {
             ParseErrTy::UndeclaredSym(ref found) => {
                 format!("{} Undeclared symbol '{}' found", str_pos, found)
             }
+            ParseErrTy::TyRequired => format!(
+                "{} Type annotation is required for variables without assignments",
+                str_pos
+            ),
         }
     }
 }
