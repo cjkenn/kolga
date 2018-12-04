@@ -16,7 +16,8 @@ Right now, kolga features basic language syntax:
 Some compiler features so far:
 1. Lexing and parsing into an AST
 2. Type checking, including for ADT's
-3. LLVM IR codegen directly from AST (no additional IR) and optimization manager
+3. Basic type inference for variable assignments. Functions still require type annotations.
+4. LLVM IR codegen directly from AST (no additional IR) and optimization manager
  
 ### Requirements
 
@@ -34,17 +35,26 @@ cargo test -- --nocapture
 ```
 
 ### Project Layout
-`libkolgac` contains code for lexing and parsing, as well as appropriate token and AST data structures.
+`kolgac` contains code for lexing and parsing, as well as appropriate token and AST data structures. This is the core compiler.
 
-`libtypes` contains type checking/inference
+`ty` contains type checking/inference
 
-`libllvm_codegen` handles generating the llvm ir from the ast
+`gen` handles generating the llvm ir from the ast
 
-`liberrors` is a smaller package containing some convenienve functions for error handling (pretty bare bones right now)
+`error` contains error handling/emitting functions, are well as error types for each stage in the compiler
 
 The `src` directory contains the file `kolga.rs`, which is the main entry point into the compiler. 
 
 ### Some Small Examples
+```
+fn basicFunc(x~num)~num {
+  let inferMe ~= x + 10;
+  let dontInferMe ~num = x - 1;
+  return inferMe;
+}
+
+let plsInferMe ~= basicFunc(1);
+```
 
 ```
 fn basicFunc(x~num, y~num)~num {
