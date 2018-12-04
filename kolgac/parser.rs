@@ -14,16 +14,14 @@ const FN_PARAM_MAX_LEN: usize = 64;
 pub struct ParserResult {
     /// The resulting AST from parsing
     pub ast: Option<Ast>,
-
-    /// Vector of any parser errors
-    pub error: Vec<ParseErr>,
+    pub has_err: bool,
 }
 
 impl ParserResult {
     pub fn new() -> ParserResult {
         ParserResult {
             ast: None,
-            error: Vec::new(),
+            has_err: false,
         }
     }
 }
@@ -58,12 +56,14 @@ impl<'l, 's> Parser<'l, 's> {
     /// be handled before continuing to future compiler passes.
     pub fn parse(&mut self) -> ParserResult {
         let mut stmts: Vec<Ast> = Vec::new();
+        let mut found_err = false;
 
         while self.currtkn.ty != TknTy::Eof {
             match self.decl() {
                 Ok(a) => stmts.push(a),
                 Err(e) => {
-                    // TODO: could emit here and avoid check an error vector later
+                    found_err = true;
+                    e.emit();
                     match e.continuable() {
                         true => (),
                         false => break,
@@ -81,7 +81,7 @@ impl<'l, 's> Parser<'l, 's> {
         };
         ParserResult {
             ast: Some(head),
-            error: self.errors.clone(),
+            has_err: found_err,
         }
     }
 
@@ -157,16 +157,16 @@ impl<'l, 's> Parser<'l, 's> {
 
         match self.currtkn.ty {
             TknTy::Eq => {
-                self.consume();
-                let var_val = self.expr()?;
-                self.expect(TknTy::Semicolon)?;
-
                 // If we don't have a type tkn, we need to infer it. So, we create our type
                 // record with a symbolic type instead.
                 let ty_rec = match var_ty_tkn {
-                    None => TyRecord::new(self.currtkn.clone(), self.next_sym()),
+                    None => TyRecord::unknown(self.currtkn.clone(), self.next_sym()),
                     Some(tkn) => TyRecord::new(tkn.clone(), self.next_sym()),
                 };
+
+                self.consume();
+                let var_val = self.expr()?;
+                self.expect(TknTy::Semicolon)?;
 
                 let sym = Sym::new(
                     SymTy::Var,
@@ -716,7 +716,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.logicand_expr()?;
                     ast = Ast::LogicalExpr {
                         num: self.next(),
-                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -739,7 +739,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.eq_expr()?;
                     ast = Ast::LogicalExpr {
                         num: self.next(),
-                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -762,7 +762,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.cmp_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -785,7 +785,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.addsub_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -808,7 +808,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.muldiv_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -831,7 +831,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let rhs = self.unary_expr()?;
                     ast = Ast::BinaryExpr {
                         num: self.next(),
-                        ty_rec: TyRecord::new(op.clone(), self.next_sym()),
+                        ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
                         rhs: Box::new(rhs),
@@ -853,7 +853,7 @@ impl<'l, 's> Parser<'l, 's> {
 
                 return Ok(Ast::UnaryExpr {
                     num: self.next(),
-                    ty_rec: TyRecord::new(op.clone(), self.next_sym()),
+                    ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                     op_tkn: op,
                     rhs: Box::new(rhs),
                 });

@@ -44,11 +44,9 @@ fn main() {
         parse_result = parser.parse();
     }
 
-    if parse_result.error.len() > 0 {
-        for err in &parse_result.error {
-            err.emit();
-        }
-
+    // Any errors should already have been emitted by the compiler, whether or
+    // not they are continuable. We exit here if there are any errors.
+    if parse_result.has_err {
         return;
     }
 
@@ -85,5 +83,6 @@ fn main() {
         return;
     }
 
+    // TODO: cerate obj files with obj gen to make an executable
     llvm_codegen.dump_ir();
 }

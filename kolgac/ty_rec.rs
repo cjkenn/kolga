@@ -72,4 +72,14 @@ impl TyRecord {
             tkn: tkn.clone(),
         }
     }
+
+    pub fn unknown(tkn: Token, sym_count: usize) -> TyRecord {
+        let name = format!("T{}", sym_count);
+
+        TyRecord {
+            name: name.clone(),
+            ty: KolgaTy::Symbolic(name),
+            tkn: tkn.clone(),
+        }
+    }
 }
