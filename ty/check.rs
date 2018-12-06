@@ -53,11 +53,11 @@ impl<'t, 's> TyCheck<'t, 's> {
             }
             Ast::ExprStmt { num: _, expr } => {
                 match *expr.clone() {
-                    Ast::FnCall { .. } => {
+                    Ast::FnCallExpr { .. } => {
                         self.check_fn_params(*expr, final_sc);
                         ()
                     }
-                    Ast::ClassFnCall {
+                    Ast::ClassFnCallExpr {
                         num: _,
                         class_tkn: _,
                         class_name: _,
@@ -129,7 +129,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     self.check_stmt(stmt.clone(), sc);
                 }
             }
-            Ast::FnDecl {
+            Ast::FnDeclStmt {
                 num: _,
                 ident_tkn,
                 fn_params: _,
@@ -309,7 +309,7 @@ impl<'t, 's> TyCheck<'t, 's> {
 
     fn check_fn_params(&mut self, fn_call_ast: Ast, final_sc: usize) {
         match fn_call_ast {
-            Ast::FnCall {
+            Ast::FnCallExpr {
                 num: _,
                 fn_tkn,
                 fn_params,
@@ -330,7 +330,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                 }
             }
-            Ast::ClassFnCall {
+            Ast::ClassFnCallExpr {
                 num: _,
                 class_tkn: _,
                 class_name: _,

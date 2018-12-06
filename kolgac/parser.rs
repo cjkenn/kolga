@@ -370,7 +370,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         self.symtab.store(name, new_sym);
 
-        Ok(Ast::FnDecl {
+        Ok(Ast::FnDeclStmt {
             num: self.next(),
             ident_tkn: fn_ident_tkn,
             fn_params: params,
@@ -919,7 +919,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let fn_ast = self.fnparams_expr(name_tkn.clone(), class_sym.clone())?;
                 let params = fn_ast.extract_params();
 
-                Ok(Ast::ClassFnCall {
+                Ok(Ast::ClassFnCallExpr {
                     num: self.next(),
                     class_tkn: class_tkn.clone().unwrap(),
                     class_name: class_name,
@@ -1014,7 +1014,7 @@ impl<'l, 's> Parser<'l, 's> {
 
                         for mtod_ast in methods {
                             match mtod_ast {
-                                Ast::FnDecl {
+                                Ast::FnDeclStmt {
                                     num: _,
                                     ident_tkn,
                                     fn_params,
@@ -1077,7 +1077,7 @@ impl<'l, 's> Parser<'l, 's> {
             );
         }
 
-        Ok(Ast::FnCall {
+        Ok(Ast::FnCallExpr {
             num: self.next(),
             fn_tkn: fn_tkn.unwrap(),
             fn_params: params,

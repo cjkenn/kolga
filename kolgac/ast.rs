@@ -106,8 +106,7 @@ pub enum Ast {
         ty_rec: TyRecord,
     },
 
-    // TODO: statement or expr
-    FnDecl {
+    FnDeclStmt {
         num: usize,
         ident_tkn: Token,
         fn_params: Vec<TyRecord>,
@@ -117,7 +116,7 @@ pub enum Ast {
     },
 
     // TODO: statement or expr
-    FnCall {
+    FnCallExpr {
         num: usize,
         fn_tkn: Token,
         fn_params: Vec<Ast>,
@@ -154,7 +153,7 @@ pub enum Ast {
     },
 
     // TODO: statement or expr
-    ClassFnCall {
+    ClassFnCallExpr {
         num: usize,
         class_tkn: Token,
         class_name: String,
@@ -174,7 +173,7 @@ impl Ast {
 
     pub fn extract_params(&self) -> Vec<Ast> {
         match self {
-            Ast::FnCall {
+            Ast::FnCallExpr {
                 num: _,
                 fn_tkn: _,
                 fn_params,

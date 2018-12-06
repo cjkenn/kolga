@@ -47,7 +47,6 @@ impl TyInfer {
             Ast::Prog { num: _, stmts } => {
                 let ty_eqs = self.ty_eq(stmts);
                 self.unify_all(ty_eqs)?;
-                println!("{:#?}", self.subs);
             }
             _ => return Err(String::from("Invalid AST found in infer")),
         };
@@ -167,13 +166,13 @@ impl TyInfer {
                 }
             }
             Ast::Prog { .. } => (),
+            Ast::FnDeclStmt { .. } => (),
             Ast::RetStmt { .. } => unimplemented!(),
             Ast::ClassDecl { .. } => unimplemented!(),
-            Ast::FnDecl { .. } => unimplemented!(),
-            Ast::FnCall { .. } => unimplemented!(),
+            Ast::FnCallExpr { .. } => unimplemented!(),
             Ast::ClassPropAccess { .. } => unimplemented!(),
             Ast::ClassPropSet { .. } => unimplemented!(),
-            Ast::ClassFnCall { .. } => unimplemented!(),
+            Ast::ClassFnCallExpr { .. } => unimplemented!(),
         }
     }
 
@@ -467,14 +466,14 @@ impl TyInfer {
 
                 ty_eqs
             }
+            Ast::FnDeclStmt { .. } => ty_eqs,
             Ast::VarDeclExpr { .. } => ty_eqs,
             Ast::RetStmt { .. } => unimplemented!(),
             Ast::ClassDecl { .. } => unimplemented!(),
-            Ast::FnDecl { .. } => unimplemented!(),
-            Ast::FnCall { .. } => unimplemented!(),
+            Ast::FnCallExpr { .. } => unimplemented!(),
             Ast::ClassPropAccess { .. } => unimplemented!(),
             Ast::ClassPropSet { .. } => unimplemented!(),
-            Ast::ClassFnCall { .. } => unimplemented!(),
+            Ast::ClassFnCallExpr { .. } => unimplemented!(),
             _ => ty_eqs,
         }
     }

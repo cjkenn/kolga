@@ -46,27 +46,24 @@ fn run_parser_test(path: PathBuf, expct: ParseExpect) {
 
     match expct.is_pass {
         true => {
-            if parse_result.error.len() > 0 {
+            if parse_result.has_err {
                 assert!(
                     false,
-                    "FAIL: {:?} expected successful parse, found error:\n{:?}",
+                    "FAIL: {:?} expected successful parse, found error",
                     path.file_stem().unwrap(),
-                    parse_result.error[0].ty
                 );
             } else {
                 println!("PASS: parse {:?}", path.file_stem().unwrap());
             }
         }
         false => {
-            if parse_result.error.len() == 0 {
+            if !parse_result.has_err {
                 assert!(
                     false,
                     "FAIL: {:?} expected error, found none",
                     path.file_stem().unwrap()
                 );
             } else {
-                assert_eq!(parse_result.error[0].line, expct.line);
-                assert_eq!(parse_result.error[0].pos, expct.pos);
                 println!("PASS: parse {:?}", path.file_stem().unwrap());
             }
         }

@@ -170,7 +170,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 for_step_expr,
                 stmts,
             } => self.for_stmt(for_var_decl, for_cond_expr, for_step_expr, stmts),
-            Ast::FnDecl {
+            Ast::FnDeclStmt {
                 num: _,
                 ident_tkn,
                 fn_params,
@@ -415,7 +415,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let class_tkn = ident_tkn.clone();
                     for mtod in methods {
                         match mtod.clone() {
-                            Ast::FnDecl {
+                            Ast::FnDeclStmt {
                                 num,
                                 ident_tkn,
                                 fn_params,
@@ -447,7 +447,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                     ident_tkn.pos,
                                 );
 
-                                let new_method = Ast::FnDecl {
+                                let new_method = Ast::FnDeclStmt {
                                     num: num,
                                     ident_tkn: new_tkn,
                                     fn_params: new_params,
@@ -543,7 +543,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     _ => None,
                 }
             }
-            Ast::FnCall {
+            Ast::FnCallExpr {
                 num: _,
                 fn_tkn,
                 fn_params,
@@ -582,7 +582,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     ))
                 }
             }
-            Ast::ClassFnCall {
+            Ast::ClassFnCallExpr {
                 num: _,
                 class_tkn,
                 class_name,
