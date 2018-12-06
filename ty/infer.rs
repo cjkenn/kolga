@@ -165,14 +165,31 @@ impl TyInfer {
                     ty_rec.ty = potential_ty.unwrap().clone();
                 }
             }
-            Ast::Prog { .. } => (),
-            Ast::FnDeclStmt { .. } => (),
-            Ast::RetStmt { .. } => unimplemented!(),
+            Ast::FnDeclStmt {
+                num: _,
+                ident_tkn: _,
+                fn_params: _,
+                ret_ty: _,
+                ref mut fn_body,
+                ..
+            } => {
+                self.update_tys(fn_body);
+            }
+            Ast::RetStmt {
+                num: _,
+                ref mut ret_expr,
+            } => {
+                match *ret_expr {
+                    Some(ref mut expr) => self.update_tys(expr),
+                    None => (),
+                };
+            }
             Ast::ClassDecl { .. } => unimplemented!(),
             Ast::FnCallExpr { .. } => unimplemented!(),
             Ast::ClassPropAccess { .. } => unimplemented!(),
             Ast::ClassPropSet { .. } => unimplemented!(),
             Ast::ClassFnCallExpr { .. } => unimplemented!(),
+            Ast::Prog { .. } => (),
         }
     }
 
@@ -475,12 +492,31 @@ impl TyInfer {
                     ty_eqs
                 }
             },
-            Ast::FnDeclStmt { .. } => ty_eqs,
+            Ast::FnDeclStmt {
+                num: _,
+                ident_tkn: _,
+                fn_params: _,
+                ret_ty: _,
+                ref fn_body,
+                sc: _,
+            } => {
+                ty_eqs.extend(self.gen_ty_eq(fn_body));
+                ty_eqs
+            }
             // nothing to do with a function call not being assigned, or a
             // declaration with no value
+            Ast::RetStmt {
+                num: _,
+                ref ret_expr,
+            } => {
+                match *ret_expr {
+                    Some(ref expr) => ty_eqs.extend(self.gen_ty_eq(expr)),
+                    None => (),
+                };
+                ty_eqs
+            }
             Ast::FnCallExpr { .. } => ty_eqs,
             Ast::VarDeclExpr { .. } => ty_eqs,
-            Ast::RetStmt { .. } => unimplemented!(),
             Ast::ClassDecl { .. } => unimplemented!(),
             Ast::ClassPropAccess { .. } => unimplemented!(),
             Ast::ClassPropSet { .. } => unimplemented!(),
