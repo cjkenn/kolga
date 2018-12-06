@@ -545,6 +545,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             }
             Ast::FnCallExpr {
                 num: _,
+                ty_rec: _,
                 fn_tkn,
                 fn_params,
             } => {

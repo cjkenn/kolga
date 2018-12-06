@@ -1036,7 +1036,7 @@ impl<'l, 's> Parser<'l, 's> {
                 params
             }
             // If the fn sym exists, simply take its params.
-            Some(sym) => sym.fn_params.clone(),
+            Some(ref sym) => sym.fn_params.clone(),
         };
 
         // If we have no expected params after checking the fn_sym and the class_sym,
@@ -1077,8 +1077,23 @@ impl<'l, 's> Parser<'l, 's> {
             );
         }
 
+        let fn_ty_rec = match fn_sym {
+            Some(sym) => Some(sym.ty_rec.clone()),
+            None => None,
+        };
+
+        if fn_ty_rec.is_none() {
+            let tkn = fn_tkn.clone().unwrap();
+            return Err(self.error_w_pos(
+                tkn.line,
+                tkn.pos,
+                ParseErrTy::UndeclaredSym(tkn.get_name()),
+            ));
+        }
+
         Ok(Ast::FnCallExpr {
             num: self.next(),
+            ty_rec: fn_ty_rec.unwrap(),
             fn_tkn: fn_tkn.unwrap(),
             fn_params: params,
         })

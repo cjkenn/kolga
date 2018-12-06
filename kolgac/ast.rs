@@ -115,9 +115,9 @@ pub enum Ast {
         sc: usize,
     },
 
-    // TODO: statement or expr
     FnCallExpr {
         num: usize,
+        ty_rec: TyRecord,
         fn_tkn: Token,
         fn_params: Vec<Ast>,
     },
@@ -152,7 +152,6 @@ pub enum Ast {
         assign_val: Box<Ast>,
     },
 
-    // TODO: statement or expr
     ClassFnCallExpr {
         num: usize,
         class_tkn: Token,
@@ -175,6 +174,7 @@ impl Ast {
         match self {
             Ast::FnCallExpr {
                 num: _,
+                ty_rec: _,
                 fn_tkn: _,
                 fn_params,
             } => fn_params.clone(),
@@ -189,7 +189,8 @@ impl Ast {
             | Ast::BinaryExpr { num: _, ty_rec, .. }
             | Ast::LogicalExpr { num: _, ty_rec, .. }
             | Ast::VarAssignExpr { num: _, ty_rec, .. }
-            | Ast::VarDeclExpr { num: _, ty_rec, .. } => Some(ty_rec.clone()),
+            | Ast::VarDeclExpr { num: _, ty_rec, .. }
+            | Ast::FnCallExpr { num: _, ty_rec, .. } => Some(ty_rec.clone()),
             _ => None,
         }
     }

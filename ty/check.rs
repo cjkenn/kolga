@@ -245,8 +245,9 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             }
-            Ast::PrimaryExpr { num: _, ty_rec } => ty_rec.ty.clone(),
-            Ast::ClassDecl { num: _, ty_rec, .. } => ty_rec.ty.clone(),
+            Ast::PrimaryExpr { num: _, ty_rec }
+            | Ast::ClassDecl { num: _, ty_rec, .. }
+            | Ast::FnCallExpr { num: _, ty_rec, .. } => ty_rec.ty.clone(),
             Ast::ClassPropAccess {
                 num: _,
                 ident_tkn: _,
@@ -311,6 +312,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         match fn_call_ast {
             Ast::FnCallExpr {
                 num: _,
+                ty_rec: _,
                 fn_tkn,
                 fn_params,
             } => {

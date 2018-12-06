@@ -459,18 +459,29 @@ impl TyInfer {
                 is_imm: _,
                 is_global: _,
                 ref value,
-            } => {
-                ty_eqs.extend(self.gen_ty_eq(value));
-                let val_ty_rec = value.get_ty_rec().unwrap();
-                ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), val_ty_rec.ty));
-
-                ty_eqs
-            }
+            } => match **value {
+                Ast::FnCallExpr {
+                    num: _,
+                    ty_rec: ref fn_ty_rec,
+                    ..
+                } => {
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), fn_ty_rec.ty.clone()));
+                    ty_eqs
+                }
+                _ => {
+                    ty_eqs.extend(self.gen_ty_eq(value));
+                    let val_ty_rec = value.get_ty_rec().unwrap();
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), val_ty_rec.ty));
+                    ty_eqs
+                }
+            },
             Ast::FnDeclStmt { .. } => ty_eqs,
+            // nothing to do with a function call not being assigned, or a
+            // declaration with no value
+            Ast::FnCallExpr { .. } => ty_eqs,
             Ast::VarDeclExpr { .. } => ty_eqs,
             Ast::RetStmt { .. } => unimplemented!(),
             Ast::ClassDecl { .. } => unimplemented!(),
-            Ast::FnCallExpr { .. } => unimplemented!(),
             Ast::ClassPropAccess { .. } => unimplemented!(),
             Ast::ClassPropSet { .. } => unimplemented!(),
             Ast::ClassFnCallExpr { .. } => unimplemented!(),
