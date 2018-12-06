@@ -59,8 +59,17 @@ fn main() {
     // We can be assured that all ast values are Some, since None is only returned
     // if there are parsing errors.
     {
-        let _result = TyInfer::new().infer(&mut ast);
+        let result = TyInfer::new().infer(&mut ast);
+        match result {
+            Ok(()) => (),
+            Err(e) => {
+                println!("{}", e);
+                return;
+            }
+        }
+
         let check_result = TyCheck::new(&ast, &mut symtab).check();
+
         if check_result.len() > 0 {
             for err in &check_result {
                 err.emit();
@@ -83,6 +92,6 @@ fn main() {
         return;
     }
 
-    // TODO: cerate obj files with obj gen to make an executable
+    // TODO: create obj files with obj gen to make an executable
     llvm_codegen.dump_ir();
 }

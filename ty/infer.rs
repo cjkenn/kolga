@@ -47,6 +47,7 @@ impl TyInfer {
             Ast::Prog { num: _, stmts } => {
                 let ty_eqs = self.ty_eq(stmts);
                 self.unify_all(ty_eqs)?;
+                println!("{:#?}", self.subs);
             }
             _ => return Err(String::from("Invalid AST found in infer")),
         };
@@ -197,6 +198,17 @@ impl TyInfer {
     /// should be a symbolic type, so long as the types aren't the same.
     /// This prevents an attempt at trying to unify two concrete types,
     /// like String and Num, which can never be unified.
+    ///
+    /// When we don't have at least one symbolic type here, it should indicate
+    /// that we are trying to assign something to the wrong type. For example,
+    /// take this program:
+    ///
+    /// let x ~= 10;
+    /// x = "hello";
+    ///
+    /// When attempting to unify this program, we would end up with an lhs
+    /// argument Num, and a rhs arg String, which we cannot unify. In this case,
+    /// we should return a type error with a type mismatch.
     fn unify(&mut self, lhs: KolgaTy, rhs: KolgaTy) -> Result<(), String> {
         if lhs == rhs {
             return Ok(());
@@ -216,7 +228,11 @@ impl TyInfer {
             _ => (),
         };
 
-        Err(String::from("Could not infer types"))
+        // TODO: line numbers would be much better here
+        Err(format!(
+            "kolgac: Type error - Cannot assign type '{}' to type '{}'",
+            rhs, lhs
+        ))
     }
 
     /// Unifies two variable types. This is done by inserting the type on the rhs
