@@ -1,4 +1,4 @@
-use ast::Ast;
+use ast::{Ast, MetaAst};
 use error::parse::{ParseErr, ParseErrTy};
 use error::KolgaErr;
 use lexer::Lexer;
@@ -76,9 +76,10 @@ impl<'l, 's> Parser<'l, 's> {
         self.symtab.finalize_global_sc();
 
         let head = Ast::Prog {
-            num: 0,
+            meta: MetaAst::new(0, 0, 0),
             stmts: stmts,
         };
+
         ParserResult {
             ast: Some(head),
             has_err: found_err,
@@ -179,9 +180,10 @@ impl<'l, 's> Parser<'l, 's> {
 
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
+                let tkn = ident_tkn.clone().unwrap();
 
                 Ok(Ast::VarAssignExpr {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -222,8 +224,10 @@ impl<'l, 's> Parser<'l, 's> {
                     let name = &ident_tkn.clone().unwrap().get_name();
                     self.symtab.store(name, cl_sym);
 
+                    let tkn = ident_tkn.clone().unwrap();
+
                     return Ok(Ast::VarAssignExpr {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
                         ty_rec: cl_ty_rec,
                         ident_tkn: ident_tkn.clone().unwrap(),
                         is_imm: is_imm,
@@ -251,9 +255,10 @@ impl<'l, 's> Parser<'l, 's> {
 
                 let name = &ident_tkn.clone().unwrap().get_name();
                 self.symtab.store(name, sym);
+                let tkn = ident_tkn.clone().unwrap();
 
                 Ok(Ast::VarDeclExpr {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
                     ty_rec: ty_rec,
                     ident_tkn: ident_tkn.unwrap(),
                     is_imm: is_imm,
@@ -371,7 +376,7 @@ impl<'l, 's> Parser<'l, 's> {
         self.symtab.store(name, new_sym);
 
         Ok(Ast::FnDeclStmt {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), fn_ident_tkn.line, fn_ident_tkn.pos),
             ident_tkn: fn_ident_tkn,
             fn_params: params,
             ret_ty: fn_ty_rec,
@@ -400,7 +405,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let prop_ast = self.var_decl()?;
                     match prop_ast.clone() {
                         Ast::VarDeclExpr {
-                            num: _,
+                            meta: _,
                             ty_rec: _,
                             ident_tkn,
                             ..
@@ -433,7 +438,7 @@ impl<'l, 's> Parser<'l, 's> {
         let final_sc_lvl = self.symtab.finalize_sc();
         let cl_ty_rec = TyRecord::new(class_tkn.clone(), self.next_sym());
         let ast = Ast::ClassDecl {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), class_tkn.line, class_tkn.pos),
             ty_rec: cl_ty_rec.clone(),
             ident_tkn: class_tkn.clone(),
             methods: methods,
@@ -492,7 +497,7 @@ impl<'l, 's> Parser<'l, 's> {
         let sc_lvl = self.symtab.finalize_sc();
 
         Ok(Ast::BlckStmt {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), self.currtkn.line, self.currtkn.pos),
             stmts: stmts,
             sc: sc_lvl,
         })
@@ -501,6 +506,8 @@ impl<'l, 's> Parser<'l, 's> {
     /// Parse an if statement, including else and elif blocks. These are stored in the
     /// IfStmt Ast type.
     fn if_stmt(&mut self) -> Result<Ast, ParseErr> {
+        let ast_line = self.currtkn.line;
+        let ast_pos = self.currtkn.pos;
         self.expect(TknTy::If)?;
 
         let if_cond = self.expr()?;
@@ -516,7 +523,7 @@ impl<'l, 's> Parser<'l, 's> {
                     let elif_ast = self.expr()?;
                     let elif_blck = self.block_stmt()?;
                     let stmt_ast = Ast::ElifStmt {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), self.currtkn.line, self.currtkn.pos),
                         cond_expr: Box::new(elif_ast),
                         stmts: Box::new(elif_blck),
                     };
@@ -537,7 +544,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
 
         Ok(Ast::IfStmt {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), ast_line, ast_pos),
             cond_expr: Box::new(if_cond),
             if_stmts: Box::new(if_blck),
             elif_exprs: else_ifs,
@@ -546,20 +553,26 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn while_stmt(&mut self) -> Result<Ast, ParseErr> {
+        let ast_line = self.currtkn.line;
+        let ast_pos = self.currtkn.pos;
         self.expect(TknTy::While)?;
+
         // TODO: skip expr for infinite loop when we have a break stmt
         let while_cond = self.expr()?;
         let while_stmts = self.block_stmt()?;
 
         Ok(Ast::WhileStmt {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), ast_line, ast_pos),
             cond_expr: Box::new(while_cond),
             stmts: Box::new(while_stmts),
         })
     }
 
     fn for_stmt(&mut self) -> Result<Ast, ParseErr> {
+        let ast_line = self.currtkn.line;
+        let ast_pos = self.currtkn.pos;
         self.expect(TknTy::For)?;
+
         let mut for_var_decl = None;
         let mut for_var_cond = None;
         let mut for_incr_expr = None;
@@ -594,7 +607,7 @@ impl<'l, 's> Parser<'l, 's> {
         let for_stmt = self.block_stmt()?;
 
         Ok(Ast::ForStmt {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), ast_line, ast_pos),
             for_var_decl: Box::new(for_var_decl.unwrap()),
             for_cond_expr: Box::new(for_var_cond.unwrap()),
             for_step_expr: Box::new(for_incr_expr.unwrap()),
@@ -603,12 +616,15 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn ret_stmt(&mut self) -> Result<Ast, ParseErr> {
+        let ast_line = self.currtkn.line;
+        let ast_pos = self.currtkn.pos;
         self.expect(TknTy::Return)?;
+
         match self.currtkn.ty {
             TknTy::Semicolon => {
                 self.consume();
                 Ok(Ast::RetStmt {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), ast_line, ast_pos),
                     ret_expr: None,
                 })
             }
@@ -616,7 +632,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let ret_expr = self.expr()?;
                 self.expect(TknTy::Semicolon)?;
                 Ok(Ast::RetStmt {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), ast_line, ast_pos),
                     ret_expr: Some(Box::new(ret_expr)),
                 })
             }
@@ -624,10 +640,14 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     fn expr_stmt(&mut self) -> Result<Ast, ParseErr> {
+        let ast_line = self.currtkn.line;
+        let ast_pos = self.currtkn.pos;
+
         let expr = self.expr()?;
         self.expect(TknTy::Semicolon)?;
+
         Ok(Ast::ExprStmt {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), ast_line, ast_pos),
             expr: Box::new(expr),
         })
     }
@@ -646,7 +666,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.assign_expr()?;
 
                 match ast.clone() {
-                    Ast::PrimaryExpr { num: _, ty_rec } => {
+                    Ast::PrimaryExpr { meta: _, ty_rec } => {
                         match ty_rec.tkn.ty {
                             TknTy::Ident(name) => {
                                 let maybe_sym = self.symtab.retrieve(&name);
@@ -660,7 +680,11 @@ impl<'l, 's> Parser<'l, 's> {
                                 }
 
                                 return Ok(Ast::VarAssignExpr {
-                                    num: self.next(),
+                                    meta: MetaAst::new(
+                                        self.next(),
+                                        sym.ident_tkn.line,
+                                        sym.ident_tkn.pos,
+                                    ),
                                     ty_rec: sym.ty_rec.clone(),
                                     ident_tkn: sym.ident_tkn.clone(),
                                     is_imm: sym.imm,
@@ -676,14 +700,14 @@ impl<'l, 's> Parser<'l, 's> {
                         };
                     }
                     Ast::ClassPropAccess {
-                        num: _,
+                        meta: _,
                         ident_tkn,
                         prop_name,
                         idx,
                         owner_class,
                     } => {
                         return Ok(Ast::ClassPropSet {
-                            num: self.next(),
+                            meta: MetaAst::new(self.next(), ident_tkn.line, ident_tkn.pos),
                             ident_tkn: ident_tkn,
                             prop_name: prop_name,
                             idx: idx,
@@ -708,6 +732,7 @@ impl<'l, 's> Parser<'l, 's> {
 
     fn logicor_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.logicand_expr()?;
+
         loop {
             match self.currtkn.ty {
                 TknTy::PipePipe | TknTy::Or => {
@@ -715,7 +740,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.logicand_expr()?;
                     ast = Ast::LogicalExpr {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), op.line, op.pos),
                         ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -731,6 +756,7 @@ impl<'l, 's> Parser<'l, 's> {
 
     fn logicand_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.eq_expr()?;
+
         loop {
             match self.currtkn.ty {
                 TknTy::AmpAmp | TknTy::And => {
@@ -738,7 +764,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.eq_expr()?;
                     ast = Ast::LogicalExpr {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), op.line, op.pos),
                         ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -754,6 +780,7 @@ impl<'l, 's> Parser<'l, 's> {
 
     fn eq_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.cmp_expr()?;
+
         loop {
             match self.currtkn.ty {
                 TknTy::BangEq | TknTy::EqEq => {
@@ -761,7 +788,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.cmp_expr()?;
                     ast = Ast::BinaryExpr {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), op.line, op.pos),
                         ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -777,6 +804,7 @@ impl<'l, 's> Parser<'l, 's> {
 
     fn cmp_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.addsub_expr()?;
+
         loop {
             match self.currtkn.ty {
                 TknTy::Lt | TknTy::LtEq | TknTy::Gt | TknTy::GtEq => {
@@ -784,7 +812,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.addsub_expr()?;
                     ast = Ast::BinaryExpr {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), op.line, op.pos),
                         ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -807,7 +835,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.muldiv_expr()?;
                     ast = Ast::BinaryExpr {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), op.line, op.pos),
                         ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -830,7 +858,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.consume();
                     let rhs = self.unary_expr()?;
                     ast = Ast::BinaryExpr {
-                        num: self.next(),
+                        meta: MetaAst::new(self.next(), op.line, op.pos),
                         ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                         op_tkn: op,
                         lhs: Box::new(ast),
@@ -852,7 +880,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.unary_expr()?;
 
                 return Ok(Ast::UnaryExpr {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), op.line, op.pos),
                     ty_rec: TyRecord::unknown(op.clone(), self.next_sym()),
                     op_tkn: op,
                     rhs: Box::new(rhs),
@@ -865,7 +893,7 @@ impl<'l, 's> Parser<'l, 's> {
     fn fncall_expr(&mut self) -> Result<Ast, ParseErr> {
         let mut ast = self.primary_expr()?;
         let ident_tkn = match ast.clone() {
-            Ast::PrimaryExpr { num: _, ty_rec } => Some(ty_rec.tkn),
+            Ast::PrimaryExpr { meta: _, ty_rec } => Some(ty_rec.tkn),
             _ => None,
         };
 
@@ -900,7 +928,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let (sc_lvl, class_name) =
                     match class_sym.clone().unwrap().assign_val.clone().unwrap() {
                         Ast::ClassDecl {
-                            num: _,
+                            meta: _,
                             ty_rec: _,
                             ident_tkn,
                             methods: _,
@@ -919,8 +947,10 @@ impl<'l, 's> Parser<'l, 's> {
                 let fn_ast = self.fnparams_expr(name_tkn.clone(), class_sym.clone())?;
                 let params = fn_ast.extract_params();
 
+                let tkn = class_tkn.clone().unwrap();
+
                 Ok(Ast::ClassFnCallExpr {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
                     class_tkn: class_tkn.clone().unwrap(),
                     class_name: class_name,
                     fn_tkn: name_tkn.unwrap().clone(),
@@ -943,7 +973,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let owner = class_ptr.assign_val.clone().unwrap();
                 let pos = match &owner {
                     Ast::ClassDecl {
-                        num: _,
+                        meta: _,
                         ty_rec: _,
                         ident_tkn: _,
                         methods: _,
@@ -964,8 +994,10 @@ impl<'l, 's> Parser<'l, 's> {
                     _ => 0 as usize,
                 };
 
+                let tkn = class_tkn.clone().unwrap();
+
                 Ok(Ast::ClassPropAccess {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
                     ident_tkn: class_tkn.unwrap(),
                     prop_name: name_tkn.unwrap().get_name(),
                     idx: pos,
@@ -1004,7 +1036,7 @@ impl<'l, 's> Parser<'l, 's> {
 
                 let params = match class_decl_ast {
                     Ast::ClassDecl {
-                        num: _,
+                        meta: _,
                         ty_rec: _,
                         ident_tkn: _,
                         methods,
@@ -1015,7 +1047,7 @@ impl<'l, 's> Parser<'l, 's> {
                         for mtod_ast in methods {
                             match mtod_ast {
                                 Ast::FnDeclStmt {
-                                    num: _,
+                                    meta: _,
                                     ident_tkn,
                                     fn_params,
                                     ..
@@ -1091,8 +1123,10 @@ impl<'l, 's> Parser<'l, 's> {
             ));
         }
 
+        let tkn = fn_tkn.clone().unwrap();
+
         Ok(Ast::FnCallExpr {
-            num: self.next(),
+            meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
             ty_rec: fn_ty_rec.unwrap(),
             fn_tkn: fn_tkn.unwrap(),
             fn_params: params,
@@ -1103,7 +1137,7 @@ impl<'l, 's> Parser<'l, 's> {
         match self.currtkn.ty.clone() {
             TknTy::Str(_) | TknTy::Val(_) | TknTy::True | TknTy::False | TknTy::Null => {
                 let ast = Ok(Ast::PrimaryExpr {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), self.currtkn.line, self.currtkn.pos),
                     ty_rec: TyRecord::new(self.currtkn.clone(), self.next_sym()),
                 });
                 self.consume();
@@ -1139,7 +1173,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let mut ty_rec = sym.ty_rec.clone();
                 ty_rec.tkn = self.currtkn.clone();
                 let ast = Ok(Ast::PrimaryExpr {
-                    num: self.next(),
+                    meta: MetaAst::new(self.next(), self.currtkn.line, self.currtkn.pos),
                     ty_rec: ty_rec.clone(),
                 });
                 self.consume();

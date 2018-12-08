@@ -2,6 +2,23 @@ use std::collections::HashMap;
 use token::Token;
 use ty_rec::TyRecord;
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct MetaAst {
+    id: usize,
+    line: usize,
+    pos: usize,
+}
+
+impl MetaAst {
+    pub fn new(id: usize, line: usize, pos: usize) -> MetaAst {
+        MetaAst {
+            id: id,
+            line: line,
+            pos: pos,
+        }
+    }
+}
+
 /// AST represents an AST node in our parse tree. Each node can contain different fields and
 /// should be represented by an anonymous struct to better document those fields, so that we know
 /// what each of the members of the enum type is supposed to represent.
@@ -13,18 +30,18 @@ use ty_rec::TyRecord;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
     Prog {
-        num: usize,
+        meta: MetaAst,
         stmts: Vec<Ast>,
     },
 
     BlckStmt {
-        num: usize,
+        meta: MetaAst,
         stmts: Vec<Ast>,
         sc: usize,
     },
 
     IfStmt {
-        num: usize,
+        meta: MetaAst,
         cond_expr: Box<Ast>,
         if_stmts: Box<Ast>,
         elif_exprs: Vec<Ast>,
@@ -32,19 +49,19 @@ pub enum Ast {
     },
 
     ElifStmt {
-        num: usize,
+        meta: MetaAst,
         cond_expr: Box<Ast>,
         stmts: Box<Ast>,
     },
 
     WhileStmt {
-        num: usize,
+        meta: MetaAst,
         cond_expr: Box<Ast>,
         stmts: Box<Ast>,
     },
 
     ForStmt {
-        num: usize,
+        meta: MetaAst,
         for_var_decl: Box<Ast>,
         for_cond_expr: Box<Ast>,
         for_step_expr: Box<Ast>,
@@ -52,17 +69,17 @@ pub enum Ast {
     },
 
     RetStmt {
-        num: usize,
+        meta: MetaAst,
         ret_expr: Option<Box<Ast>>,
     },
 
     ExprStmt {
-        num: usize,
+        meta: MetaAst,
         expr: Box<Ast>,
     },
 
     VarDeclExpr {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
         ident_tkn: Token,
         is_imm: bool,
@@ -70,7 +87,7 @@ pub enum Ast {
     },
 
     VarAssignExpr {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
         ident_tkn: Token,
         is_imm: bool,
@@ -79,7 +96,7 @@ pub enum Ast {
     },
 
     LogicalExpr {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
         op_tkn: Token,
         lhs: Box<Ast>,
@@ -87,7 +104,7 @@ pub enum Ast {
     },
 
     BinaryExpr {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
         op_tkn: Token,
         lhs: Box<Ast>,
@@ -95,19 +112,19 @@ pub enum Ast {
     },
 
     UnaryExpr {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
         op_tkn: Token,
         rhs: Box<Ast>,
     },
 
     PrimaryExpr {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
     },
 
     FnDeclStmt {
-        num: usize,
+        meta: MetaAst,
         ident_tkn: Token,
         fn_params: Vec<TyRecord>,
         ret_ty: TyRecord,
@@ -116,7 +133,7 @@ pub enum Ast {
     },
 
     FnCallExpr {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
         fn_tkn: Token,
         fn_params: Vec<Ast>,
@@ -124,7 +141,7 @@ pub enum Ast {
 
     // TODO: statement or expr
     ClassDecl {
-        num: usize,
+        meta: MetaAst,
         ty_rec: TyRecord,
         ident_tkn: Token,
         methods: Vec<Ast>,
@@ -135,7 +152,7 @@ pub enum Ast {
 
     // TODO: statement or expr
     ClassPropAccess {
-        num: usize,
+        meta: MetaAst,
         ident_tkn: Token,
         prop_name: String,
         idx: usize,
@@ -144,7 +161,7 @@ pub enum Ast {
 
     // TODO: statement or expr
     ClassPropSet {
-        num: usize,
+        meta: MetaAst,
         ident_tkn: Token,
         prop_name: String,
         idx: usize,
@@ -153,7 +170,7 @@ pub enum Ast {
     },
 
     ClassFnCallExpr {
-        num: usize,
+        meta: MetaAst,
         class_tkn: Token,
         class_name: String,
         fn_tkn: Token,
@@ -173,7 +190,7 @@ impl Ast {
     pub fn extract_params(&self) -> Vec<Ast> {
         match self {
             Ast::FnCallExpr {
-                num: _,
+                meta: _,
                 ty_rec: _,
                 fn_tkn: _,
                 fn_params,
@@ -184,13 +201,25 @@ impl Ast {
 
     pub fn get_ty_rec(&self) -> Option<TyRecord> {
         match self {
-            Ast::PrimaryExpr { num: _, ty_rec }
-            | Ast::UnaryExpr { num: _, ty_rec, .. }
-            | Ast::BinaryExpr { num: _, ty_rec, .. }
-            | Ast::LogicalExpr { num: _, ty_rec, .. }
-            | Ast::VarAssignExpr { num: _, ty_rec, .. }
-            | Ast::VarDeclExpr { num: _, ty_rec, .. }
-            | Ast::FnCallExpr { num: _, ty_rec, .. } => Some(ty_rec.clone()),
+            Ast::PrimaryExpr { meta: _, ty_rec }
+            | Ast::UnaryExpr {
+                meta: _, ty_rec, ..
+            }
+            | Ast::BinaryExpr {
+                meta: _, ty_rec, ..
+            }
+            | Ast::LogicalExpr {
+                meta: _, ty_rec, ..
+            }
+            | Ast::VarAssignExpr {
+                meta: _, ty_rec, ..
+            }
+            | Ast::VarDeclExpr {
+                meta: _, ty_rec, ..
+            }
+            | Ast::FnCallExpr {
+                meta: _, ty_rec, ..
+            } => Some(ty_rec.clone()),
             _ => None,
         }
     }

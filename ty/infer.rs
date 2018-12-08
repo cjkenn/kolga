@@ -44,7 +44,7 @@ impl TyInfer {
     /// as we alter the AST in place in the last step of the function.
     pub fn infer(&mut self, ast: &mut Ast) -> Result<(), String> {
         match ast {
-            Ast::Prog { num: _, stmts } => {
+            Ast::Prog { meta: _, stmts } => {
                 let ty_eqs = self.ty_eq(stmts);
                 self.unify_all(ty_eqs)?;
             }
@@ -52,7 +52,7 @@ impl TyInfer {
         };
 
         match ast {
-            Ast::Prog { num: _, stmts } => {
+            Ast::Prog { meta: _, stmts } => {
                 for stmt in stmts.iter_mut() {
                     self.update_tys(stmt);
                 }
@@ -70,7 +70,7 @@ impl TyInfer {
     fn update_tys(&self, ast: &mut Ast) {
         match *ast {
             Ast::BlckStmt {
-                num: _,
+                meta: _,
                 ref mut stmts,
                 ..
             } => {
@@ -79,7 +79,7 @@ impl TyInfer {
                 }
             }
             Ast::IfStmt {
-                num: _,
+                meta: _,
                 ref mut cond_expr,
                 ref mut if_stmts,
                 ref mut elif_exprs,
@@ -97,7 +97,7 @@ impl TyInfer {
                 }
             }
             Ast::ElifStmt {
-                num: _,
+                meta: _,
                 ref mut cond_expr,
                 ref mut stmts,
             } => {
@@ -105,7 +105,7 @@ impl TyInfer {
                 self.update_tys(stmts);
             }
             Ast::WhileStmt {
-                num: _,
+                meta: _,
                 ref mut cond_expr,
                 ref mut stmts,
             } => {
@@ -113,7 +113,7 @@ impl TyInfer {
                 self.update_tys(stmts);
             }
             Ast::ForStmt {
-                num: _,
+                meta: _,
                 ref mut for_var_decl,
                 ref mut for_cond_expr,
                 ref mut for_step_expr,
@@ -125,13 +125,13 @@ impl TyInfer {
                 self.update_tys(stmts);
             }
             Ast::ExprStmt {
-                num: _,
+                meta: _,
                 ref mut expr,
             } => {
                 self.update_tys(expr);
             }
             Ast::VarAssignExpr {
-                num: _,
+                meta: _,
                 ref mut ty_rec,
                 ident_tkn: _,
                 is_imm: _,
@@ -145,14 +145,14 @@ impl TyInfer {
                 }
             }
             Ast::LogicalExpr {
-                num: _,
+                meta: _,
                 ref mut ty_rec,
                 op_tkn: _,
                 ref mut lhs,
                 ref mut rhs,
             }
             | Ast::BinaryExpr {
-                num: _,
+                meta: _,
                 ref mut ty_rec,
                 op_tkn: _,
                 ref mut lhs,
@@ -166,7 +166,7 @@ impl TyInfer {
                 }
             }
             Ast::UnaryExpr {
-                num: _,
+                meta: _,
                 ref mut ty_rec,
                 op_tkn: _,
                 ref mut rhs,
@@ -178,12 +178,12 @@ impl TyInfer {
                 }
             }
             Ast::VarDeclExpr {
-                num: _,
+                meta: _,
                 ref mut ty_rec,
                 ..
             }
             | Ast::PrimaryExpr {
-                num: _,
+                meta: _,
                 ref mut ty_rec,
                 ..
             } => {
@@ -193,7 +193,7 @@ impl TyInfer {
                 }
             }
             Ast::FnDeclStmt {
-                num: _,
+                meta: _,
                 ident_tkn: _,
                 fn_params: _,
                 ret_ty: _,
@@ -203,7 +203,7 @@ impl TyInfer {
                 self.update_tys(fn_body);
             }
             Ast::RetStmt {
-                num: _,
+                meta: _,
                 ref mut ret_expr,
             } => {
                 match *ret_expr {
@@ -365,14 +365,14 @@ impl TyInfer {
         match *ast {
             Ast::PrimaryExpr { .. } => ty_eqs,
             Ast::LogicalExpr {
-                num: _,
+                meta: _,
                 ref ty_rec,
                 ref op_tkn,
                 ref lhs,
                 ref rhs,
             }
             | Ast::BinaryExpr {
-                num: _,
+                meta: _,
                 ref ty_rec,
                 ref op_tkn,
                 ref lhs,
@@ -398,7 +398,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::UnaryExpr {
-                num: _,
+                meta: _,
                 ref ty_rec,
                 ref op_tkn,
                 ref rhs,
@@ -415,12 +415,12 @@ impl TyInfer {
 
                 ty_eqs
             }
-            Ast::ExprStmt { num: _, ref expr } => {
+            Ast::ExprStmt { meta: _, ref expr } => {
                 ty_eqs.extend(self.gen_ty_eq(expr));
                 ty_eqs
             }
             Ast::BlckStmt {
-                num: _, ref stmts, ..
+                meta: _, ref stmts, ..
             } => {
                 for stmt in stmts.iter() {
                     ty_eqs.extend(self.gen_ty_eq(stmt));
@@ -428,7 +428,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::IfStmt {
-                num: _,
+                meta: _,
                 ref cond_expr,
                 ref if_stmts,
                 ref elif_exprs,
@@ -450,7 +450,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::ElifStmt {
-                num: _,
+                meta: _,
                 ref cond_expr,
                 ref stmts,
             } => {
@@ -462,7 +462,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::WhileStmt {
-                num: _,
+                meta: _,
                 ref cond_expr,
                 ref stmts,
             } => {
@@ -474,7 +474,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::ForStmt {
-                num: _,
+                meta: _,
                 ref for_var_decl,
                 ref for_cond_expr,
                 ref for_step_expr,
@@ -497,7 +497,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::VarAssignExpr {
-                num: _,
+                meta: _,
                 ref ty_rec,
                 ident_tkn: _,
                 is_imm: _,
@@ -505,7 +505,7 @@ impl TyInfer {
                 ref value,
             } => match **value {
                 Ast::FnCallExpr {
-                    num: _,
+                    meta: _,
                     ty_rec: ref fn_ty_rec,
                     ..
                 } => {
@@ -520,7 +520,7 @@ impl TyInfer {
                 }
             },
             Ast::FnDeclStmt {
-                num: _,
+                meta: _,
                 ident_tkn: _,
                 fn_params: _,
                 ret_ty: _,
@@ -533,7 +533,7 @@ impl TyInfer {
             // nothing to do with a function call not being assigned, or a
             // declaration with no value
             Ast::RetStmt {
-                num: _,
+                meta: _,
                 ref ret_expr,
             } => {
                 match *ret_expr {
