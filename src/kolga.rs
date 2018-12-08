@@ -63,7 +63,7 @@ fn main() {
         match result {
             Ok(()) => (),
             Err(e) => {
-                println!("{}", e);
+                e.emit();
                 return;
             }
         }

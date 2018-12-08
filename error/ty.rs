@@ -6,6 +6,8 @@ pub enum TypeErrTy {
     BinOpMismatch(String, String, String, String, String),
     InvalidFn(String),
     InvalidRet(String, String),
+    InfiniteType,
+    InvalidInfer,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +57,10 @@ impl KolgaErr for TypeErr {
                 "{} {} expects a return type of {}, but no return found",
                 str_pos, found, ret_ty
             ),
+            TypeErrTy::InfiniteType => {
+                String::from("Could not infer types (infinite recursive type found)")
+            }
+            TypeErrTy::InvalidInfer => String::from("Could not infer types due to invalid input"),
         }
     }
 }

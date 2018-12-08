@@ -1,4 +1,5 @@
-use kolgac::ast::Ast;
+use error::ty::{TypeErr, TypeErrTy};
+use kolgac::ast::{Ast, MetaAst};
 use kolgac::token::TknTy;
 use kolgac::ty_rec::KolgaTy;
 use std::collections::HashMap;
@@ -9,11 +10,16 @@ use std::collections::HashMap;
 pub struct TyMatch {
     pub lhs: KolgaTy,
     pub rhs: KolgaTy,
+    pub meta: MetaAst,
 }
 
 impl TyMatch {
-    pub fn new(lhs: KolgaTy, rhs: KolgaTy) -> TyMatch {
-        TyMatch { lhs: lhs, rhs: rhs }
+    pub fn new(lhs: KolgaTy, rhs: KolgaTy, meta: MetaAst) -> TyMatch {
+        TyMatch {
+            lhs: lhs,
+            rhs: rhs,
+            meta: meta,
+        }
     }
 }
 
@@ -42,13 +48,13 @@ impl TyInfer {
     ///
     /// Returns an empty result, indication success. There is no result to return,
     /// as we alter the AST in place in the last step of the function.
-    pub fn infer(&mut self, ast: &mut Ast) -> Result<(), String> {
+    pub fn infer(&mut self, ast: &mut Ast) -> Result<(), TypeErr> {
         match ast {
             Ast::Prog { meta: _, stmts } => {
                 let ty_eqs = self.ty_eq(stmts);
                 self.unify_all(ty_eqs)?;
             }
-            _ => return Err(String::from("Invalid AST found in infer")),
+            _ => return Err(TypeErr::new(0, 0, TypeErrTy::InvalidInfer)),
         };
 
         match ast {
@@ -229,9 +235,9 @@ impl TyInfer {
         ty_eqs
     }
 
-    fn unify_all(&mut self, ty_eqs: Vec<TyMatch>) -> Result<(), String> {
+    fn unify_all(&mut self, ty_eqs: Vec<TyMatch>) -> Result<(), TypeErr> {
         for eq in ty_eqs {
-            self.unify(eq.lhs, eq.rhs)?;
+            self.unify(eq.lhs, eq.rhs, eq.meta)?;
         }
 
         Ok(())
@@ -252,29 +258,29 @@ impl TyInfer {
     /// When attempting to unify this program, we would end up with an lhs
     /// argument Num, and a rhs arg String, which we cannot unify. In this case,
     /// we should return a type error with a type mismatch.
-    fn unify(&mut self, lhs: KolgaTy, rhs: KolgaTy) -> Result<(), String> {
+    fn unify(&mut self, lhs: KolgaTy, rhs: KolgaTy, meta: MetaAst) -> Result<(), TypeErr> {
         if lhs == rhs {
             return Ok(());
         }
 
         match lhs {
             KolgaTy::Symbolic(_) => {
-                return self.unify_var(lhs, rhs);
+                return self.unify_var(lhs, rhs, meta);
             }
             _ => (),
         };
 
         match rhs {
             KolgaTy::Symbolic(_) => {
-                return self.unify_var(rhs, lhs);
+                return self.unify_var(rhs, lhs, meta);
             }
             _ => (),
         };
 
-        // TODO: line numbers would be much better here
-        Err(format!(
-            "kolgac: Type error - Cannot assign type '{}' to type '{}'",
-            rhs, lhs
+        Err(TypeErr::new(
+            meta.line,
+            meta.pos,
+            TypeErrTy::TyMismatch(lhs.to_string(), rhs.to_string()),
         ))
     }
 
@@ -284,7 +290,7 @@ impl TyInfer {
     /// which we do to ensure that if we have already unified a pair, that unification
     /// is honored throughout the entire unification process.
     /// We Expect lhs to be KolgaTy::Symbolic
-    fn unify_var(&mut self, lhs: KolgaTy, rhs: KolgaTy) -> Result<(), String> {
+    fn unify_var(&mut self, lhs: KolgaTy, rhs: KolgaTy, meta: MetaAst) -> Result<(), TypeErr> {
         let mb_lhs_name = match lhs.clone() {
             KolgaTy::Symbolic(name) => Some(name),
             _ => None,
@@ -304,7 +310,7 @@ impl TyInfer {
         if self.subs.contains_key(&name) {
             let existing_ty = subs_clone.get(&name).unwrap();
 
-            return self.unify(existing_ty.clone(), rhs);
+            return self.unify(existing_ty.clone(), rhs, meta);
         }
 
         // Do the same for the rhs type.
@@ -312,15 +318,13 @@ impl TyInfer {
             let name = mb_rhs_name.unwrap();
             let existing_ty = subs_clone.get(&name).unwrap();
 
-            return self.unify(lhs, existing_ty.clone());
+            return self.unify(lhs, existing_ty.clone(), meta);
         }
 
         // Ensure that the type doesn't contain a reference to itself
         // (ie. let x = x) to prevent infinite unification.
         if self.occurs_check(lhs, rhs.clone()) {
-            return Err(String::from(
-                "Could not infer types (infinite recursive type found)",
-            ));
+            return Err(TypeErr::new(meta.line, meta.pos, TypeErrTy::InfiniteType));
         }
 
         // Insert the unified type for the lhs key (the name of the symbolic type)
@@ -365,14 +369,14 @@ impl TyInfer {
         match *ast {
             Ast::PrimaryExpr { .. } => ty_eqs,
             Ast::LogicalExpr {
-                meta: _,
+                ref meta,
                 ref ty_rec,
                 ref op_tkn,
                 ref lhs,
                 ref rhs,
             }
             | Ast::BinaryExpr {
-                meta: _,
+                ref meta,
                 ref ty_rec,
                 ref op_tkn,
                 ref lhs,
@@ -386,19 +390,19 @@ impl TyInfer {
                 let lhs_ty_rec = lhs.get_ty_rec().unwrap();
                 let rhs_ty_rec = rhs.get_ty_rec().unwrap();
 
-                ty_eqs.push(TyMatch::new(lhs_ty_rec.ty, KolgaTy::Num));
-                ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Num));
+                ty_eqs.push(TyMatch::new(lhs_ty_rec.ty, KolgaTy::Num, meta.clone()));
+                ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Num, meta.clone()));
 
                 if op_tkn.ty.is_cmp_op() {
-                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Bool));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Bool, meta.clone()));
                 } else {
-                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Num));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Num, meta.clone()));
                 }
 
                 ty_eqs
             }
             Ast::UnaryExpr {
-                meta: _,
+                ref meta,
                 ref ty_rec,
                 ref op_tkn,
                 ref rhs,
@@ -406,11 +410,11 @@ impl TyInfer {
                 ty_eqs.extend(self.gen_ty_eq(rhs));
                 let rhs_ty_rec = rhs.get_ty_rec().unwrap();
                 if op_tkn.ty == TknTy::Bang {
-                    ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Bool));
-                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Bool));
+                    ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Bool, meta.clone()));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Bool, meta.clone()));
                 } else {
-                    ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Num));
-                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Num));
+                    ty_eqs.push(TyMatch::new(rhs_ty_rec.ty, KolgaTy::Num, meta.clone()));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), KolgaTy::Num, meta.clone()));
                 }
 
                 ty_eqs
@@ -428,7 +432,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::IfStmt {
-                meta: _,
+                ref meta,
                 ref cond_expr,
                 ref if_stmts,
                 ref elif_exprs,
@@ -437,7 +441,11 @@ impl TyInfer {
                 ty_eqs.extend(self.gen_ty_eq(if_stmts));
 
                 let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
+                ty_eqs.push(TyMatch::new(
+                    cond_expr_ty_rec.ty,
+                    KolgaTy::Bool,
+                    meta.clone(),
+                ));
 
                 for stmt in elif_exprs.iter() {
                     ty_eqs.extend(self.gen_ty_eq(stmt));
@@ -450,31 +458,39 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::ElifStmt {
-                meta: _,
+                ref meta,
                 ref cond_expr,
                 ref stmts,
             } => {
                 ty_eqs.extend(self.gen_ty_eq(stmts));
 
                 let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
+                ty_eqs.push(TyMatch::new(
+                    cond_expr_ty_rec.ty,
+                    KolgaTy::Bool,
+                    meta.clone(),
+                ));
 
                 ty_eqs
             }
             Ast::WhileStmt {
-                meta: _,
+                ref meta,
                 ref cond_expr,
                 ref stmts,
             } => {
                 ty_eqs.extend(self.gen_ty_eq(stmts));
 
                 let cond_expr_ty_rec = cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
+                ty_eqs.push(TyMatch::new(
+                    cond_expr_ty_rec.ty,
+                    KolgaTy::Bool,
+                    meta.clone(),
+                ));
 
                 ty_eqs
             }
             Ast::ForStmt {
-                meta: _,
+                ref meta,
                 ref for_var_decl,
                 ref for_cond_expr,
                 ref for_step_expr,
@@ -484,20 +500,28 @@ impl TyInfer {
 
                 // The var declaration should be a number
                 let var_decl_ty_rec = for_var_decl.get_ty_rec().unwrap();
-                ty_eqs.push(TyMatch::new(var_decl_ty_rec.ty, KolgaTy::Num));
+                ty_eqs.push(TyMatch::new(var_decl_ty_rec.ty, KolgaTy::Num, meta.clone()));
 
                 // The cond expr should be a bool
                 let cond_expr_ty_rec = for_cond_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TyMatch::new(cond_expr_ty_rec.ty, KolgaTy::Bool));
+                ty_eqs.push(TyMatch::new(
+                    cond_expr_ty_rec.ty,
+                    KolgaTy::Bool,
+                    meta.clone(),
+                ));
 
                 // The step expression should be a number
                 let step_expr_ty_rec = for_step_expr.get_ty_rec().unwrap();
-                ty_eqs.push(TyMatch::new(step_expr_ty_rec.ty, KolgaTy::Num));
+                ty_eqs.push(TyMatch::new(
+                    step_expr_ty_rec.ty,
+                    KolgaTy::Num,
+                    meta.clone(),
+                ));
 
                 ty_eqs
             }
             Ast::VarAssignExpr {
-                meta: _,
+                ref meta,
                 ref ty_rec,
                 ident_tkn: _,
                 is_imm: _,
@@ -505,17 +529,21 @@ impl TyInfer {
                 ref value,
             } => match **value {
                 Ast::FnCallExpr {
-                    meta: _,
+                    meta: ref fn_meta,
                     ty_rec: ref fn_ty_rec,
                     ..
                 } => {
-                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), fn_ty_rec.ty.clone()));
+                    ty_eqs.push(TyMatch::new(
+                        ty_rec.ty.clone(),
+                        fn_ty_rec.ty.clone(),
+                        fn_meta.clone(),
+                    ));
                     ty_eqs
                 }
                 _ => {
                     ty_eqs.extend(self.gen_ty_eq(value));
                     let val_ty_rec = value.get_ty_rec().unwrap();
-                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), val_ty_rec.ty));
+                    ty_eqs.push(TyMatch::new(ty_rec.ty.clone(), val_ty_rec.ty, meta.clone()));
                     ty_eqs
                 }
             },

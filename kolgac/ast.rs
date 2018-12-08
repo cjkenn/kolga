@@ -4,9 +4,9 @@ use ty_rec::TyRecord;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MetaAst {
-    id: usize,
-    line: usize,
-    pos: usize,
+    pub id: usize,
+    pub line: usize,
+    pub pos: usize,
 }
 
 impl MetaAst {
