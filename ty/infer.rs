@@ -130,27 +130,54 @@ impl TyInfer {
             } => {
                 self.update_tys(expr);
             }
-            Ast::VarDeclExpr {
+            Ast::VarAssignExpr {
                 num: _,
                 ref mut ty_rec,
-                ..
+                ident_tkn: _,
+                is_imm: _,
+                is_global: _,
+                ref mut value,
+            } => {
+                let potential_ty = self.subs.get(&ty_rec.name);
+                if potential_ty.is_some() {
+                    ty_rec.ty = potential_ty.unwrap().clone();
+                    self.update_tys(value);
+                }
             }
-            | Ast::VarAssignExpr {
+            Ast::LogicalExpr {
                 num: _,
                 ref mut ty_rec,
-                ..
-            }
-            | Ast::LogicalExpr {
-                num: _,
-                ref mut ty_rec,
-                ..
+                op_tkn: _,
+                ref mut lhs,
+                ref mut rhs,
             }
             | Ast::BinaryExpr {
                 num: _,
                 ref mut ty_rec,
-                ..
+                op_tkn: _,
+                ref mut lhs,
+                ref mut rhs,
+            } => {
+                let potential_ty = self.subs.get(&ty_rec.name);
+                if potential_ty.is_some() {
+                    ty_rec.ty = potential_ty.unwrap().clone();
+                    self.update_tys(lhs);
+                    self.update_tys(rhs);
+                }
             }
-            | Ast::UnaryExpr {
+            Ast::UnaryExpr {
+                num: _,
+                ref mut ty_rec,
+                op_tkn: _,
+                ref mut rhs,
+            } => {
+                let potential_ty = self.subs.get(&ty_rec.name);
+                if potential_ty.is_some() {
+                    ty_rec.ty = potential_ty.unwrap().clone();
+                    self.update_tys(rhs);
+                }
+            }
+            Ast::VarDeclExpr {
                 num: _,
                 ref mut ty_rec,
                 ..
