@@ -139,8 +139,7 @@ pub enum Ast {
         fn_params: Vec<Ast>,
     },
 
-    // TODO: statement or expr
-    ClassDecl {
+    ClassDeclStmt {
         meta: MetaAst,
         ty_rec: TyRecord,
         ident_tkn: Token,

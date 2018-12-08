@@ -282,7 +282,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         let var_ident = ident_tkn.get_name();
 
                         match *value.clone() {
-                            Ast::ClassDecl {
+                            Ast::ClassDeclStmt {
                                 meta: _,
                                 ty_rec: _,
                                 ident_tkn,
@@ -327,7 +327,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             // here should already be a struct type (if we tried to create a class
                             // before declaring it we would not pass parsing).
                             match *raw_val {
-                                Ast::ClassDecl { .. } => vec![alloca_instr],
+                                Ast::ClassDeclStmt { .. } => vec![alloca_instr],
                                 _ => {
                                     let val = self.gen_expr(&raw_val).unwrap();
                                     LLVMBuildStore(self.builder, val, alloca_instr);
@@ -365,7 +365,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     vec![alloca_instr]
                 },
             },
-            Ast::ClassDecl {
+            Ast::ClassDeclStmt {
                 meta: _,
                 ty_rec: _,
                 ident_tkn,
@@ -655,7 +655,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
             // Class declarations ast types can be used as rvalues when creating a class.
-            Ast::ClassDecl {
+            Ast::ClassDeclStmt {
                 meta: _,
                 ty_rec: _,
                 ident_tkn,

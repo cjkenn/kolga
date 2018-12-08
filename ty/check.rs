@@ -150,7 +150,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     _ => self.check_stmt(fn_stmts, sc),
                 };
             }
-            Ast::ClassDecl {
+            Ast::ClassDeclStmt {
                 meta: _,
                 ty_rec: _,
                 ident_tkn: _,
@@ -246,7 +246,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             }
             Ast::PrimaryExpr { meta: _, ty_rec }
-            | Ast::ClassDecl {
+            | Ast::ClassDeclStmt {
                 meta: _, ty_rec, ..
             }
             | Ast::FnCallExpr {
@@ -268,7 +268,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     /// available props until we find the name of the expected prop (the second param).
     fn extract_prop_ty(&self, class_decl_ast: &Ast, prop_name: String) -> KolgaTy {
         match class_decl_ast {
-            Ast::ClassDecl {
+            Ast::ClassDeclStmt {
                 meta: _,
                 ty_rec: _,
                 ident_tkn: _,

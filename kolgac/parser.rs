@@ -109,7 +109,6 @@ impl<'l, 's> Parser<'l, 's> {
         };
 
         let ident_tkn = self.match_ident_tkn();
-        let next_tkn = self.lexer.peek_tkn();
 
         self.expect(TknTy::Tilde)?;
 
@@ -136,6 +135,7 @@ impl<'l, 's> Parser<'l, 's> {
         } else {
             let ty_name = self.currtkn.get_name();
             let maybe_class_sym = self.symtab.retrieve(&ty_name);
+
             if maybe_class_sym.is_none() {
                 let ty_str = self.currtkn.ty.to_string();
                 var_err = Some(self.error(ParseErrTy::InvalidTy(ty_str)));
@@ -225,7 +225,7 @@ impl<'l, 's> Parser<'l, 's> {
                     self.symtab.store(name, cl_sym);
 
                     let tkn = ident_tkn.clone().unwrap();
-
+                    println!("{:#?}", cl_assign.clone().unwrap());
                     return Ok(Ast::VarAssignExpr {
                         meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
                         ty_rec: cl_ty_rec,
@@ -412,6 +412,9 @@ impl<'l, 's> Parser<'l, 's> {
                         } => {
                             prop_map.insert(ident_tkn.get_name(), prop_ctr);
                         }
+                        Ast::VarAssignExpr { .. } => {
+                            return Err(self.error(ParseErrTy::ClassPropAssign));
+                        }
                         _ => {
                             return Err(self.error(ParseErrTy::InvalidClassProp));
                         }
@@ -437,7 +440,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         let final_sc_lvl = self.symtab.finalize_sc();
         let cl_ty_rec = TyRecord::new(class_tkn.clone(), self.next_sym());
-        let ast = Ast::ClassDecl {
+        let ast = Ast::ClassDeclStmt {
             meta: MetaAst::new(self.next(), class_tkn.line, class_tkn.pos),
             ty_rec: cl_ty_rec.clone(),
             ident_tkn: class_tkn.clone(),
@@ -927,7 +930,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
                 let (sc_lvl, class_name) =
                     match class_sym.clone().unwrap().assign_val.clone().unwrap() {
-                        Ast::ClassDecl {
+                        Ast::ClassDeclStmt {
                             meta: _,
                             ty_rec: _,
                             ident_tkn,
@@ -972,7 +975,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let class_ptr = class_sym.unwrap();
                 let owner = class_ptr.assign_val.clone().unwrap();
                 let pos = match &owner {
-                    Ast::ClassDecl {
+                    Ast::ClassDeclStmt {
                         meta: _,
                         ty_rec: _,
                         ident_tkn: _,
@@ -1035,7 +1038,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let class_decl_ast = maybe_class_sym.unwrap().assign_val.clone().unwrap();
 
                 let params = match class_decl_ast {
-                    Ast::ClassDecl {
+                    Ast::ClassDeclStmt {
                         meta: _,
                         ty_rec: _,
                         ident_tkn: _,

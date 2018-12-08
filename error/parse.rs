@@ -10,6 +10,7 @@ pub enum ParseErrTy {
     InvalidForStmt,
     InvalidIfStmt,
     InvalidClassProp,
+    ClassPropAssign,
     ImmDecl(String),
     TknMismatch(String, String),
     FnParamCntExceeded(usize),
@@ -105,6 +106,10 @@ impl KolgaErr for ParseErr {
             }
             ParseErrTy::TyRequired => format!(
                 "{} Type annotation is required for variables without assignments",
+                str_pos
+            ),
+            ParseErrTy::ClassPropAssign => format!(
+                "{} Cannot assign to a var in a class declaration (use a constructor)",
                 str_pos
             ),
         }
