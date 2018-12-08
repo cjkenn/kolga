@@ -34,22 +34,11 @@ cargo run [filename]
 cargo test -- --nocapture
 ```
 
-### Project Layout
-`kolgac` contains code for lexing and parsing, as well as appropriate token and AST data structures. This is the core compiler.
-
-`ty` contains type checking/inference
-
-`gen` handles generating the llvm ir from the ast
-
-`error` contains error handling/emitting functions, are well as error types for each stage in the compiler
-
-The `src` directory contains the file `kolga.rs`, which is the main entry point into the compiler. 
-
-### Some Small Examples
+### Some Examples
 ```
 fn basicFunc(x~num)~num {
   let inferMe ~= x + 10;
-  let dontInferMe ~num = x - 1;
+  let dontInferMe~num = x - 1;
   return inferMe;
 }
 
@@ -74,7 +63,7 @@ fn negate(y~bool)~bool {
 ```
 class mClass {
   let z~num;
-  let y~num = 10;
+  let y~num;
   
   fn nop()~void {
     return;
@@ -85,4 +74,15 @@ class mClass {
   }
 }
 ```
+
+### Project Layout
+`kolgac` contains code for lexing and parsing, as well as appropriate token and AST data structures. This is the core compiler.
+
+`ty` contains type checking/inference
+
+`gen` handles generating the llvm ir from the ast
+
+`error` contains error handling/emitting functions, are well as error types for each stage in the compiler
+
+The `src` directory contains the file `kolga.rs`, which is the main entry point into the compiler. 
 
