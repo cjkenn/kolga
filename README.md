@@ -73,6 +73,13 @@ class mClass {
     return y * 3;
   }
 }
+
+let instance~mClass {
+  z = 1,
+  y = 10,
+};
+
+instance.nop();
 ```
 
 ### Project Layout
