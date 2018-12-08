@@ -149,6 +149,13 @@ pub enum Ast {
         sc: usize,
     },
 
+    ClassConstrExpr {
+        meta: MetaAst,
+        ty_rec: TyRecord,
+        class_name: String,
+        props: HashMap<String, Ast>,
+    },
+
     // TODO: statement or expr
     ClassPropAccess {
         meta: MetaAst,

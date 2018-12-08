@@ -2,6 +2,7 @@ use KolgaErr;
 
 #[derive(Debug, Clone)]
 pub enum ParseErrTy {
+    ClassPropAssign,
     InvalidIdent(String),
     InvalidTkn(String),
     InvalidAssign(String),
@@ -10,7 +11,7 @@ pub enum ParseErrTy {
     InvalidForStmt,
     InvalidIfStmt,
     InvalidClassProp,
-    ClassPropAssign,
+    InvalidClassConstr,
     ImmDecl(String),
     TknMismatch(String, String),
     FnParamCntExceeded(usize),
@@ -112,6 +113,7 @@ impl KolgaErr for ParseErr {
                 "{} Cannot assign to a var in a class declaration (use a constructor)",
                 str_pos
             ),
+            ParseErrTy::InvalidClassConstr => format!("{} Invalid class constructor", str_pos),
         }
     }
 }

@@ -200,41 +200,11 @@ impl<'l, 's> Parser<'l, 's> {
                     return Err(self.error(ParseErrTy::ImmDecl(ty_str)));
                 }
 
-                self.consume();
-
-                // If we have a class type, retrieve the class declaration from the
-                // symbol table and set the assign value of the var to that class declaration.
-                // We also create a type record for that class type.
                 if is_class_type {
-                    let class_sym = self
-                        .symtab
-                        .retrieve(&var_ty_tkn.clone().unwrap().get_name())
-                        .unwrap();
-                    let cl_ty_rec = TyRecord::new(var_ty_tkn.clone().unwrap(), self.next_sym());
-                    let cl_assign = class_sym.assign_val.clone();
-                    let cl_sym = Sym::new(
-                        SymTy::Var,
-                        is_imm,
-                        cl_ty_rec.clone(),
-                        ident_tkn.clone().unwrap(),
-                        cl_assign.clone(),
-                        None,
-                    );
-
-                    let name = &ident_tkn.clone().unwrap().get_name();
-                    self.symtab.store(name, cl_sym);
-
-                    let tkn = ident_tkn.clone().unwrap();
-                    println!("{:#?}", cl_assign.clone().unwrap());
-                    return Ok(Ast::VarAssignExpr {
-                        meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
-                        ty_rec: cl_ty_rec,
-                        ident_tkn: ident_tkn.clone().unwrap(),
-                        is_imm: is_imm,
-                        is_global: self.symtab.is_global(),
-                        value: Box::new(cl_assign.unwrap()),
-                    });
+                    return Err(self.error(ParseErrTy::InvalidClassConstr));
                 }
+
+                self.consume();
 
                 // For a var declaration without an assignment, we require a type annotation.
                 // The inferrer isn't smart enough (yet) to infer types without this information
@@ -264,6 +234,92 @@ impl<'l, 's> Parser<'l, 's> {
                     is_imm: is_imm,
                     is_global: self.symtab.is_global(),
                 })
+            }
+            TknTy::LeftBrace => {
+                // If we have a class type, retrieve the class declaration from the
+                // symbol table and set the assign value of the var to that class declaration.
+                // We also create a type record for that class type.
+                if is_class_type {
+                    self.consume();
+
+                    // Retrieve the class specification from the symbol table so we
+                    // can ensure the class is being created correctly.
+                    let class_sym = self
+                        .symtab
+                        .retrieve(&var_ty_tkn.clone().unwrap().get_name())
+                        .unwrap();
+
+                    let expected_props = match class_sym.assign_val.clone().unwrap() {
+                        Ast::ClassDeclStmt {
+                            meta: _,
+                            ty_rec: _,
+                            ident_tkn: _,
+                            methods: _,
+                            props: _,
+                            prop_pos,
+                            ..
+                        } => prop_pos,
+                        _ => panic!("Class assigned to a non class ast"),
+                    };
+                    let mut class_props = HashMap::new();
+
+                    loop {
+                        match self.currtkn.ty.clone() {
+                            TknTy::Ident(name) => {
+                                // If the identifier is not a real prop for this class,
+                                // we should error.
+                                if !expected_props.contains_key(&name) {
+                                    return Err(self.error(ParseErrTy::InvalidClassProp));
+                                }
+
+                                self.consume();
+                                self.expect(TknTy::Eq)?;
+
+                                let prop_assign = self.expr()?;
+                                class_props.insert(name.clone(), prop_assign);
+
+                                self.expect(TknTy::Comma)?;
+                            }
+                            _ => break,
+                        }
+                    }
+
+                    self.expect(TknTy::RightBrace)?;
+                    self.expect(TknTy::Semicolon)?;
+
+                    let cl_ty_rec = TyRecord::new(var_ty_tkn.clone().unwrap(), self.next_sym());
+                    let tkn = ident_tkn.clone().unwrap();
+
+                    let constr = Ast::ClassConstrExpr {
+                        meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
+                        ty_rec: cl_ty_rec.clone(),
+                        class_name: var_ty_tkn.clone().unwrap().get_name(),
+                        props: class_props,
+                    };
+                    let cl_sym = Sym::new(
+                        SymTy::Var,
+                        is_imm,
+                        cl_ty_rec.clone(),
+                        ident_tkn.clone().unwrap(),
+                        Some(constr.clone()),
+                        None,
+                    );
+                    self.symtab.store(&tkn.get_name(), cl_sym);
+
+                    Ok(Ast::VarAssignExpr {
+                        meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
+                        ty_rec: cl_ty_rec,
+                        ident_tkn: ident_tkn.clone().unwrap(),
+                        is_imm: is_imm,
+                        is_global: self.symtab.is_global(),
+                        value: Box::new(constr),
+                    })
+                } else {
+                    // If we find a left brace but we're not actually trying to create a
+                    // class, we should return an error.
+                    let ty_str = self.currtkn.ty.to_string();
+                    Err(self.error(ParseErrTy::InvalidAssign(ty_str)))
+                }
             }
             _ => {
                 let ty_str = self.currtkn.ty.to_string();

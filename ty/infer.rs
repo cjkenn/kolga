@@ -222,6 +222,7 @@ impl TyInfer {
                     None => (),
                 };
             }
+            Ast::ClassConstrExpr { .. } => unimplemented!(),
             Ast::ClassDeclStmt { .. } => unimplemented!(),
             Ast::ClassPropAccess { .. } => unimplemented!(),
             Ast::ClassPropSet { .. } => unimplemented!(),
