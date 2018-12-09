@@ -3,6 +3,7 @@ use KolgaErr;
 #[derive(Debug, Clone)]
 pub enum TypeErrTy {
     TyMismatch(String, String),
+    PropMismatch(String, String),
     BinOpMismatch(String, String, String, String, String),
     InvalidFn(String),
     InvalidRet(String, String),
@@ -38,6 +39,10 @@ impl KolgaErr for TypeErr {
         match self.ty {
             TypeErrTy::TyMismatch(ref expected, ref found) => format!(
                 "{} type mismatch: Wanted {} but found {}",
+                str_pos, expected, found
+            ),
+            TypeErrTy::PropMismatch(ref expected, ref found) => format!(
+                "{} property type mismatch: Wanted {} but found {}",
                 str_pos, expected, found
             ),
             TypeErrTy::BinOpMismatch(

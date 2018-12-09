@@ -225,6 +225,9 @@ impl Ast {
             }
             | Ast::FnCallExpr {
                 meta: _, ty_rec, ..
+            }
+            | Ast::ClassConstrExpr {
+                meta: _, ty_rec, ..
             } => Some(ty_rec.clone()),
             _ => None,
         }

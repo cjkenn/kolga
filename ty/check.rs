@@ -1,11 +1,11 @@
-use std::rc::Rc;
-
 use error::ty::{TypeErr, TypeErrTy};
-use kolgac::ast::Ast;
+use kolgac::ast::{Ast, MetaAst};
 use kolgac::sym::Sym;
 use kolgac::symtab::SymbolTable;
 use kolgac::token::{TknTy, Token};
 use kolgac::ty_rec::KolgaTy;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 pub struct TyCheck<'t, 's> {
     ast: &'t Ast,
@@ -245,6 +245,15 @@ impl<'t, 's> TyCheck<'t, 's> {
 
                 self.reduce_bin_ty(op_tkn.clone(), lhs_ty_name, rhs_ty_name)
             }
+            Ast::ClassConstrExpr {
+                meta,
+                ty_rec,
+                class_name,
+                props,
+            } => {
+                self.check_class_props(class_name, props, meta);
+                ty_rec.ty.clone()
+            }
             Ast::PrimaryExpr { meta: _, ty_rec }
             | Ast::ClassDeclStmt {
                 meta: _, ty_rec, ..
@@ -289,15 +298,6 @@ impl<'t, 's> TyCheck<'t, 's> {
                         {
                             prop_ty = Some(ty_rec.ty.clone());
                         }
-                        Ast::VarAssignExpr {
-                            ref ty_rec,
-                            ref ident_tkn,
-                            ..
-                        }
-                            if ident_tkn.get_name() == prop_name =>
-                        {
-                            prop_ty = Some(ty_rec.ty.clone());
-                        }
                         _ => (),
                     };
                 }
@@ -309,6 +309,33 @@ impl<'t, 's> TyCheck<'t, 's> {
                 return prop_ty.unwrap();
             }
             _ => panic!("Cannot extract property type from this ast"),
+        }
+    }
+
+    /// Checks that the property assignments in a class constructor match the provided
+    /// types in the class declaration. Takes in a class name, so we can look up the
+    /// class declaration from the symbol table, and a map of props used in the
+    /// class constructor.
+    fn check_class_props(
+        &mut self,
+        class_name: &String,
+        props: &HashMap<String, Ast>,
+        meta: &MetaAst,
+    ) {
+        // TODO: Can this be done without assuming scope level 0?
+        let class_decl_sym = self
+            .symtab
+            .retrieve_from_finalized_sc(class_name, 0)
+            .unwrap();
+        let class_decl_ast = class_decl_sym.assign_val.clone().unwrap();
+
+        for (key, val) in props.iter() {
+            let expected_ty = self.extract_prop_ty(&class_decl_ast, key.clone());
+            let provided_ty = val.get_ty_rec().unwrap().ty;
+
+            if expected_ty != provided_ty {
+                self.prop_mismatch(meta, &expected_ty, &provided_ty);
+            }
         }
     }
 
@@ -459,6 +486,14 @@ impl<'t, 's> TyCheck<'t, 's> {
             tkn.line,
             tkn.pos,
             TypeErrTy::TyMismatch(lhs.to_string(), rhs.to_string()),
+        );
+    }
+
+    fn prop_mismatch(&mut self, meta: &MetaAst, lhs: &KolgaTy, rhs: &KolgaTy) {
+        self.error(
+            meta.line,
+            meta.pos,
+            TypeErrTy::PropMismatch(lhs.to_string(), rhs.to_string()),
         );
     }
 
