@@ -282,13 +282,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         let var_ident = ident_tkn.get_name();
 
                         match *value.clone() {
-                            Ast::ClassDeclStmt {
+                            Ast::ClassConstrExpr {
                                 meta: _,
                                 ty_rec: _,
-                                ident_tkn,
+                                class_name,
                                 ..
                             } => {
-                                let llvm_ty = self.classtab.retrieve(&ident_tkn.get_name());
+                                let llvm_ty = self.classtab.retrieve(&class_name);
                                 if llvm_ty.is_none() {
                                     self.error(GenErrTy::InvalidClass(ident_tkn.get_name()));
                                     return Vec::new();
@@ -327,7 +327,37 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             // here should already be a struct type (if we tried to create a class
                             // before declaring it we would not pass parsing).
                             match *raw_val {
-                                Ast::ClassDeclStmt { .. } => vec![alloca_instr],
+                                Ast::ClassConstrExpr {
+                                    meta: _,
+                                    ty_rec: _,
+                                    class_name: _,
+                                    props,
+                                } => {
+                                    let mut instrs = Vec::new();
+                                    instrs.push(alloca_instr);
+
+                                    let mut pos = 0;
+                                    for (key, val) in props.iter() {
+                                        // TODO: indices are wrong here
+                                        let gep_val = LLVMBuildStructGEP(
+                                            self.builder,
+                                            alloca_instr,
+                                            pos as u32,
+                                            self.c_str(key),
+                                        );
+
+                                        // TODO: need to handle errors in gen_expr.
+                                        let st_val = LLVMBuildStore(
+                                            self.builder,
+                                            self.gen_expr(val).unwrap(),
+                                            gep_val,
+                                        );
+                                        instrs.push(st_val);
+                                        pos = pos + 1;
+                                    }
+
+                                    instrs
+                                }
                                 _ => {
                                     let val = self.gen_expr(&raw_val).unwrap();
                                     LLVMBuildStore(self.builder, val, alloca_instr);
@@ -654,25 +684,23 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     Some(val)
                 }
             }
-            // Class declarations ast types can be used as rvalues when creating a class.
-            Ast::ClassDeclStmt {
+            Ast::ClassConstrExpr {
                 meta: _,
                 ty_rec: _,
-                ident_tkn,
+                class_name,
                 ..
             } => {
-                let name = ident_tkn.get_name();
-                let llvm_struct_ty = self.classtab.retrieve(&name);
+                let llvm_struct_ty = self.classtab.retrieve(&class_name);
                 match llvm_struct_ty {
                     Some(ty_ref) => {
-                        let c_name = self.c_str(&name);
+                        let c_name = self.c_str(&class_name);
                         unsafe {
                             let llvm_val = LLVMBuildAlloca(self.builder, ty_ref, c_name);
                             return Some(llvm_val);
                         }
                     }
                     None => {
-                        self.error(GenErrTy::InvalidClass(name));
+                        self.error(GenErrTy::InvalidClass(class_name.clone()));
                         None
                     }
                 }
@@ -706,7 +734,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     Some(ld_val)
                 }
             }
-            _ => unimplemented!("Ast type {:?} is not implemented for codegen", expr),
+            _ => unimplemented!("Ast type {:#?} is not implemented for codegen", expr),
         }
     }
 
