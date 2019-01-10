@@ -156,9 +156,9 @@ pub enum Ast {
         props: HashMap<String, Ast>,
     },
 
-    // TODO: statement or expr
-    ClassPropAccess {
+    ClassPropAccessExpr {
         meta: MetaAst,
+        ty_rec: TyRecord,
         ident_tkn: Token,
         prop_name: String,
         idx: usize,
@@ -227,6 +227,9 @@ impl Ast {
                 meta: _, ty_rec, ..
             }
             | Ast::ClassConstrExpr {
+                meta: _, ty_rec, ..
+            }
+            | Ast::ClassPropAccessExpr {
                 meta: _, ty_rec, ..
             } => Some(ty_rec.clone()),
             _ => None,

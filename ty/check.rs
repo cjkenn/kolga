@@ -261,8 +261,9 @@ impl<'t, 's> TyCheck<'t, 's> {
             | Ast::FnCallExpr {
                 meta: _, ty_rec, ..
             } => ty_rec.ty.clone(),
-            Ast::ClassPropAccess {
+            Ast::ClassPropAccessExpr {
                 meta: _,
+                ty_rec: _,
                 ident_tkn: _,
                 prop_name,
                 idx: _,
@@ -286,7 +287,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                 ..
             } => {
                 let mut prop_ty = None;
-                // TODO: this is O(n) and not efficient (should store props in a map)
+                // TODO: this is O(n)
                 for prop in props {
                     match prop.clone() {
                         Ast::VarDeclExpr {
@@ -307,6 +308,15 @@ impl<'t, 's> TyCheck<'t, 's> {
                 }
 
                 return prop_ty.unwrap();
+            }
+            Ast::ClassConstrExpr {
+                meta: _,
+                ty_rec: _,
+                class_name: _,
+                props,
+            } => {
+                let prop = props.get(&prop_name).unwrap();
+                prop.get_ty_rec().unwrap().ty
             }
             _ => panic!("Cannot extract property type from this ast"),
         }

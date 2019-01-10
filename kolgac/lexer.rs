@@ -205,7 +205,7 @@ impl Lexer {
         }
     }
 
-    /// Look ahead to the next token, and then reest the buffer and rewind
+    /// Look ahead to the next token, and then reset the buffer and rewind
     /// the reader for future calls to lex().
     pub fn peek_tkn(&mut self) -> Token {
         // Copy the current state of the lexer

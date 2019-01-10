@@ -705,8 +705,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     }
                 }
             }
-            Ast::ClassPropAccess {
+            Ast::ClassPropAccessExpr {
                 meta: _,
+                ty_rec: _,
                 ident_tkn,
                 prop_name,
                 idx,

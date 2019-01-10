@@ -758,8 +758,9 @@ impl<'l, 's> Parser<'l, 's> {
                             }
                         };
                     }
-                    Ast::ClassPropAccess {
+                    Ast::ClassPropAccessExpr {
                         meta: _,
+                        ty_rec: _,
                         ident_tkn,
                         prop_name,
                         idx,
@@ -1022,6 +1023,9 @@ impl<'l, 's> Parser<'l, 's> {
                 self.class_expr(name_tkn)
             }
             _ => {
+                // A typical class property access
+                // Get the class construction expression from the symbol table. We use this
+                // to get class metadata
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
                 if class_sym.is_none() {
                     return Err(self.error(ParseErrTy::UndeclaredSym(
@@ -1030,7 +1034,32 @@ impl<'l, 's> Parser<'l, 's> {
                 }
                 let class_ptr = class_sym.unwrap();
                 let owner = class_ptr.assign_val.clone().unwrap();
-                let pos = match &owner {
+
+                let class_name = match &owner {
+                    Ast::ClassConstrExpr {
+                        meta: _,
+                        ty_rec: _,
+                        class_name,
+                        ..
+                    } => Some(class_name.clone()),
+                    _ => None,
+                };
+
+                if class_name.is_none() {
+                    return Err(self.error(ParseErrTy::InvalidClassProp));
+                }
+
+                // We also need the class declaration in addition to the class construction
+                // above. This is needed to get the property position within the prop
+                // array in the class. Doing this here will make it slightly easier to
+                // generate LLVM IR (because we need the index for GEP instructions).
+                let class_decl_sym = self.symtab.retrieve(&class_name.clone().unwrap());
+                if class_decl_sym.is_none() {
+                    return Err(self.error(ParseErrTy::UndeclaredSym(class_name.unwrap())));
+                }
+
+                // Get the prop position from the declaration.
+                let pos = match class_decl_sym.unwrap().assign_val.clone().unwrap() {
                     Ast::ClassDeclStmt {
                         meta: _,
                         ty_rec: _,
@@ -1038,7 +1067,7 @@ impl<'l, 's> Parser<'l, 's> {
                         methods: _,
                         props: _,
                         prop_pos,
-                        sc: _,
+                        ..
                     } => {
                         let map = prop_pos.clone();
                         let idx = map.get(&name_tkn.clone().unwrap().get_name());
@@ -1053,10 +1082,29 @@ impl<'l, 's> Parser<'l, 's> {
                     _ => 0 as usize,
                 };
 
+                // Get the type record from the class construction.
+                let prop_ty_rec = match &owner {
+                    Ast::ClassConstrExpr {
+                        meta: _,
+                        ty_rec: _,
+                        class_name: _,
+                        props,
+                    } => {
+                        let prop = props.get(&name_tkn.clone().unwrap().get_name()).unwrap();
+                        prop.get_ty_rec()
+                    }
+                    _ => None,
+                };
+
+                if prop_ty_rec.is_none() {
+                    return Err(self.error(ParseErrTy::InvalidClassProp));
+                }
+
                 let tkn = class_tkn.clone().unwrap();
 
-                Ok(Ast::ClassPropAccess {
+                Ok(Ast::ClassPropAccessExpr {
                     meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
+                    ty_rec: prop_ty_rec.unwrap(),
                     ident_tkn: class_tkn.unwrap(),
                     prop_name: name_tkn.unwrap().get_name(),
                     idx: pos,
