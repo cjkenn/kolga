@@ -305,6 +305,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
 
                                 let val = self.gen_expr(&value.clone()).unwrap();
+                                // TODO: this doesn't work for class prop accesses, because it
+                                // returns a load instruction
                                 LLVMSetInitializer(global, val);
                                 self.valtab.store(&ident_tkn.get_name(), global);
                                 vec![global]
@@ -327,36 +329,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             // here should already be a struct type (if we tried to create a class
                             // before declaring it we would not pass parsing).
                             match *raw_val {
-                                Ast::ClassConstrExpr {
-                                    meta: _,
-                                    ty_rec: _,
-                                    class_name: _,
-                                    props,
-                                } => {
-                                    let mut instrs = Vec::new();
-                                    instrs.push(alloca_instr);
-
-                                    let mut pos = 0;
-                                    for (key, val) in props.iter() {
-                                        // TODO: indices are wrong here
-                                        let gep_val = LLVMBuildStructGEP(
-                                            self.builder,
-                                            alloca_instr,
-                                            pos as u32,
-                                            self.c_str(key),
-                                        );
-
-                                        // TODO: need to handle errors in gen_expr.
-                                        let st_val = LLVMBuildStore(
-                                            self.builder,
-                                            self.gen_expr(val).unwrap(),
-                                            gep_val,
-                                        );
-                                        instrs.push(st_val);
-                                        pos = pos + 1;
-                                    }
-
-                                    instrs
+                                Ast::ClassConstrExpr { .. } => {
+                                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                                    vec![alloca_instr]
                                 }
                                 _ => {
                                     let val = self.gen_expr(&raw_val).unwrap();
@@ -711,7 +686,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 ident_tkn,
                 prop_name,
                 idx,
-                owner_class: _,
+                ..
             } => {
                 let name = ident_tkn.get_name();
                 let class = self.valtab.retrieve(&name);
@@ -721,6 +696,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
 
                 let classptr = class.unwrap();
+
                 unsafe {
                     let gep_val = LLVMBuildStructGEP(
                         self.builder,
