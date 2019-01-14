@@ -9,6 +9,7 @@ use llvm_sys::LLVMRealPredicate;
 use valtab::ValTab;
 //use fpm::FPM;
 use std::ffi::CString;
+use std::os::raw::c_ulonglong;
 use std::ptr;
 use std::slice;
 
@@ -696,14 +697,17 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
 
                 let classptr = class.unwrap();
-
+                let mut offset = 0;
+                let mut offset_vec = vec![self.llvm_int32(offset as c_ulonglong)];
                 unsafe {
-                    let gep_val = LLVMBuildStructGEP(
+                    let gep_val = LLVMBuildGEP(
                         self.builder,
                         classptr,
-                        *idx as u32,
+                        offset_vec.as_mut_ptr(),
+                        offset_vec.len() as u32,
                         self.c_str(prop_name),
                     );
+
                     // GEP returns the address of the prop we want to access. We can load it
                     // into a variable here so that we return a non-pointer type.
                     // TODO: can this be set as a global variable?
@@ -907,7 +911,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
 
-            // Generate code the the else block, if we have one.
+            // Generate code for the else block, if we have one.
             if has_else {
                 LLVMMoveBasicBlockAfter(else_bb, final_elif_bb);
                 LLVMPositionBuilderAtEnd(self.builder, else_bb);
@@ -1055,6 +1059,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
             let llvm_ty = self.llvm_ty_from_ty_rec(&ty_rec);
             let c_name = self.c_str(name);
+
             LLVMBuildAlloca(builder, llvm_ty, c_name)
         }
     }
@@ -1070,6 +1075,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // Retrieve the class type from the class table, and return a pointer to it.
                 // TODO: error checking here
                 let class_ty = self.classtab.retrieve(&name).unwrap();
+                // TODO: this should be LLVMStructType
                 unsafe { LLVMPointerType(class_ty, 0) }
             }
             KolgaTy::Symbolic(_) => panic!("Found a type in codegen that wasn't inferred!"),
@@ -1170,6 +1176,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
     fn i8_ty(&self) -> LLVMTypeRef {
         unsafe { LLVMInt8TypeInContext(self.context) }
+    }
+
+    fn llvm_int32(&self, val: c_ulonglong) -> LLVMValueRef {
+        unsafe { LLVMConstInt(LLVMInt32Type(), val, LLVM_FALSE) }
     }
 
     fn c_str(&mut self, s: &str) -> *mut i8 {

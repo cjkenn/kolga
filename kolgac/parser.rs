@@ -1259,7 +1259,7 @@ impl<'l, 's> Parser<'l, 's> {
                 }
 
                 let sym = mb_sym.unwrap();
-                // If was have no assign value, but we are looking at a param
+                // If we have no assign value, but we are looking at a param
                 // or function decl sym, we can return the sym. But no assign value on
                 // any other type requires a check that we are assigning to it, otherwise
                 // we are trying to access an undefined variable.
