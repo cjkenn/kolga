@@ -697,14 +697,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
 
                 let classptr = class.unwrap();
-                let mut offset = 0;
-                let mut offset_vec = vec![self.llvm_int32(offset as c_ulonglong)];
                 unsafe {
-                    let gep_val = LLVMBuildGEP(
+                    let gep_val = LLVMBuildStructGEP(
                         self.builder,
                         classptr,
-                        offset_vec.as_mut_ptr(),
-                        offset_vec.len() as u32,
+                        *idx as u32,
                         self.c_str(prop_name),
                     );
 
@@ -1071,13 +1068,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             KolgaTy::Num => self.double_ty(),
             KolgaTy::Bool => self.i8_ty(),
             KolgaTy::Void => self.void_ty(),
-            KolgaTy::Class(name) => {
-                // Retrieve the class type from the class table, and return a pointer to it.
-                // TODO: error checking here
-                let class_ty = self.classtab.retrieve(&name).unwrap();
-                // TODO: this should be LLVMStructType
-                unsafe { LLVMPointerType(class_ty, 0) }
-            }
+            KolgaTy::Class(name) => self.classtab.retrieve(&name).unwrap(),
             KolgaTy::Symbolic(_) => panic!("Found a type in codegen that wasn't inferred!"),
         }
     }
