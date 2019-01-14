@@ -1090,8 +1090,12 @@ impl<'l, 's> Parser<'l, 's> {
                         class_name: _,
                         props,
                     } => {
-                        let prop = props.get(&name_tkn.clone().unwrap().get_name()).unwrap();
-                        prop.get_ty_rec()
+                        let mb_prop = props.get(&name_tkn.clone().unwrap().get_name());
+                        if mb_prop.is_none() {
+                            return Err(self.error(ParseErrTy::InvalidClassProp));
+                        }
+
+                        mb_prop.unwrap().get_ty_rec()
                     }
                     _ => None,
                 };
