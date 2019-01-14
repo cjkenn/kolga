@@ -760,14 +760,15 @@ impl<'l, 's> Parser<'l, 's> {
                     }
                     Ast::ClassPropAccessExpr {
                         meta: _,
-                        ty_rec: _,
+                        ty_rec,
                         ident_tkn,
                         prop_name,
                         idx,
                         owner_class,
                     } => {
-                        return Ok(Ast::ClassPropSet {
+                        return Ok(Ast::ClassPropSetExpr {
                             meta: MetaAst::new(self.next(), ident_tkn.line, ident_tkn.pos),
+                            ty_rec: ty_rec.clone(),
                             ident_tkn: ident_tkn,
                             prop_name: prop_name,
                             idx: idx,

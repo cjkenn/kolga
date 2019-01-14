@@ -165,9 +165,9 @@ pub enum Ast {
         owner_class: Box<Ast>,
     },
 
-    // TODO: statement or expr
-    ClassPropSet {
+    ClassPropSetExpr {
         meta: MetaAst,
+        ty_rec: TyRecord,
         ident_tkn: Token,
         prop_name: String,
         idx: usize,
@@ -230,6 +230,9 @@ impl Ast {
                 meta: _, ty_rec, ..
             }
             | Ast::ClassPropAccessExpr {
+                meta: _, ty_rec, ..
+            }
+            | Ast::ClassPropSetExpr {
                 meta: _, ty_rec, ..
             } => Some(ty_rec.clone()),
             _ => None,

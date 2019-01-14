@@ -79,6 +79,8 @@ fn main() {
         }
     }
 
+    // Create a new LLVM module and generate IR inside it. The IR can then be passed
+    // to the object generator to build machine code.
     let mut valtab = ValTab::new();
     let mut llvm_codegen = CodeGenerator::new(&ast, &mut valtab);
 

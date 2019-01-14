@@ -269,6 +269,22 @@ impl<'t, 's> TyCheck<'t, 's> {
                 idx: _,
                 owner_class,
             } => self.extract_prop_ty(&owner_class, prop_name.clone()),
+            Ast::ClassPropSetExpr {
+                meta: _,
+                ty_rec: _,
+                ident_tkn,
+                prop_name,
+                idx: _,
+                owner_class,
+                assign_val,
+            } => {
+                let prop_ty = self.extract_prop_ty(&owner_class, prop_name.clone());
+                let rhs_ty = self.check_expr(assign_val, final_sc);
+                if prop_ty != rhs_ty {
+                    self.ty_mismatch(&ident_tkn, &prop_ty, &rhs_ty);
+                }
+                prop_ty
+            }
             _ => panic!("Unrecognized expression type found!"),
         }
     }
@@ -332,7 +348,9 @@ impl<'t, 's> TyCheck<'t, 's> {
         props: &HashMap<String, Ast>,
         meta: &MetaAst,
     ) {
-        // TODO: Can this be done without assuming scope level 0?
+        // TODO: Can this be done without assuming scope level 0? We should allow
+        // other scopes so that we can declare classes inside of functions blocks
+        // if we want to.
         let class_decl_sym = self
             .symtab
             .retrieve_from_finalized_sc(class_name, 0)

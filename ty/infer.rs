@@ -222,7 +222,7 @@ impl TyInfer {
                     None => (),
                 };
             }
-            Ast::ClassPropSet { .. } => unimplemented!(),
+            Ast::ClassPropSetExpr { .. } => (),
             Ast::ClassFnCallExpr { .. } => unimplemented!(),
             Ast::ClassDeclStmt { .. }
             | Ast::ClassConstrExpr { .. }
@@ -576,7 +576,7 @@ impl TyInfer {
                 ty_eqs
             }
             Ast::ClassPropAccessExpr { .. } => ty_eqs,
-            Ast::ClassPropSet { .. } => unimplemented!(),
+            Ast::ClassPropSetExpr { .. } => ty_eqs,
             Ast::ClassFnCallExpr { .. } => unimplemented!(),
             Ast::VarDeclExpr { .. } | Ast::FnCallExpr { .. } | Ast::ClassDeclStmt { .. } => ty_eqs,
             _ => ty_eqs,

@@ -9,7 +9,6 @@ use llvm_sys::LLVMRealPredicate;
 use valtab::ValTab;
 //use fpm::FPM;
 use std::ffi::CString;
-use std::os::raw::c_ulonglong;
 use std::ptr;
 use std::slice;
 
@@ -712,6 +711,37 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     Some(ld_val)
                 }
             }
+            Ast::ClassPropSetExpr {
+                meta: _,
+                ty_rec: _,
+                ident_tkn,
+                prop_name,
+                idx,
+                owner_class,
+                assign_val,
+            } => {
+                let name = ident_tkn.get_name();
+                let class = self.valtab.retrieve(&name);
+                if class.is_none() {
+                    self.error(GenErrTy::InvalidClass(name));
+                    return None;
+                }
+
+                let classptr = class.unwrap();
+                unsafe {
+                    let gep_val = LLVMBuildStructGEP(
+                        self.builder,
+                        classptr,
+                        *idx as u32,
+                        self.c_str(prop_name),
+                    );
+
+                    let assign = self.gen_expr(&assign_val).unwrap();
+                    let store_val = LLVMBuildStore(self.builder, assign, gep_val);
+
+                    Some(store_val)
+                }
+            }
             _ => unimplemented!("Ast type {:#?} is not implemented for codegen", expr),
         }
     }
@@ -1167,10 +1197,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
     fn i8_ty(&self) -> LLVMTypeRef {
         unsafe { LLVMInt8TypeInContext(self.context) }
-    }
-
-    fn llvm_int32(&self, val: c_ulonglong) -> LLVMValueRef {
-        unsafe { LLVMConstInt(LLVMInt32Type(), val, LLVM_FALSE) }
     }
 
     fn c_str(&mut self, s: &str) -> *mut i8 {
