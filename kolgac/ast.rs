@@ -177,6 +177,7 @@ pub enum Ast {
 
     ClassFnCallExpr {
         meta: MetaAst,
+        ty_rec: TyRecord,
         class_tkn: Token,
         class_name: String,
         fn_tkn: Token,
@@ -226,6 +227,9 @@ impl Ast {
             | Ast::FnCallExpr {
                 meta: _, ty_rec, ..
             }
+            | Ast::ClassFnCallExpr {
+                meta: _, ty_rec, ..
+            }
             | Ast::ClassConstrExpr {
                 meta: _, ty_rec, ..
             }
@@ -234,6 +238,13 @@ impl Ast {
             }
             | Ast::ClassPropSetExpr {
                 meta: _, ty_rec, ..
+            }
+            | Ast::FnDeclStmt {
+                meta: _,
+                ident_tkn: _,
+                fn_params: _,
+                ret_ty: ty_rec,
+                ..
             } => Some(ty_rec.clone()),
             _ => None,
         }

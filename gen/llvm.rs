@@ -592,11 +592,12 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             }
             Ast::ClassFnCallExpr {
                 meta: _,
+                ty_rec: _,
                 class_tkn,
                 class_name,
                 fn_tkn,
                 fn_params,
-                sc: _,
+                ..
             } => {
                 // The class function is stored under a different name in the
                 // value table, with the class name prepended.

@@ -59,6 +59,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     }
                     Ast::ClassFnCallExpr {
                         meta: _,
+                        ty_rec: _,
                         class_tkn: _,
                         class_name: _,
                         fn_tkn: _,
@@ -260,6 +261,9 @@ impl<'t, 's> TyCheck<'t, 's> {
             }
             | Ast::FnCallExpr {
                 meta: _, ty_rec, ..
+            }
+            | Ast::ClassFnCallExpr {
+                meta: _, ty_rec, ..
             } => ty_rec.ty.clone(),
             Ast::ClassPropAccessExpr {
                 meta: _,
@@ -368,6 +372,7 @@ impl<'t, 's> TyCheck<'t, 's> {
     }
 
     fn check_fn_params(&mut self, fn_call_ast: Ast, final_sc: usize) {
+        println!("{:#?}", fn_call_ast);
         match fn_call_ast {
             Ast::FnCallExpr {
                 meta: _,
@@ -393,6 +398,7 @@ impl<'t, 's> TyCheck<'t, 's> {
             }
             Ast::ClassFnCallExpr {
                 meta: _,
+                ty_rec: _,
                 class_tkn: _,
                 class_name: _,
                 fn_tkn,

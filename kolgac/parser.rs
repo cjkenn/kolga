@@ -1009,11 +1009,12 @@ impl<'l, 's> Parser<'l, 's> {
 
                 Ok(Ast::ClassFnCallExpr {
                     meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
+                    ty_rec: fn_ast.get_ty_rec().unwrap(),
                     class_tkn: tkn.clone(),
                     class_name: class_name,
                     fn_tkn: name_tkn.unwrap().clone(),
                     fn_params: params,
-                    sc: 0,
+                    sc: self.symtab.level(),
                 })
             }
             TknTy::Period => {

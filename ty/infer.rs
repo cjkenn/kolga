@@ -193,6 +193,11 @@ impl TyInfer {
                 ref mut ty_rec,
                 ..
             }
+            | Ast::ClassFnCallExpr {
+                meta: _,
+                ref mut ty_rec,
+                ..
+            }
             | Ast::PrimaryExpr {
                 meta: _,
                 ref mut ty_rec,
@@ -223,7 +228,6 @@ impl TyInfer {
                 };
             }
             Ast::ClassPropSetExpr { .. } => (),
-            Ast::ClassFnCallExpr { .. } => unimplemented!(),
             Ast::ClassDeclStmt { .. }
             | Ast::ClassConstrExpr { .. }
             | Ast::Prog { .. }
@@ -575,10 +579,12 @@ impl TyInfer {
                 };
                 ty_eqs
             }
-            Ast::ClassPropAccessExpr { .. } => ty_eqs,
-            Ast::ClassPropSetExpr { .. } => ty_eqs,
-            Ast::ClassFnCallExpr { .. } => unimplemented!(),
-            Ast::VarDeclExpr { .. } | Ast::FnCallExpr { .. } | Ast::ClassDeclStmt { .. } => ty_eqs,
+            Ast::ClassPropAccessExpr { .. }
+            | Ast::ClassPropSetExpr { .. }
+            | Ast::ClassFnCallExpr { .. }
+            | Ast::VarDeclExpr { .. }
+            | Ast::FnCallExpr { .. }
+            | Ast::ClassDeclStmt { .. } => ty_eqs,
             _ => ty_eqs,
         }
     }
