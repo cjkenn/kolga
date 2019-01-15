@@ -443,11 +443,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
                                 // We change the name of the function by prepending the
                                 // class name so we avoid storing duplicates in the value table.
-                                // TOOD: This is mostly a hack though, because then no one can
-                                // create a function with the class name prepended to the class
-                                // function name!
+                                // This is kind of a hack, but in a normal program you can't create
+                                // a function name with a period in it, because it would probably
+                                // be parsed as a property anyway.
                                 let curr_name = ident_tkn.get_name();
-                                let new_name = format!("{}_{}", class_tkn.get_name(), curr_name);
+                                let new_name = format!("{}.{}", class_tkn.get_name(), curr_name);
                                 let new_tkn = Token::new(
                                     TknTy::Ident(new_name),
                                     ident_tkn.line,

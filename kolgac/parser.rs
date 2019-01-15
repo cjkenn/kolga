@@ -296,6 +296,7 @@ impl<'l, 's> Parser<'l, 's> {
                         class_name: var_ty_tkn.clone().unwrap().get_name(),
                         props: class_props,
                     };
+
                     let cl_sym = Sym::new(
                         SymTy::Var,
                         is_imm,
@@ -985,38 +986,34 @@ impl<'l, 's> Parser<'l, 's> {
         let ast = match self.currtkn.ty {
             TknTy::LeftParen => {
                 // Calling a function that belongs to the class
+                // TODO: can we do less cloning and unwrapping here?
                 let class_sym = self.symtab.retrieve(&class_tkn.clone().unwrap().get_name());
-                let (sc_lvl, class_name) =
-                    match class_sym.clone().unwrap().assign_val.clone().unwrap() {
-                        Ast::ClassDeclStmt {
-                            meta: _,
-                            ty_rec: _,
-                            ident_tkn,
-                            methods: _,
-                            props: _,
-                            prop_pos: _,
-                            sc,
-                        } => (sc, ident_tkn.get_name()),
-                        _ => {
-                            self.error(ParseErrTy::UndeclaredSym(
-                                name_tkn.clone().unwrap().get_name(),
-                            ));
-                            (0, String::new())
-                        }
-                    };
+                let class_name = match class_sym.clone().unwrap().assign_val.clone().unwrap() {
+                    Ast::ClassConstrExpr {
+                        meta: _,
+                        ty_rec: _,
+                        class_name,
+                        ..
+                    } => class_name.clone(),
+                    _ => {
+                        self.error(ParseErrTy::UndeclaredSym(
+                            name_tkn.clone().unwrap().get_name(),
+                        ));
+                        String::new()
+                    }
+                };
 
                 let fn_ast = self.fnparams_expr(name_tkn.clone(), class_sym.clone())?;
                 let params = fn_ast.extract_params();
-
                 let tkn = class_tkn.clone().unwrap();
 
                 Ok(Ast::ClassFnCallExpr {
                     meta: MetaAst::new(self.next(), tkn.line, tkn.pos),
-                    class_tkn: class_tkn.clone().unwrap(),
+                    class_tkn: tkn.clone(),
                     class_name: class_name,
                     fn_tkn: name_tkn.unwrap().clone(),
                     fn_params: params,
-                    sc: sc_lvl,
+                    sc: 0,
                 })
             }
             TknTy::Period => {
@@ -1090,6 +1087,7 @@ impl<'l, 's> Parser<'l, 's> {
                         ty_rec: _,
                         class_name: _,
                         props,
+                        ..
                     } => {
                         let mb_prop = props.get(&name_tkn.clone().unwrap().get_name());
                         if mb_prop.is_none() {
@@ -1134,6 +1132,10 @@ impl<'l, 's> Parser<'l, 's> {
         self.expect(TknTy::LeftParen)?;
 
         let fn_sym = self.symtab.retrieve(&fn_tkn.clone().unwrap().get_name());
+        let mut fn_ty_rec = match fn_sym {
+            Some(ref sym) => Some(sym.ty_rec.clone()),
+            None => None,
+        };
 
         // If the fn_sym doesn't exist, we need to handle the case that it might be
         // a class method, so we check the class symbol if one exists.
@@ -1144,9 +1146,25 @@ impl<'l, 's> Parser<'l, 's> {
             // and get the expected params. If the method doesn't exist on the class,
             // we return None.
             None => {
-                let class_decl_ast = maybe_class_sym.unwrap().assign_val.clone().unwrap();
+                let class_constr_ast = maybe_class_sym.unwrap().assign_val.clone().unwrap();
+                let class_name = match class_constr_ast {
+                    Ast::ClassConstrExpr {
+                        meta: _,
+                        ty_rec: _,
+                        class_name,
+                        ..
+                    } => Some(class_name.clone()),
+                    _ => None,
+                };
 
-                let params = match class_decl_ast {
+                if class_name.is_none() {
+                    return Err(self.error(ParseErrTy::UndeclaredSym(
+                        fn_tkn.clone().unwrap().get_name(),
+                    )));
+                }
+
+                let class_decl_sym = self.symtab.retrieve(&class_name.unwrap()).unwrap();
+                let params = match class_decl_sym.assign_val.clone().unwrap() {
                     Ast::ClassDeclStmt {
                         meta: _,
                         ty_rec: _,
@@ -1155,17 +1173,18 @@ impl<'l, 's> Parser<'l, 's> {
                         ..
                     } => {
                         let mut expected_params = None;
-
                         for mtod_ast in methods {
                             match mtod_ast {
                                 Ast::FnDeclStmt {
                                     meta: _,
                                     ident_tkn,
                                     fn_params,
+                                    ret_ty,
                                     ..
                                 } => {
                                     if ident_tkn.get_name() == fn_tkn.clone().unwrap().get_name() {
                                         expected_params = Some(fn_params);
+                                        fn_ty_rec = Some(ret_ty.clone());
                                     }
                                 }
                                 _ => (),
@@ -1220,11 +1239,6 @@ impl<'l, 's> Parser<'l, 's> {
                 ParseErrTy::WrongFnParamCnt(expected_params.len(), params.len()),
             );
         }
-
-        let fn_ty_rec = match fn_sym {
-            Some(sym) => Some(sym.ty_rec.clone()),
-            None => None,
-        };
 
         if fn_ty_rec.is_none() {
             let tkn = fn_tkn.clone().unwrap();
