@@ -314,9 +314,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                             ref ty_rec,
                             ref ident_tkn,
                             ..
-                        }
-                            if ident_tkn.get_name() == prop_name =>
-                        {
+                        } if ident_tkn.get_name() == prop_name => {
                             prop_ty = Some(ty_rec.ty.clone());
                         }
                         _ => (),
@@ -372,7 +370,6 @@ impl<'t, 's> TyCheck<'t, 's> {
     }
 
     fn check_fn_params(&mut self, fn_call_ast: Ast, final_sc: usize) {
-        println!("{:#?}", fn_call_ast);
         match fn_call_ast {
             Ast::FnCallExpr {
                 meta: _,

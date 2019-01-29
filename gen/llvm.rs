@@ -204,6 +204,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     // we pass in an array of LLVMTypeRef's to the function, but we want
                     // LLVMValueRef's to store in the symbol table and to give them names. We need
                     // to get the params and loop through them again.
+                    
+                    // TODO: class function dont work here because we add an extra param (a pointer
+                    // to the class def)
                     let mut llvm_params: *mut LLVMValueRef =
                         Vec::with_capacity(param_tys.len()).as_mut_ptr();
                     LLVMGetParams(llvm_fn, llvm_params);
@@ -460,9 +463,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                     fn_params: new_params,
                                     ret_ty: ret_ty.clone(),
                                     fn_body: fn_body.clone(),
-                                    sc: sc,
+                                    sc: 0,
                                 };
-
+                                
                                 self.gen_stmt(&new_method);
                             }
                             _ => (),
@@ -602,7 +605,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // The class function is stored under a different name in the
                 // value table, with the class name prepended.
                 let fn_name = fn_tkn.clone().get_name();
-                let class_fn_name = format!("{}_{}", class_name, fn_name);
+                let class_fn_name = format!("{}.{}", class_name, fn_name);
 
                 let llvm_fn = self.valtab.retrieve(&class_fn_name);
                 if llvm_fn.is_none() {
