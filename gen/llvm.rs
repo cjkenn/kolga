@@ -182,13 +182,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     self.valtab.init_sc();
 
                     let fn_name = self.c_str(&ident_tkn.get_name());
-                    let fn_ty = self.llvm_ty_from_ty_rec(ret_ty);
+                    let fn_ty = self.llvm_ty_from_ty_rec(ret_ty, false);
 
                     // Convert our params to an array of LLVMTypeRef's. We then pass these
                     // types to the function to encode the types of our params. After we create
                     // our function, we can add it to the builder and position it at
                     // the end of the new basic block.
-                    let mut param_tys = self.llvm_tys_from_ty_rec_arr(fn_params);
+                    let mut param_tys = self.llvm_tys_from_ty_rec_arr(fn_params, true);
                     let llvm_fn_ty = LLVMFunctionType(
                         fn_ty,
                         param_tys.as_mut_ptr(),
@@ -203,15 +203,15 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     // Get the params from the function we created. This is a little weird since
                     // we pass in an array of LLVMTypeRef's to the function, but we want
                     // LLVMValueRef's to store in the symbol table and to give them names. We need
-                    // to get the params and loop through them again.
-                    
-                    // TODO: class function dont work here because we add an extra param (a pointer
-                    // to the class def)
+                    // to get the params and loop through them again.                    
                     let mut llvm_params: *mut LLVMValueRef =
                         Vec::with_capacity(param_tys.len()).as_mut_ptr();
+                    
                     LLVMGetParams(llvm_fn, llvm_params);
+                    
                     let param_value_vec =
                         slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
+                    
                     for (idx, param) in param_value_vec.iter().enumerate() {
                         let name = self.c_str(&fn_params[idx].tkn.get_name());
                         LLVMSetValueName(*param, name);
@@ -304,7 +304,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 }
                             }
                             _ => unsafe {
-                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
+                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
                                 let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
 
                                 let val = self.gen_expr(&value.clone()).unwrap();
@@ -356,7 +356,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             } => match is_global {
                 true => unsafe {
                     let c_name = self.c_str(&ident_tkn.get_name());
-                    let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
+                    let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
                     let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
                     self.valtab.store(&ident_tkn.get_name(), global);
                     vec![global]
@@ -393,7 +393,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             Ast::VarDeclExpr {
                                 meta: _, ty_rec, ..
                             } => {
-                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec);
+                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
                                 prop_tys.push(llvm_ty);
                             }
                             _ => (),
@@ -616,9 +616,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // We need to insert a pointer to the class instance as the first param in order to
                 // call the class function. We get that pointer from the value table (the pointer
                 // is the actual instance of the class that has been created).
-                let mut param_tys: Vec<LLVMValueRef> = Vec::new();
-                let class_instance = self.valtab.retrieve(&class_tkn.get_name());
-                param_tys.push(class_instance.unwrap());
+                let mut fn_args: Vec<LLVMValueRef> = Vec::new();
+                let class_instance = self.valtab.retrieve(&class_tkn.get_name());                
+                fn_args.push(class_instance.unwrap());
 
                 for param in fn_params {
                     let llvm_val = self.gen_expr(param);
@@ -627,15 +627,16 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         return None;
                     }
 
-                    param_tys.push(llvm_val.unwrap());
+                    fn_args.push(llvm_val.unwrap());
                 }
 
+                // TODO: call here isnt correct due to the type of class params
                 unsafe {
                     Some(LLVMBuildCall(
                         self.builder,
                         llvm_fn.unwrap(),
-                        param_tys.as_mut_ptr(),
-                        param_tys.len() as u32,
+                        fn_args.as_mut_ptr(),
+                        fn_args.len() as u32,
                         self.c_str(""),
                     ))
                 }
@@ -1088,30 +1089,38 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let entry_first_instr = LLVMGetFirstInstruction(entry_bb);
             LLVMPositionBuilder(builder, entry_bb, entry_first_instr);
 
-            let llvm_ty = self.llvm_ty_from_ty_rec(&ty_rec);
+            let llvm_ty = self.llvm_ty_from_ty_rec(&ty_rec, false);
             let c_name = self.c_str(name);
 
             LLVMBuildAlloca(builder, llvm_ty, c_name)
         }
     }
 
-    /// Converts a TyRecord type to an LLVMTypeRef
-    fn llvm_ty_from_ty_rec(&self, ty_rec: &TyRecord) -> LLVMTypeRef {
+    /// Converts a TyRecord type to an LLVMTypeRef. If class_to_ptr is true,
+    /// class types are returned as pointers to that class in LLVM.
+    fn llvm_ty_from_ty_rec(&self, ty_rec: &TyRecord, class_to_ptr: bool) -> LLVMTypeRef {
         match ty_rec.ty.clone() {
             KolgaTy::String => self.str_ty(),
             KolgaTy::Num => self.double_ty(),
             KolgaTy::Bool => self.i8_ty(),
             KolgaTy::Void => self.void_ty(),
-            KolgaTy::Class(name) => self.classtab.retrieve(&name).unwrap(),
+            KolgaTy::Class(name) => {
+                if class_to_ptr {
+                    return self.ptr_ty(self.classtab.retrieve(&name).unwrap());
+                }
+                
+                self.classtab.retrieve(&name).unwrap()
+            }
             KolgaTy::Symbolic(_) => panic!("Found a type in codegen that wasn't inferred!"),
         }
     }
 
-    /// Converts a vector of TyRecords into a vector of LLVMTypeRefs
-    fn llvm_tys_from_ty_rec_arr(&self, ty_recs: &Vec<TyRecord>) -> Vec<LLVMTypeRef> {
+    /// Converts a vector of TyRecords into a vector of LLVMTypeRefs. If class_to_ptr is set
+    /// to true, class type params are converted to pointers to the class.
+    fn llvm_tys_from_ty_rec_arr(&self, ty_recs: &Vec<TyRecord>, class_to_ptr: bool) -> Vec<LLVMTypeRef> {
         let mut llvm_tys = Vec::new();
         for ty_rec in ty_recs {
-            llvm_tys.push(self.llvm_ty_from_ty_rec(&ty_rec));
+            llvm_tys.push(self.llvm_ty_from_ty_rec(&ty_rec, class_to_ptr));
         }
 
         llvm_tys
@@ -1201,6 +1210,10 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
     fn i8_ty(&self) -> LLVMTypeRef {
         unsafe { LLVMInt8TypeInContext(self.context) }
+    }
+
+    fn ptr_ty(&self, ty: LLVMTypeRef) -> LLVMTypeRef {
+        unsafe { LLVMPointerType(ty, 0) }
     }
 
     fn c_str(&mut self, s: &str) -> *mut i8 {
