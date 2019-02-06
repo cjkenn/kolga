@@ -209,10 +209,16 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     
                     LLVMGetParams(llvm_fn, llvm_params);
                     
-                    let param_value_vec =
+                    let param_value_vec: Vec<LLVMValueRef> =
                         slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
                     
                     for (idx, param) in param_value_vec.iter().enumerate() {
+                        // TODO: if the param is a pointer, we dont want to
+                        // build an alloca/store for it.
+                        // if LLVMTypeOf(*param) ==  {
+                        //     continue;
+                        // }
+                        
                         let name = self.c_str(&fn_params[idx].tkn.get_name());
                         LLVMSetValueName(*param, name);
 
@@ -221,6 +227,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                             fn_params[idx].clone(),
                             &fn_params[idx].tkn.get_name(),
                         );
+                        
                         LLVMBuildStore(self.builder, *param, alloca_instr);
                         self.valtab
                             .store(&fn_params[idx].tkn.get_name(), alloca_instr);
