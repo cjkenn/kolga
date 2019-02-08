@@ -5,7 +5,7 @@ use kolgac::token::{TknTy, Token};
 use kolgac::ty_rec::{KolgaTy, TyRecord};
 use llvm_sys::core::*;
 use llvm_sys::prelude::*;
-use llvm_sys::LLVMRealPredicate;
+use llvm_sys::{LLVMRealPredicate, LLVMTypeKind};
 use valtab::ValTab;
 //use fpm::FPM;
 use std::ffi::CString;
@@ -213,11 +213,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
                     
                     for (idx, param) in param_value_vec.iter().enumerate() {
-                        // TODO: if the param is a pointer, we dont want to
+                        // If the param is a pointer, we dont want to
                         // build an alloca/store for it.
-                        // if LLVMTypeOf(*param) ==  {
-                        //     continue;
-                        // }
+                        if LLVMGetTypeKind(LLVMTypeOf(*param)) == LLVMTypeKind::LLVMPointerTypeKind  {
+                             continue;
+                        }
                         
                         let name = self.c_str(&fn_params[idx].tkn.get_name());
                         LLVMSetValueName(*param, name);
