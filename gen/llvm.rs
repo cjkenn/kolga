@@ -177,107 +177,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 ret_ty,
                 fn_body,
                 sc: _,
-            } => {
-                unsafe {
-                    self.valtab.init_sc();
-
-                    let fn_name = self.c_str(&ident_tkn.get_name());
-                    let fn_ty = self.llvm_ty_from_ty_rec(ret_ty, false);
-
-                    // Convert our params to an array of LLVMTypeRef's. We then pass these
-                    // types to the function to encode the types of our params. After we create
-                    // our function, we can add it to the builder and position it at
-                    // the end of the new basic block.
-                    let mut param_tys = self.llvm_tys_from_ty_rec_arr(fn_params, true);
-                    let llvm_fn_ty = LLVMFunctionType(
-                        fn_ty,
-                        param_tys.as_mut_ptr(),
-                        param_tys.len() as u32,
-                        LLVM_FALSE,
-                    );
-
-                    let llvm_fn = LLVMAddFunction(self.module, fn_name, llvm_fn_ty);
-                    let fn_val = LLVMAppendBasicBlockInContext(self.context, llvm_fn, fn_name);
-                    LLVMPositionBuilderAtEnd(self.builder, fn_val);
-
-                    // Get the params from the function we created. This is a little weird since
-                    // we pass in an array of LLVMTypeRef's to the function, but we want
-                    // LLVMValueRef's to store in the symbol table and to give them names. We need
-                    // to get the params and loop through them again.                    
-                    let mut llvm_params: *mut LLVMValueRef =
-                        Vec::with_capacity(param_tys.len()).as_mut_ptr();
-                    
-                    LLVMGetParams(llvm_fn, llvm_params);
-                    
-                    let param_value_vec: Vec<LLVMValueRef> =
-                        slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
-                    
-                    for (idx, param) in param_value_vec.iter().enumerate() {
-                        // If the param is a pointer, we dont want to
-                        // build an alloca/store for it.
-                        if LLVMGetTypeKind(LLVMTypeOf(*param)) == LLVMTypeKind::LLVMPointerTypeKind  {
-                             continue;
-                        }
-                        
-                        let name = self.c_str(&fn_params[idx].tkn.get_name());
-                        LLVMSetValueName(*param, name);
-
-                        let alloca_instr = self.build_entry_bb_alloca(
-                            llvm_fn,
-                            fn_params[idx].clone(),
-                            &fn_params[idx].tkn.get_name(),
-                        );
-                        
-                        LLVMBuildStore(self.builder, *param, alloca_instr);
-                        self.valtab
-                            .store(&fn_params[idx].tkn.get_name(), alloca_instr);
-                    }
-
-                    // Store the function symbol inside the value table before parsing the
-                    // body, so we can accept recursive calls.
-                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
-
-                    // TODO: this is hard to read -_-
-                    match *fn_body.clone() {
-                        Ast::BlckStmt {
-                            meta: _,
-                            stmts,
-                            sc: _,
-                        } => {
-                            for stmt in stmts {
-                                match stmt.clone() {
-                                    Ast::RetStmt { meta: _, ret_expr } => {
-                                        if ret_expr.is_none() {
-                                            // Use a null ptr when we return void
-                                            LLVMBuildRet(self.builder, ptr::null_mut());
-                                        } else {
-                                            let llvm_val =
-                                                self.gen_expr(&ret_expr.clone().unwrap());
-                                            LLVMBuildRet(self.builder, llvm_val.unwrap());
-                                        }
-                                    }
-                                    _ => {
-                                        self.gen_stmt(&stmt.clone());
-                                    }
-                                }
-                            }
-                        }
-                        _ => (),
-                    }
-
-                    // Run the function pass through our manager
-                    //self.fpm.run(llvm_fn);
-
-                    // Close the function level scope, which will pop off any params and
-                    // variable declared here (we don't need these anymore, since we aren't
-                    // going to be making another pass over them later). Add the llvm function
-                    // to the value table so we can look it up later for a call.
-                    self.valtab.close_sc();
-                    self.valtab.store(&ident_tkn.get_name(), llvm_fn);
-                }
-
-                Vec::new()
-            }
+            } => self.fn_decl_stmt(ident_tkn, fn_params, ret_ty, fn_body),
             Ast::VarAssignExpr {
                 meta: _,
                 ty_rec,
@@ -472,7 +372,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                     fn_body: fn_body.clone(),
                                     sc: 0,
                                 };
-                                
+
                                 self.gen_stmt(&new_method);
                             }
                             _ => (),
@@ -624,7 +524,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // call the class function. We get that pointer from the value table (the pointer
                 // is the actual instance of the class that has been created).
                 let mut fn_args: Vec<LLVMValueRef> = Vec::new();
-                let class_instance = self.valtab.retrieve(&class_tkn.get_name());                
+                let class_instance = self.valtab.retrieve(&class_tkn.get_name());
                 fn_args.push(class_instance.unwrap());
 
                 for param in fn_params {
@@ -1080,6 +980,135 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         return_stmt_vec
     }
 
+    /// Generate LLVM IR for a function declaration statement. If no values are generated,
+    /// an empty vector is returned.
+    fn fn_decl_stmt(
+        &mut self,
+        ident_tkn: &Token,
+        fn_params: &Vec<TyRecord>,
+        ret_ty: &TyRecord,
+        fn_body: &Box<Ast>,
+    ) -> Vec<LLVMValueRef> {
+        self.valtab.init_sc();
+
+        let fn_name = self.c_str(&ident_tkn.get_name());
+        let fn_ty = self.llvm_ty_from_ty_rec(ret_ty, false);
+
+        // Convert our params to an array of LLVMTypeRef's. We then pass these
+        // types to the function to encode the types of our params. After we create
+        // our function, we can add it to the builder and position it at
+        // the end of the new basic block.
+        let mut param_tys = self.llvm_tys_from_ty_rec_arr(fn_params, true);
+
+        unsafe {
+            let llvm_fn_ty = LLVMFunctionType(
+                fn_ty,
+                param_tys.as_mut_ptr(),
+                param_tys.len() as u32,
+                LLVM_FALSE,
+            );
+
+            let llvm_fn = LLVMAddFunction(self.module, fn_name, llvm_fn_ty);
+            let fn_val = LLVMAppendBasicBlockInContext(self.context, llvm_fn, fn_name);
+            LLVMPositionBuilderAtEnd(self.builder, fn_val);
+
+            // Get the params from the function we created. This is a little weird since
+            // we pass in an array of LLVMTypeRef's to the function, but we want
+            // LLVMValueRef's to store in the symbol table and to give them names. We need
+            // to get the params and loop through them again.
+            let llvm_params: *mut LLVMValueRef = Vec::with_capacity(param_tys.len()).as_mut_ptr();
+            LLVMGetParams(llvm_fn, llvm_params);
+            let param_value_vec: Vec<LLVMValueRef> =
+                slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
+
+            for (idx, param) in param_value_vec.iter().enumerate() {
+                // If the param is a pointer, we dont want to
+                // build an alloca/store for it.
+                if LLVMGetTypeKind(LLVMTypeOf(*param)) == LLVMTypeKind::LLVMPointerTypeKind {
+                    continue;
+                }
+
+                let name = self.c_str(&fn_params[idx].tkn.get_name());
+                LLVMSetValueName(*param, name);
+
+                let alloca_instr = self.build_entry_bb_alloca(
+                    llvm_fn,
+                    fn_params[idx].clone(),
+                    &fn_params[idx].tkn.get_name(),
+                );
+
+                LLVMBuildStore(self.builder, *param, alloca_instr);
+                self.valtab
+                    .store(&fn_params[idx].tkn.get_name(), alloca_instr);
+            }
+
+            // Store the function symbol inside the value table before parsing the
+            // body, so we can accept recursive calls.
+            self.valtab.store(&ident_tkn.get_name(), llvm_fn);
+
+            // TODO: this is hard to read -_-
+            // Iterate the function body and generate ir for the statements within. We also
+            // generate the IR for the return expression here.
+            match *fn_body.clone() {
+                Ast::BlckStmt {
+                    meta: _,
+                    stmts,
+                    sc: _,
+                } => self.fn_body(&stmts),
+                _ => (),
+            }
+
+            // Run the function pass through our manager
+            // TODO: this is commented out because of compile times
+            //self.fpm.run(llvm_fn);
+
+            // Close the function level scope, which will pop off any params and
+            // variable declared here (we don't need these anymore, since we aren't
+            // going to be making another pass over them later). Add the llvm function
+            // to the value table so we can look it up later for a call.
+            self.valtab.close_sc();
+            self.valtab.store(&ident_tkn.get_name(), llvm_fn);
+        }
+
+        Vec::new()
+    }
+
+    /// Generate LLVM IR for a function body. This iterates all function statements
+    /// and calls gen_stmts() for them. Also builds return statements when it
+    /// finds them. Returns nothing as the actual generation is handled by gen_stmt().
+    fn fn_body(&mut self, stmts: &Vec<Ast>) {
+        for stmt in stmts {
+            // We have the return type already, but we don't know
+            // if the function returns an expression we need to generate as well.
+            // We find the return statement and either return a null ptr (for void)
+            // or generate IR for a return expression.
+            match *stmt {
+                Ast::RetStmt {
+                    meta: _,
+                    ref ret_expr,
+                }
+                    if ret_expr.is_none() =>
+                unsafe {
+                    LLVMBuildRet(self.builder, ptr::null_mut());
+                }
+                Ast::RetStmt {
+                    meta: _,
+                    ref ret_expr,
+                }
+                    if ret_expr.is_some() =>
+                {
+                    let llvm_val = self.gen_expr(&ret_expr.clone().unwrap());
+                    unsafe {
+                        LLVMBuildRet(self.builder, llvm_val.unwrap());
+                    }
+                }
+                _ => {
+                    self.gen_stmt(&stmt);
+                }
+            }
+        }
+    }
+
     /// Builds an alloca instruction at the beginning of a function so we can store
     /// parameters on the function stack. This uses a new builder so the current builder
     /// doesn't move positions. We would have to move it back to its original spot, which
@@ -1115,7 +1144,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 if class_to_ptr {
                     return self.ptr_ty(self.classtab.retrieve(&name).unwrap());
                 }
-                
+
                 self.classtab.retrieve(&name).unwrap()
             }
             KolgaTy::Symbolic(_) => panic!("Found a type in codegen that wasn't inferred!"),
@@ -1124,7 +1153,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
 
     /// Converts a vector of TyRecords into a vector of LLVMTypeRefs. If class_to_ptr is set
     /// to true, class type params are converted to pointers to the class.
-    fn llvm_tys_from_ty_rec_arr(&self, ty_recs: &Vec<TyRecord>, class_to_ptr: bool) -> Vec<LLVMTypeRef> {
+    fn llvm_tys_from_ty_rec_arr(
+        &self,
+        ty_recs: &Vec<TyRecord>,
+        class_to_ptr: bool,
+    ) -> Vec<LLVMTypeRef> {
         let mut llvm_tys = Vec::new();
         for ty_rec in ty_recs {
             llvm_tys.push(self.llvm_ty_from_ty_rec(&ty_rec, class_to_ptr));
