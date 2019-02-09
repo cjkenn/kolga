@@ -236,7 +236,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// to terminate on.
     fn gen_expr(&mut self, expr: &Ast) -> Option<LLVMValueRef> {
         match expr {
-            Ast::PrimaryExpr { meta: _, ty_rec } => self.gen_primary_expr(&ty_rec),
+            Ast::PrimaryExpr { meta: _, ty_rec } => self.primary_expr(&ty_rec),
             Ast::BinaryExpr {
                 meta: _,
                 ty_rec: _,
@@ -336,30 +336,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 prop_name,
                 idx,
                 ..
-            } => {
-                let name = ident_tkn.get_name();
-                let class = self.valtab.retrieve(&name);
-                if class.is_none() {
-                    self.error(GenErrTy::InvalidClass(name));
-                    return None;
-                }
-
-                let classptr = class.unwrap();
-                unsafe {
-                    let gep_val = LLVMBuildStructGEP(
-                        self.builder,
-                        classptr,
-                        *idx as u32,
-                        self.c_str(prop_name),
-                    );
-
-                    // GEP returns the address of the prop we want to access. We can load it
-                    // into a variable here so that we return a non-pointer type.
-                    // TODO: can this be set as a global variable?
-                    let ld_val = LLVMBuildLoad(self.builder, gep_val, self.c_str(prop_name));
-                    Some(ld_val)
-                }
-            }
+            } => self.class_prop_expr(ident_tkn, prop_name, *idx, None),
             Ast::ClassPropSetExpr {
                 meta: _,
                 ty_rec: _,
@@ -368,29 +345,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 idx,
                 owner_class: _,
                 assign_val,
-            } => {
-                let name = ident_tkn.get_name();
-                let class = self.valtab.retrieve(&name);
-                if class.is_none() {
-                    self.error(GenErrTy::InvalidClass(name));
-                    return None;
-                }
-
-                let classptr = class.unwrap();
-                unsafe {
-                    let gep_val = LLVMBuildStructGEP(
-                        self.builder,
-                        classptr,
-                        *idx as u32,
-                        self.c_str(prop_name),
-                    );
-
-                    let assign = self.gen_expr(&assign_val).unwrap();
-                    let store_val = LLVMBuildStore(self.builder, assign, gep_val);
-
-                    Some(store_val)
-                }
-            }
+            } => self.class_prop_expr(ident_tkn, prop_name, *idx, Some(assign_val)),
             _ => unimplemented!("Ast type {:#?} is not implemented for codegen", expr),
         }
     }
@@ -398,7 +353,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Generate LLVM IR for a primary expression. This returns an Option because
     /// it's possible that we cant retrieve an identifier from the value table (if it's
     /// undefined).
-    fn gen_primary_expr(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
+    fn primary_expr(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
             TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.double_ty(), *val)) },
             TknTy::Str(ref lit) => unsafe {
@@ -1186,6 +1141,42 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 fn_args.len() as u32,
                 self.c_str(""),
             ))
+        }
+    }
+
+    fn class_prop_expr(
+        &mut self,
+        ident_tkn: &Token,
+        prop_name: &str,
+        idx: usize,
+        assign_val: Option<&Box<Ast>>,
+    ) -> Option<LLVMValueRef> {
+        let name = ident_tkn.get_name();
+        let class = self.valtab.retrieve(&name);
+        if class.is_none() {
+            self.error(GenErrTy::InvalidClass(name));
+            return None;
+        }
+
+        let classptr = class.unwrap();
+        let c_name = self.c_str(prop_name);
+        unsafe {
+            let gep_val = LLVMBuildStructGEP(self.builder, classptr, idx as u32, c_name);
+
+            match assign_val {
+                Some(ref ast) => {
+                    let assign = self.gen_expr(ast).unwrap();
+                    let store_val = LLVMBuildStore(self.builder, assign, gep_val);
+                    Some(store_val)
+                }
+                None => {
+                    // GEP returns the address of the prop we want to access. We can load it
+                    // into a variable here so that we return a non-pointer type.
+                    // TODO: can this be set as a global variable?
+                    let ld_val = LLVMBuildLoad(self.builder, gep_val, c_name);
+                    Some(ld_val)
+                }
+            }
         }
     }
 
