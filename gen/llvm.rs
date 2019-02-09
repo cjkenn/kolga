@@ -40,8 +40,9 @@ pub struct CodeGenerator<'t, 'v> {
     strings: Vec<CString>,
 
     /// Vector of potential errors to return.
-    pub errors: Vec<GenErr>, // /// LLVM Function pass manager, for some optimization passes after function codegen.
-                             //fpm: FPM
+    pub errors: Vec<GenErr>,
+    // LLVM Function pass manager, for some optimization passes after function codegen.
+    //fpm: FPM
 }
 
 /// We implement Drop for the CodeGenerator to ensure that our LLVM structs are safely
@@ -185,75 +186,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 is_imm: _,
                 is_global,
                 value,
-            } => {
-                match is_global {
-                    true => {
-                        let c_name = self.c_str(&ident_tkn.get_name());
-                        let var_ident = ident_tkn.get_name();
-
-                        match *value.clone() {
-                            Ast::ClassConstrExpr {
-                                meta: _,
-                                ty_rec: _,
-                                class_name,
-                                ..
-                            } => {
-                                let llvm_ty = self.classtab.retrieve(&class_name);
-                                if llvm_ty.is_none() {
-                                    self.error(GenErrTy::InvalidClass(ident_tkn.get_name()));
-                                    return Vec::new();
-                                }
-                                unsafe {
-                                    let global =
-                                        LLVMAddGlobal(self.module, llvm_ty.unwrap(), c_name);
-                                    self.valtab.store(&var_ident, global);
-                                    vec![global]
-                                }
-                            }
-                            _ => unsafe {
-                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
-                                let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
-
-                                let val = self.gen_expr(&value.clone()).unwrap();
-                                // TODO: this doesn't work for class prop accesses, because it
-                                // returns a load instruction
-                                LLVMSetInitializer(global, val);
-                                self.valtab.store(&ident_tkn.get_name(), global);
-                                vec![global]
-                            },
-                        }
-                    }
-                    false => {
-                        unsafe {
-                            let insert_bb = LLVMGetInsertBlock(self.builder);
-                            let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
-                            let alloca_instr = self.build_entry_bb_alloca(
-                                llvm_func,
-                                ty_rec.clone(),
-                                &ident_tkn.get_name(),
-                            );
-
-                            let raw_val = value.clone();
-                            // We don't need to store anything for class types, since they
-                            // are already built into structs in the class declaration. The class
-                            // here should already be a struct type (if we tried to create a class
-                            // before declaring it we would not pass parsing).
-                            match *raw_val {
-                                Ast::ClassConstrExpr { .. } => {
-                                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
-                                    vec![alloca_instr]
-                                }
-                                _ => {
-                                    let val = self.gen_expr(&raw_val).unwrap();
-                                    LLVMBuildStore(self.builder, val, alloca_instr);
-                                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
-                                    vec![alloca_instr]
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            } => self.var_assign_expr(ty_rec, ident_tkn, *is_global, value),
             Ast::VarDeclExpr {
                 meta: _,
                 ty_rec,
@@ -261,6 +194,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 is_imm: _,
                 is_global,
             } => match is_global {
+                // Similar to var assignments, we generate different IR based on
+                // whether the var is global or not. For global declarations, we
+                // add a global without setting the initializer. For locals, we
+                // build an alloca/store pair, but with no expression value
+                // to store.
                 true => unsafe {
                     let c_name = self.c_str(&ident_tkn.get_name());
                     let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
@@ -338,7 +276,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                                 fn_params,
                                 ret_ty,
                                 fn_body,
-                                sc,
+                                ..
                             } => {
                                 // We need to add the class declaration type to the list of
                                 // params so we obtain a pointer to it inside the method body.
@@ -629,7 +567,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 ident_tkn,
                 prop_name,
                 idx,
-                owner_class,
+                owner_class: _,
                 assign_val,
             } => {
                 let name = ident_tkn.get_name();
@@ -1046,7 +984,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             // body, so we can accept recursive calls.
             self.valtab.store(&ident_tkn.get_name(), llvm_fn);
 
-            // TODO: this is hard to read -_-
             // Iterate the function body and generate ir for the statements within. We also
             // generate the IR for the return expression here.
             match *fn_body.clone() {
@@ -1055,6 +992,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     stmts,
                     sc: _,
                 } => self.fn_body(&stmts),
+                // Skip anything that isn't a block statement (there shouldn't be
+                // anything that isn't or we'd have a parse error).
                 _ => (),
             }
 
@@ -1104,6 +1043,114 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
                 _ => {
                     self.gen_stmt(&stmt);
+                }
+            }
+        }
+    }
+
+    /// Generate LLVM IR for a variable assign expression block. Also calls
+    /// gen_expr() to recursively generate IR for inner expressions.
+    /// This returns a vector of LLVMValue's based on what the contained expressions evaluate to.
+    fn var_assign_expr(
+        &mut self,
+        ty_rec: &TyRecord,
+        ident_tkn: &Token,
+        is_global: bool,
+        value: &Box<Ast>,
+    ) -> Vec<LLVMValueRef> {
+        // We match on the is_global flag because we need to treat global vars
+        // differently from non-globals.
+        //
+        // For global variable assignments, we want to register a new global using LLVMAddGlobal,
+        // and then set the initializer.
+        // For non-globals, we find the nearest insert block and build a store instruction
+        // to hold the variable in that block.
+        match is_global {
+            true => self.global_var_assign(ty_rec, ident_tkn, value),
+            false => self.local_var_assign(ty_rec, ident_tkn, value),
+        }
+    }
+
+    /// Generate LLVM IR for global variable assignments. Returns a vector of LLVMValueRefs,
+    /// which are the values potentially generated by expressions within the assignment.
+    fn global_var_assign(
+        &mut self,
+        ty_rec: &TyRecord,
+        ident_tkn: &Token,
+        value: &Box<Ast>,
+    ) -> Vec<LLVMValueRef> {
+        let c_name = self.c_str(&ident_tkn.get_name());
+        let var_ident = ident_tkn.get_name();
+
+        // For global class constructors, we add the global without an initializer.
+        // We also have to find the class from the class table to ensure we aren't
+        // trying to create a class object that isn't defined.
+        match *value.clone() {
+            Ast::ClassConstrExpr {
+                meta: _,
+                ty_rec: _,
+                class_name,
+                ..
+            } => {
+                let llvm_ty = self.classtab.retrieve(&class_name);
+                if llvm_ty.is_none() {
+                    self.error(GenErrTy::InvalidClass(ident_tkn.get_name()));
+                    return Vec::new();
+                }
+                unsafe {
+                    let global = LLVMAddGlobal(self.module, llvm_ty.unwrap(), c_name);
+                    self.valtab.store(&var_ident, global);
+                    vec![global]
+                }
+            }
+            _ => unsafe {
+                // For other variabel types, create a global and set the initializer.
+                // We are certain to have an initializer here, because we're parsing
+                // a var assign, and not a var decl.
+                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
+                let global = LLVMAddGlobal(self.module, llvm_ty, c_name);
+
+                let val = self.gen_expr(&value.clone()).unwrap();
+                // TODO: this doesn't work for class prop accesses, because it
+                // returns a load instruction
+                LLVMSetInitializer(global, val);
+                self.valtab.store(&ident_tkn.get_name(), global);
+                vec![global]
+            },
+        }
+    }
+
+    /// Generate LLVM IR for local variable assignments. Alloca/store
+    /// instructions are built for local vars, with the exception of classes.
+    /// Returns a vector of LLVMValueRefs, which are the values potentially
+    /// generated by expressions within the assignment.
+    fn local_var_assign(
+        &mut self,
+        ty_rec: &TyRecord,
+        ident_tkn: &Token,
+        value: &Box<Ast>,
+    ) -> Vec<LLVMValueRef> {
+        unsafe {
+            let insert_bb = LLVMGetInsertBlock(self.builder);
+            let llvm_func = LLVMGetBasicBlockParent(insert_bb);
+            let alloca_instr =
+                self.build_entry_bb_alloca(llvm_func, ty_rec.clone(), &ident_tkn.get_name());
+
+            let raw_val = value.clone();
+            // We don't need to store anything for class types, since they
+            // are already built into structs in the class declaration. The class
+            // here should already be a struct type (if we tried to create a class
+            // before declaring it we would not pass parsing).
+            match *value.clone() {
+                Ast::ClassConstrExpr { .. } => {
+                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                    vec![alloca_instr]
+                }
+                _ => {
+                    let val = self.gen_expr(&raw_val).unwrap();
+                    LLVMBuildStore(self.builder, val, alloca_instr);
+                    self.valtab.store(&ident_tkn.get_name(), alloca_instr);
+                    vec![alloca_instr]
                 }
             }
         }
