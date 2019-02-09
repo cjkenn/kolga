@@ -236,7 +236,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// to terminate on.
     fn gen_expr(&mut self, expr: &Ast) -> Option<LLVMValueRef> {
         match expr {
-            Ast::PrimaryExpr { meta: _, ty_rec } => self.gen_primary(&ty_rec),
+            Ast::PrimaryExpr { meta: _, ty_rec } => self.gen_primary_expr(&ty_rec),
             Ast::BinaryExpr {
                 meta: _,
                 ty_rec: _,
@@ -272,78 +272,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 ty_rec: _,
                 op_tkn,
                 rhs,
-            } => {
-                let mb_rhs_llvm_val = self.gen_expr(&rhs);
-                if mb_rhs_llvm_val.is_none() {
-                    return None;
-                }
-
-                let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
-                match op_tkn.ty {
-                    TknTy::Minus => unsafe {
-                        Some(LLVMBuildFNeg(
-                            self.builder,
-                            rhs_llvm_val,
-                            self.c_str("tmpneg"),
-                        ))
-                    },
-                    TknTy::Bang => {
-                        unsafe {
-                            // There isn't any logical not instruction, so we use XOR to
-                            // flip the value (which is of type i8 now) from 0/1 to represent
-                            // the opposite boolean value.
-                            let xor_rhs = LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE);
-                            Some(LLVMBuildXor(
-                                self.builder,
-                                rhs_llvm_val,
-                                xor_rhs,
-                                self.c_str("tmpnot"),
-                            ))
-                        }
-                    }
-                    _ => None,
-                }
-            }
+            } => self.unary_expr(op_tkn, rhs),
             Ast::FnCallExpr {
                 meta: _,
                 ty_rec: _,
                 fn_tkn,
                 fn_params,
-            } => {
-                // Check if the function was defined in the IR. We should always have
-                // the function defined in the IR though, since we wouldn't pass the parsing
-                // phase if we tried to call an undefined function name.
-                let fn_name = fn_tkn.clone().get_name();
-                let llvm_fn = self.valtab.retrieve(&fn_name);
-                if llvm_fn.is_none() {
-                    self.error(GenErrTy::InvalidFn(fn_name));
-                    return None;
-                }
-
-                // Recursively generate LLVMValueRef's for the function params, which
-                // might be non-primary expressions themselves. We store these in a vector,
-                // so we can pass it to the LLVM IR function call instruction.
-                let mut param_tys: Vec<LLVMValueRef> = Vec::new();
-                for param in fn_params {
-                    let llvm_val = self.gen_expr(param);
-                    if llvm_val.is_none() {
-                        self.error(GenErrTy::InvalidFnParam);
-                        return None;
-                    }
-
-                    param_tys.push(llvm_val.unwrap());
-                }
-
-                unsafe {
-                    Some(LLVMBuildCall(
-                        self.builder,
-                        llvm_fn.unwrap(),
-                        param_tys.as_mut_ptr(),
-                        param_tys.len() as u32,
-                        self.c_str(""),
-                    ))
-                }
-            }
+            } => self.fn_call_expr(fn_tkn, fn_params),
             Ast::ClassFnCallExpr {
                 meta: _,
                 ty_rec: _,
@@ -352,46 +287,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 fn_tkn,
                 fn_params,
                 ..
-            } => {
-                // The class function is stored under a different name in the
-                // value table, with the class name prepended.
-                let fn_name = fn_tkn.clone().get_name();
-                let class_fn_name = format!("{}.{}", class_name, fn_name);
-
-                let llvm_fn = self.valtab.retrieve(&class_fn_name);
-                if llvm_fn.is_none() {
-                    self.error(GenErrTy::InvalidFn(fn_name));
-                    return None;
-                }
-
-                // We need to insert a pointer to the class instance as the first param in order to
-                // call the class function. We get that pointer from the value table (the pointer
-                // is the actual instance of the class that has been created).
-                let mut fn_args: Vec<LLVMValueRef> = Vec::new();
-                let class_instance = self.valtab.retrieve(&class_tkn.get_name());
-                fn_args.push(class_instance.unwrap());
-
-                for param in fn_params {
-                    let llvm_val = self.gen_expr(param);
-                    if llvm_val.is_none() {
-                        self.error(GenErrTy::InvalidFnParam);
-                        return None;
-                    }
-
-                    fn_args.push(llvm_val.unwrap());
-                }
-
-                // TODO: call here isnt correct due to the type of class params
-                unsafe {
-                    Some(LLVMBuildCall(
-                        self.builder,
-                        llvm_fn.unwrap(),
-                        fn_args.as_mut_ptr(),
-                        fn_args.len() as u32,
-                        self.c_str(""),
-                    ))
-                }
-            }
+            } => self.class_fn_call_expr(class_tkn, class_name, fn_tkn, fn_params),
             Ast::VarAssignExpr {
                 meta: _,
                 ty_rec: _,
@@ -420,22 +316,19 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 ty_rec: _,
                 class_name,
                 ..
-            } => {
-                let llvm_struct_ty = self.classtab.retrieve(&class_name);
-                match llvm_struct_ty {
-                    Some(ty_ref) => {
-                        let c_name = self.c_str(&class_name);
-                        unsafe {
-                            let llvm_val = LLVMBuildAlloca(self.builder, ty_ref, c_name);
-                            return Some(llvm_val);
-                        }
-                    }
-                    None => {
-                        self.error(GenErrTy::InvalidClass(class_name.clone()));
-                        None
+            } => match self.classtab.retrieve(&class_name) {
+                Some(ty_ref) => {
+                    let c_name = self.c_str(&class_name);
+                    unsafe {
+                        let llvm_val = LLVMBuildAlloca(self.builder, ty_ref, c_name);
+                        return Some(llvm_val);
                     }
                 }
-            }
+                None => {
+                    self.error(GenErrTy::InvalidClass(class_name.clone()));
+                    None
+                }
+            },
             Ast::ClassPropAccessExpr {
                 meta: _,
                 ty_rec: _,
@@ -505,7 +398,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Generate LLVM IR for a primary expression. This returns an Option because
     /// it's possible that we cant retrieve an identifier from the value table (if it's
     /// undefined).
-    fn gen_primary(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
+    fn gen_primary_expr(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
             TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.double_ty(), *val)) },
             TknTy::Str(ref lit) => unsafe {
@@ -1164,6 +1057,136 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         }
 
         Vec::new()
+    }
+
+    /// Generate LLVM IR for unary expressions. Returns the value generated or None
+    /// if there is no value or on error.
+    fn unary_expr(&mut self, op_tkn: &Token, rhs: &Box<Ast>) -> Option<LLVMValueRef> {
+        // Recursively generate LLVM value for the rhs of the expression. If there
+        // is an error when generating, return None.
+        let mb_rhs_llvm_val = self.gen_expr(&rhs);
+        if mb_rhs_llvm_val.is_none() {
+            return None;
+        }
+
+        let rhs_llvm_val = mb_rhs_llvm_val.unwrap();
+
+        // Build the correct instruction by matching on the unary operator. For unary
+        // minus, we build a neg instruction, and for unary logical negation, we
+        // use and xor to flip the boolean value.
+        match op_tkn.ty {
+            TknTy::Minus => unsafe {
+                Some(LLVMBuildFNeg(
+                    self.builder,
+                    rhs_llvm_val,
+                    self.c_str("tmpneg"),
+                ))
+            },
+            TknTy::Bang => {
+                unsafe {
+                    // There isn't any logical not instruction, so we use XOR to
+                    // flip the value (which is of type i8 now) from 0/1 to represent
+                    // the opposite boolean value.
+                    let xor_rhs = LLVMConstInt(self.i8_ty(), 1, LLVM_FALSE);
+                    Some(LLVMBuildXor(
+                        self.builder,
+                        rhs_llvm_val,
+                        xor_rhs,
+                        self.c_str("tmpnot"),
+                    ))
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Generate LLVM IR for function calls. Returns the value generated or None
+    /// if there is no value or on error.
+    fn fn_call_expr(&mut self, fn_tkn: &Token, fn_params: &Vec<Ast>) -> Option<LLVMValueRef> {
+        // Check if the function was defined in the IR. We should always have
+        // the function defined in the IR though, since we wouldn't pass the parsing
+        // phase if we tried to call an undefined function name.
+        let fn_name = fn_tkn.clone().get_name();
+        let llvm_fn = self.valtab.retrieve(&fn_name);
+        if llvm_fn.is_none() {
+            self.error(GenErrTy::InvalidFn(fn_name));
+            return None;
+        }
+
+        // Recursively generate LLVMValueRef's for the function params, which
+        // might be non-primary expressions themselves. We store these in a vector,
+        // so we can pass it to the LLVM IR function call instruction.
+        let mut param_tys: Vec<LLVMValueRef> = Vec::new();
+        for param in fn_params {
+            let llvm_val = self.gen_expr(param);
+            if llvm_val.is_none() {
+                self.error(GenErrTy::InvalidFnParam);
+                return None;
+            }
+
+            param_tys.push(llvm_val.unwrap());
+        }
+
+        unsafe {
+            Some(LLVMBuildCall(
+                self.builder,
+                llvm_fn.unwrap(),
+                param_tys.as_mut_ptr(),
+                param_tys.len() as u32,
+                self.c_str(""),
+            ))
+        }
+    }
+
+    /// Generate LLVM IR for class function calls. This is handeled separately from
+    /// function calls because we need to look up additional information from the class
+    /// (class variables, etc.) that are not present in the FnCall AST.
+    fn class_fn_call_expr(
+        &mut self,
+        class_tkn: &Token,
+        class_name: &str,
+        fn_tkn: &Token,
+        fn_params: &Vec<Ast>,
+    ) -> Option<LLVMValueRef> {
+        // The class function is stored under a different name in the
+        // value table, with the class name prepended.
+        let fn_name = fn_tkn.get_name();
+        let class_fn_name = format!("{}.{}", class_name, fn_name);
+        let llvm_fn = self.valtab.retrieve(&class_fn_name);
+
+        if llvm_fn.is_none() {
+            self.error(GenErrTy::InvalidFn(fn_name));
+            return None;
+        }
+
+        // We need to insert a pointer to the class instance as the first param in order to
+        // call the class function. We get that pointer from the value table (the pointer
+        // is the actual instance of the class that has been created).
+        let mut fn_args: Vec<LLVMValueRef> = Vec::new();
+        let class_instance = self.valtab.retrieve(&class_tkn.get_name());
+        fn_args.push(class_instance.unwrap());
+
+        // Recursively generate any LLVMValue's from the function params, as they
+        // may be expressions themselves.
+        for param in fn_params {
+            let llvm_val = self.gen_expr(param);
+            if llvm_val.is_none() {
+                self.error(GenErrTy::InvalidFnParam);
+                return None;
+            }
+
+            fn_args.push(llvm_val.unwrap());
+        }
+
+        unsafe {
+            Some(LLVMBuildCall(
+                self.builder,
+                llvm_fn.unwrap(),
+                fn_args.as_mut_ptr(),
+                fn_args.len() as u32,
+                self.c_str(""),
+            ))
+        }
     }
 
     /// Builds an alloca instruction at the beginning of a function so we can store
