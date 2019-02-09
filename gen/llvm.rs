@@ -225,101 +225,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 methods,
                 props,
                 ..
-            } => {
-                unsafe {
-                    let mut prop_tys = Vec::new();
-                    for pr in props {
-                        // Here we just want to lay out the props,
-                        // we don't actually want to allocate them until we
-                        // create an object of this class.
-                        // So, we want the llvm type of the props, but we
-                        // don't want to generate any code for them yet.
-                        match &pr.clone() {
-                            Ast::VarDeclExpr {
-                                meta: _, ty_rec, ..
-                            } => {
-                                let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
-                                prop_tys.push(llvm_ty);
-                            }
-                            _ => (),
-                        }
-                    }
-
-                    let class_name = ident_tkn.get_name();
-                    let llvm_struct = LLVMStructCreateNamed(self.context, self.c_str(&class_name));
-                    LLVMStructSetBody(
-                        llvm_struct,
-                        prop_tys.as_mut_ptr(),
-                        prop_tys.len() as u32,
-                        LLVM_FALSE,
-                    );
-
-                    // Store the struct type in a special class table, so we can look it up
-                    // later when we want to allocate one. This is not the same as a the value table,
-                    // as it doesn't represent an allocated value, just the type info for the class.
-                    // Note: This must be stored before we process the class method declarations,
-                    // because they need to look up the class name from the symbol table in order
-                    // to insert the class as a 'self' param.
-                    self.classtab.store(&class_name, llvm_struct);
-
-                    // Methods are generated like any other method, but with a pointer to
-                    // the enclosing class as the first parameter ('self'). This pointer can be
-                    // used to access class variables and other class methods
-                    // These don't "belong" to the class in the llvm ir, but just
-                    // live anywhere in the output
-                    let class_tkn = ident_tkn.clone();
-                    for mtod in methods {
-                        match mtod.clone() {
-                            Ast::FnDeclStmt {
-                                meta,
-                                ident_tkn,
-                                fn_params,
-                                ret_ty,
-                                fn_body,
-                                ..
-                            } => {
-                                // We need to add the class declaration type to the list of
-                                // params so we obtain a pointer to it inside the method body.
-                                let fake_class_param = TyRecord {
-                                    name: String::new(), // hack
-                                    ty: KolgaTy::Class(class_name.clone()),
-                                    tkn: class_tkn.clone(),
-                                };
-
-                                let mut new_params = fn_params.clone();
-                                new_params.insert(0, fake_class_param);
-
-                                // We change the name of the function by prepending the
-                                // class name so we avoid storing duplicates in the value table.
-                                // This is kind of a hack, but in a normal program you can't create
-                                // a function name with a period in it, because it would probably
-                                // be parsed as a property anyway.
-                                let curr_name = ident_tkn.get_name();
-                                let new_name = format!("{}.{}", class_tkn.get_name(), curr_name);
-                                let new_tkn = Token::new(
-                                    TknTy::Ident(new_name),
-                                    ident_tkn.line,
-                                    ident_tkn.pos,
-                                );
-
-                                let new_method = Ast::FnDeclStmt {
-                                    meta: meta,
-                                    ident_tkn: new_tkn,
-                                    fn_params: new_params,
-                                    ret_ty: ret_ty.clone(),
-                                    fn_body: fn_body.clone(),
-                                    sc: 0,
-                                };
-
-                                self.gen_stmt(&new_method);
-                            }
-                            _ => (),
-                        }
-                    }
-                }
-
-                Vec::new()
-            }
+            } => self.class_decl_stmt(ident_tkn, methods, props),
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt),
         }
     }
@@ -1154,6 +1060,108 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
             }
         }
+    }
+
+    /// Generate IR for a class declaration. Classes are mapped to Structs in LLVM, so this
+    /// creates a struct with each class property as a member of the struct. In order to
+    /// generate IR for class methods, we manually add a new param to each method in the
+    /// class declaration. This param is a pointer to the class contructor, so that class
+    /// props can be accessed from the method.
+    fn class_decl_stmt(
+        &mut self,
+        ident_tkn: &Token,
+        methods: &Vec<Ast>,
+        props: &Vec<Ast>,
+    ) -> Vec<LLVMValueRef> {
+        let mut prop_tys = Vec::new();
+        for pr in props {
+            // Here we just want to lay out the props,
+            // we don't actually want to allocate them until we
+            // create an object of this class.
+            // So, we want the llvm type of the props, but we
+            // don't want to generate any code for them yet.
+            match &pr {
+                Ast::VarDeclExpr {
+                    meta: _, ty_rec, ..
+                } => {
+                    let llvm_ty = self.llvm_ty_from_ty_rec(ty_rec, false);
+                    prop_tys.push(llvm_ty);
+                }
+                _ => (),
+            }
+        }
+
+        let class_name = ident_tkn.get_name();
+        unsafe {
+            let llvm_struct = LLVMStructCreateNamed(self.context, self.c_str(&class_name));
+            LLVMStructSetBody(
+                llvm_struct,
+                prop_tys.as_mut_ptr(),
+                prop_tys.len() as u32,
+                LLVM_FALSE,
+            );
+
+            // Store the struct type in a special class table, so we can look it up
+            // later when we want to allocate one. This is not the same as a the value table,
+            // as it doesn't represent an allocated value, just the type info for the class.
+            // Note: This must be stored before we process the class method declarations,
+            // because they need to look up the class name from the symbol table in order
+            // to insert the class as a 'self' param.
+            self.classtab.store(&class_name, llvm_struct);
+        }
+
+        // Methods are generated like any other method, but with a pointer to
+        // the enclosing class as the first parameter ('self'). This pointer can be
+        // used to access class variables and other class methods
+        // These don't "belong" to the class in the llvm ir, but just
+        // live anywhere in the output
+        let class_tkn = ident_tkn.clone();
+        for mtod in methods {
+            match mtod.clone() {
+                Ast::FnDeclStmt {
+                    meta,
+                    ident_tkn,
+                    fn_params,
+                    ret_ty,
+                    fn_body,
+                    ..
+                } => {
+                    // We need to add the class declaration type to the list of
+                    // params so we obtain a pointer to it inside the method body.
+                    let fake_class_param = TyRecord {
+                        name: String::new(), // hack
+                        ty: KolgaTy::Class(class_name.clone()),
+                        tkn: class_tkn.clone(),
+                    };
+
+                    let mut new_params = fn_params.clone();
+                    new_params.insert(0, fake_class_param);
+
+                    // We change the name of the function by prepending the
+                    // class name so we avoid storing duplicates in the value table.
+                    // This is kind of a hack, but in a normal program you can't create
+                    // a function name with a period in it, because it would probably
+                    // be parsed as a property anyway.
+                    let curr_name = ident_tkn.get_name();
+                    let new_name = format!("{}.{}", class_tkn.get_name(), curr_name);
+                    let new_tkn = Token::new(TknTy::Ident(new_name), ident_tkn.line, ident_tkn.pos);
+
+                    let new_method = Ast::FnDeclStmt {
+                        meta: meta,
+                        ident_tkn: new_tkn,
+                        fn_params: new_params,
+                        ret_ty: ret_ty.clone(),
+                        fn_body: fn_body.clone(),
+                        sc: 0,
+                    };
+
+                    self.gen_stmt(&new_method);
+                }
+                _ => (),
+            }
+        }
+
+        Vec::new()
     }
 
     /// Builds an alloca instruction at the beginning of a function so we can store
