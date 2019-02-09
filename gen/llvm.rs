@@ -1074,6 +1074,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         props: &Vec<Ast>,
     ) -> Vec<LLVMValueRef> {
         let mut prop_tys = Vec::new();
+
         for pr in props {
             // Here we just want to lay out the props,
             // we don't actually want to allocate them until we
@@ -1115,9 +1116,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         // used to access class variables and other class methods
         // These don't "belong" to the class in the llvm ir, but just
         // live anywhere in the output
-        let class_tkn = ident_tkn.clone();
+        let class_tkn = ident_tkn;
         for mtod in methods {
-            match mtod.clone() {
+            match &mtod {
                 Ast::FnDeclStmt {
                     meta,
                     ident_tkn,
@@ -1128,8 +1129,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 } => {
                     // We need to add the class declaration type to the list of
                     // params so we obtain a pointer to it inside the method body.
+                    // The name isn't important here, as long the ty value is correct.
                     let fake_class_param = TyRecord {
-                        name: String::new(), // hack
+                        name: String::new(),
                         ty: KolgaTy::Class(class_name.clone()),
                         tkn: class_tkn.clone(),
                     };
@@ -1147,7 +1149,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let new_tkn = Token::new(TknTy::Ident(new_name), ident_tkn.line, ident_tkn.pos);
 
                     let new_method = Ast::FnDeclStmt {
-                        meta: meta,
+                        meta: meta.clone(),
                         ident_tkn: new_tkn,
                         fn_params: new_params,
                         ret_ty: ret_ty.clone(),
