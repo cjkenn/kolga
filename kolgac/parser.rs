@@ -33,13 +33,13 @@ impl ParserResult {
     }
 }
 
-struct ParseContext {
-    pub class_ctx: Option<ClassContext>,
+struct ParseContext<'pc> {
+    pub clsctx: &'pc mut ClassContext,
 }
 
-impl ParseContext {
-    pub fn new() -> ParseContext {
-        ParseContext { class_ctx: None }
+impl<'pc> ParseContext<'pc> {
+    pub fn new(cctx: &'pc mut ClassContext) -> ParseContext<'pc> {
+        ParseContext { clsctx: cctx }
     }
 }
 
@@ -55,6 +55,11 @@ impl ClassContext {
             prop_map: pm,
             methods: mtods,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.prop_map.clear();
+        self.methods.clear();
     }
 }
 
@@ -105,10 +110,11 @@ impl<'l, 's> Parser<'l, 's> {
 
         // Create a new empty parse context, whose reference is passed to all
         // parsing functions
-        let mut pctx = ParseContext::new();
+        let mut cctx = ClassContext::new(HashMap::new(), Vec::new());
+        let mut pctx = ParseContext::new(&mut cctx);
 
         while self.currtkn.ty != TknTy::Eof {
-            match self.decl(&pctx) {
+            match self.decl(&mut pctx) {
                 Ok(a) => stmts.push(a),
                 Err(e) => {
                     found_err = true;
@@ -136,7 +142,7 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     /// Parses a declaration. In kolga we can declare variables, functions, and classes.
-    fn decl(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn decl(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         match self.currtkn.ty {
             TknTy::Let => self.var_decl(pctx),
             TknTy::Fn => self.fn_decl(pctx),
@@ -146,7 +152,7 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     /// Parses a variable declaration
-    fn var_decl(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn var_decl(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         self.expect(TknTy::Let)?;
 
         let is_imm = match self.currtkn.ty {
@@ -379,7 +385,7 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     /// Parses a function declaration.
-    fn fn_decl(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn fn_decl(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         self.expect(TknTy::Fn)?;
         let fn_ident_tkn = self.currtkn.clone();
         self.consume();
@@ -493,7 +499,7 @@ impl<'l, 's> Parser<'l, 's> {
     }
 
     /// Parses a class declaration
-    fn class_decl(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn class_decl(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         self.expect(TknTy::Class)?;
         let class_tkn = self.currtkn.clone();
         self.consume();
@@ -504,7 +510,7 @@ impl<'l, 's> Parser<'l, 's> {
         let mut methods = Vec::new();
         let mut props = Vec::new();
         let mut prop_map = HashMap::new();
-        let mut class_ctx = ClassContext::new(HashMap::new(), Vec::new());
+        pctx.clsctx.reset();
 
         let mut prop_ctr = 0;
         loop {
@@ -519,7 +525,7 @@ impl<'l, 's> Parser<'l, 's> {
                             ..
                         } => {
                             prop_map.insert(ident_tkn.get_name(), prop_ctr);
-                            class_ctx.prop_map.insert(ident_tkn.get_name(), prop_ctr);
+                            pctx.clsctx.prop_map.insert(ident_tkn.get_name(), prop_ctr);
                         }
                         Ast::VarAssignExpr { .. } => {
                             return Err(self.error(ParseErrTy::ClassPropAssign));
@@ -533,7 +539,7 @@ impl<'l, 's> Parser<'l, 's> {
                 }
                 TknTy::Fn => {
                     let result = self.fn_decl(pctx)?;
-                    class_ctx.methods.push(result.clone());
+                    pctx.clsctx.methods.push(result.clone());
                     methods.push(result);
                 }
                 TknTy::RightBrace => {
@@ -571,14 +577,16 @@ impl<'l, 's> Parser<'l, 's> {
             Some(ast.clone()),
             None,
         );
+
         self.symtab.store(&class_tkn.get_name(), sym);
+        pctx.clsctx.reset();
 
         Ok(ast)
     }
 
     /// Parses a statement. This function does not perform any scope management, which
     /// is delegated to each statement type.
-    fn stmt(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn stmt(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         match self.currtkn.ty {
             TknTy::If => self.if_stmt(pctx),
             TknTy::While => self.while_stmt(pctx),
@@ -591,7 +599,7 @@ impl<'l, 's> Parser<'l, 's> {
 
     /// Parses a block statement, beginning with a '{' token. This creates a new scope,
     /// parses any statements within the block, and closes the block scope at the end.
-    fn block_stmt(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn block_stmt(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         self.expect(TknTy::LeftBrace)?;
         let mut stmts = Vec::new();
         self.symtab.init_sc();
@@ -618,7 +626,7 @@ impl<'l, 's> Parser<'l, 's> {
 
     /// Parse an if statement, including else and elif blocks. These are stored in the
     /// IfStmt Ast type.
-    fn if_stmt(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn if_stmt(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let ast_line = self.currtkn.line;
         let ast_pos = self.currtkn.pos;
         self.expect(TknTy::If)?;
@@ -665,7 +673,7 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn while_stmt(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn while_stmt(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let ast_line = self.currtkn.line;
         let ast_pos = self.currtkn.pos;
         self.expect(TknTy::While)?;
@@ -681,7 +689,7 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn for_stmt(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn for_stmt(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let ast_line = self.currtkn.line;
         let ast_pos = self.currtkn.pos;
         self.expect(TknTy::For)?;
@@ -728,7 +736,7 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn ret_stmt(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn ret_stmt(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let ast_line = self.currtkn.line;
         let ast_pos = self.currtkn.pos;
         self.expect(TknTy::Return)?;
@@ -752,7 +760,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    fn expr_stmt(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn expr_stmt(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let ast_line = self.currtkn.line;
         let ast_pos = self.currtkn.pos;
 
@@ -765,11 +773,11 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         self.assign_expr(pctx)
     }
 
-    fn assign_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn assign_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let ast = self.logicor_expr(pctx)?;
 
         match self.currtkn.ty {
@@ -845,7 +853,7 @@ impl<'l, 's> Parser<'l, 's> {
         Ok(ast)
     }
 
-    fn logicor_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn logicor_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.logicand_expr(pctx)?;
 
         loop {
@@ -869,7 +877,7 @@ impl<'l, 's> Parser<'l, 's> {
         Ok(ast)
     }
 
-    fn logicand_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn logicand_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.eq_expr(pctx)?;
 
         loop {
@@ -893,7 +901,7 @@ impl<'l, 's> Parser<'l, 's> {
         Ok(ast)
     }
 
-    fn eq_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn eq_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.cmp_expr(pctx)?;
 
         loop {
@@ -917,7 +925,7 @@ impl<'l, 's> Parser<'l, 's> {
         Ok(ast)
     }
 
-    fn cmp_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn cmp_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.addsub_expr(pctx)?;
 
         loop {
@@ -941,7 +949,7 @@ impl<'l, 's> Parser<'l, 's> {
         Ok(ast)
     }
 
-    fn addsub_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn addsub_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.muldiv_expr(pctx)?;
         loop {
             match self.currtkn.ty {
@@ -964,7 +972,7 @@ impl<'l, 's> Parser<'l, 's> {
         Ok(ast)
     }
 
-    fn muldiv_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn muldiv_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.unary_expr(pctx)?;
         loop {
             match self.currtkn.ty {
@@ -987,7 +995,7 @@ impl<'l, 's> Parser<'l, 's> {
         Ok(ast)
     }
 
-    fn unary_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn unary_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         match self.currtkn.ty {
             TknTy::Bang | TknTy::Minus => {
                 let op = self.currtkn.clone();
@@ -1005,7 +1013,7 @@ impl<'l, 's> Parser<'l, 's> {
         }
     }
 
-    fn fncall_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn fncall_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.primary_expr(pctx)?;
         let ident_tkn = match ast.clone() {
             Ast::PrimaryExpr { meta: _, ty_rec } => Some(ty_rec.tkn),
@@ -1031,7 +1039,7 @@ impl<'l, 's> Parser<'l, 's> {
     /// Parses calling class methods or getting/setting class props.
     fn class_expr(
         &mut self,
-        pctx: &ParseContext,
+        pctx: &mut ParseContext,
         class_tkn: Option<Token>,
     ) -> Result<Ast, ParseErr> {
         // Consume period token
@@ -1184,7 +1192,7 @@ impl<'l, 's> Parser<'l, 's> {
     /// what is passed in is correct.
     fn fnparams_expr(
         &mut self,
-        pctx: &ParseContext,
+        pctx: &mut ParseContext,
         fn_tkn: Option<Token>,
         maybe_class_sym: Option<Rc<Sym>>,
     ) -> Result<Ast, ParseErr> {
@@ -1318,7 +1326,7 @@ impl<'l, 's> Parser<'l, 's> {
         })
     }
 
-    fn primary_expr(&mut self, pctx: &ParseContext) -> Result<Ast, ParseErr> {
+    fn primary_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         match self.currtkn.ty.clone() {
             TknTy::Str(_) | TknTy::Val(_) | TknTy::True | TknTy::False | TknTy::Null => {
                 let ast = Ok(Ast::PrimaryExpr {
