@@ -60,7 +60,7 @@ pub enum TknTy {
     And,
     Null,
     Void,
-    SelfKw,
+    SelfKw, // Self is a reserved word in rust
 
     Eof,
 }

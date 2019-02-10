@@ -33,6 +33,7 @@ impl ParserResult {
     }
 }
 
+#[derive(Debug)]
 struct ParseContext<'pc> {
     pub clsctx: &'pc mut ClassContext,
 }
@@ -43,7 +44,7 @@ impl<'pc> ParseContext<'pc> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ClassContext {
     pub prop_map: HashMap<String, usize>,
     pub methods: Vec<Ast>,
@@ -60,6 +61,10 @@ impl ClassContext {
     pub fn reset(&mut self) {
         self.prop_map.clear();
         self.methods.clear();
+    }
+
+    pub fn exists(&self, key: &str) -> bool {
+        self.prop_map.contains_key(key)
     }
 }
 
@@ -1345,22 +1350,21 @@ impl<'l, 's> Parser<'l, 's> {
                 }
 
                 let sym = mb_sym.unwrap();
+                let expr_in_cls = pctx.clsctx.exists(ident_name);
+
                 // If we have no assign value, but we are looking at a param
                 // or function decl sym, we can return the sym. But no assign value on
                 // any other type requires a check that we are assigning to it, otherwise
                 // we are trying to access an undefined variable.
                 // Fn is here to support recursive calls.
-                if sym.assign_val.is_none()
-                    && (sym.sym_ty != SymTy::Param && sym.sym_ty != SymTy::Fn)
-                {
+                let unassigned_err =
+                    (sym.sym_ty != SymTy::Param && sym.sym_ty != SymTy::Fn) && !expr_in_cls;
+
+                if sym.assign_val.is_none() && unassigned_err {
                     let next_tkn = self.lexer.peek_tkn();
                     // If the following token is '=', we don't need to report an error
                     // for unitialized var (we are initializing it here).
                     if next_tkn.ty != TknTy::Eq {
-                        // TODO: how to handle 'self' in var references here? we need to know
-                        // which class self refers to, so we can look up the decl and check if
-                        // the following var that appears after the period does exist.
-
                         let err = self.error(ParseErrTy::UnassignedVar(ident_name.to_string()));
                         self.consume();
                         return Err(err);
@@ -1387,6 +1391,12 @@ impl<'l, 's> Parser<'l, 's> {
                 let err = self.error(ParseErrTy::InvalidAssign(ty_str));
                 self.consume();
                 Err(err)
+            }
+            TknTy::SelfKw => {
+                self.consume();
+                self.expect(TknTy::Period)?;
+                let ast = self.primary_expr(pctx)?;
+                Ok(ast)
             }
             _ => {
                 let ty_str = self.currtkn.ty.to_string();
