@@ -70,6 +70,7 @@ impl Lexer {
             (String::from("and"), TknTy::And),
             (String::from("null"), TknTy::Null),
             (String::from("void"), TknTy::Void),
+            (String::from("self"), TknTy::SelfKw),
         ]
             .iter()
             .cloned()

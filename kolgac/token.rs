@@ -60,6 +60,7 @@ pub enum TknTy {
     And,
     Null,
     Void,
+    SelfKw,
 
     Eof,
 }
@@ -166,6 +167,7 @@ impl fmt::Debug for TknTy {
             TknTy::And => "and".to_string(),
             TknTy::Null => "null".to_string(),
             TknTy::Void => "void".to_string(),
+            TknTy::SelfKw => "self".to_string(),
             TknTy::Eof => "EOF".to_string(),
         };
 
@@ -228,6 +230,7 @@ impl fmt::Display for TknTy {
             TknTy::And => "and".to_string(),
             TknTy::Null => "null".to_string(),
             TknTy::Void => "void".to_string(),
+            TknTy::SelfKw => "self".to_string(),
             TknTy::Eof => "EOF".to_string(),
         };
 
