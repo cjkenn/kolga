@@ -25,6 +25,7 @@ impl TyMatch {
 
 /// Used to infer types for a given AST.
 pub struct TyInfer {
+    /// Represents a substitution from a variable name to a type
     subs: HashMap<String, KolgaTy>,
 }
 
@@ -46,7 +47,7 @@ impl TyInfer {
     ///    in the AST with the mgu's contained in the type mapping. After this pass,
     ///    our program should have no symbolic types remaining.
     ///
-    /// Returns an empty result, indication success. There is no result to return,
+    /// Returns an empty result, indicating success. There is no result to return,
     /// as we alter the AST in place in the last step of the function.
     pub fn infer(&mut self, ast: &mut Ast) -> Result<(), TypeErr> {
         match ast {
@@ -227,8 +228,18 @@ impl TyInfer {
                     None => (),
                 };
             }
-            Ast::ClassPropSetExpr { .. } => (),
-            Ast::ClassDeclStmt { .. }
+            Ast::ClassDeclStmt {
+                meta: _,
+                ty_rec: _,
+                ident_tkn: _,
+                ref mut methods,
+                ..
+            } => {
+                for mut mtod in methods {
+                    self.update_tys(&mut mtod);
+                }
+            }
+            Ast::ClassPropSetExpr { .. }
             | Ast::ClassConstrExpr { .. }
             | Ast::Prog { .. }
             | Ast::ClassPropAccessExpr { .. } => (),
@@ -579,12 +590,23 @@ impl TyInfer {
                 };
                 ty_eqs
             }
+            Ast::ClassDeclStmt {
+                meta: _,
+                ty_rec: _,
+                ident_tkn: _,
+                ref methods,
+                ..
+            } => {
+                for mtod in methods {
+                    ty_eqs.extend(self.gen_ty_eq(&mtod));
+                }
+                ty_eqs
+            }
             Ast::ClassPropAccessExpr { .. }
             | Ast::ClassPropSetExpr { .. }
             | Ast::ClassFnCallExpr { .. }
             | Ast::VarDeclExpr { .. }
-            | Ast::FnCallExpr { .. }
-            | Ast::ClassDeclStmt { .. } => ty_eqs,
+            | Ast::FnCallExpr { .. } => ty_eqs,
             _ => ty_eqs,
         }
     }
