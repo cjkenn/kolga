@@ -121,6 +121,7 @@ pub enum Ast {
     PrimaryExpr {
         meta: MetaAst,
         ty_rec: TyRecord,
+        is_self: bool,
     },
 
     FnDeclStmt {
@@ -208,7 +209,9 @@ impl Ast {
 
     pub fn get_ty_rec(&self) -> Option<TyRecord> {
         match self {
-            Ast::PrimaryExpr { meta: _, ty_rec }
+            Ast::PrimaryExpr {
+                meta: _, ty_rec, ..
+            }
             | Ast::UnaryExpr {
                 meta: _, ty_rec, ..
             }

@@ -236,7 +236,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// to terminate on.
     fn gen_expr(&mut self, expr: &Ast) -> Option<LLVMValueRef> {
         match expr {
-            Ast::PrimaryExpr { meta: _, ty_rec } => self.primary_expr(&ty_rec),
+            Ast::PrimaryExpr {
+                meta: _,
+                ty_rec,
+                is_self,
+            } => self.primary_expr(&ty_rec, *is_self),
             Ast::BinaryExpr {
                 meta: _,
                 ty_rec: _,
@@ -353,7 +357,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// Generate LLVM IR for a primary expression. This returns an Option because
     /// it's possible that we cant retrieve an identifier from the value table (if it's
     /// undefined).
-    fn primary_expr(&mut self, ty_rec: &TyRecord) -> Option<LLVMValueRef> {
+    fn primary_expr(&mut self, ty_rec: &TyRecord, is_self: bool) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
             TknTy::Val(ref val) => unsafe { Some(LLVMConstReal(self.double_ty(), *val)) },
             TknTy::Str(ref lit) => unsafe {
@@ -370,6 +374,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let c_name = self.c_str(&name);
                     Some(LLVMBuildLoad(self.builder, val, c_name))
                 },
+                // TODO: class vars (using self) are not in a valtab here
+                None if is_self => {
+                    // We need a gep instruction here to retrieve the class property
+                    None
+                }
                 None => None,
             },
             _ => unimplemented!("Tkn ty {:?} is unimplemented in codegen", ty_rec.tkn.ty),

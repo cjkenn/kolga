@@ -255,7 +255,9 @@ impl<'t, 's> TyCheck<'t, 's> {
                 self.check_class_props(class_name, props, meta);
                 ty_rec.ty.clone()
             }
-            Ast::PrimaryExpr { meta: _, ty_rec }
+            Ast::PrimaryExpr {
+                meta: _, ty_rec, ..
+            }
             | Ast::ClassDeclStmt {
                 meta: _, ty_rec, ..
             }
@@ -314,7 +316,9 @@ impl<'t, 's> TyCheck<'t, 's> {
                             ref ty_rec,
                             ref ident_tkn,
                             ..
-                        } if ident_tkn.get_name() == prop_name => {
+                        }
+                            if ident_tkn.get_name() == prop_name =>
+                        {
                             prop_ty = Some(ty_rec.ty.clone());
                         }
                         _ => (),

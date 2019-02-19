@@ -48,6 +48,7 @@ impl<'pc> ParseContext<'pc> {
 pub struct ClassContext {
     pub prop_map: HashMap<String, usize>,
     pub methods: Vec<Ast>,
+    pub ident_is_self: bool,
 }
 
 impl ClassContext {
@@ -55,12 +56,14 @@ impl ClassContext {
         ClassContext {
             prop_map: pm,
             methods: mtods,
+            ident_is_self: false,
         }
     }
 
     pub fn reset(&mut self) {
         self.prop_map.clear();
         self.methods.clear();
+        self.ident_is_self = false;
     }
 
     pub fn exists(&self, key: &str) -> bool {
@@ -792,7 +795,9 @@ impl<'l, 's> Parser<'l, 's> {
                 let rhs = self.assign_expr(pctx)?;
 
                 match ast.clone() {
-                    Ast::PrimaryExpr { meta: _, ty_rec } => {
+                    Ast::PrimaryExpr {
+                        meta: _, ty_rec, ..
+                    } => {
                         match ty_rec.tkn.ty {
                             TknTy::Ident(name) => {
                                 let maybe_sym = self.symtab.retrieve(&name);
@@ -1021,7 +1026,9 @@ impl<'l, 's> Parser<'l, 's> {
     fn fncall_expr(&mut self, pctx: &mut ParseContext) -> Result<Ast, ParseErr> {
         let mut ast = self.primary_expr(pctx)?;
         let ident_tkn = match ast.clone() {
-            Ast::PrimaryExpr { meta: _, ty_rec } => Some(ty_rec.tkn),
+            Ast::PrimaryExpr {
+                meta: _, ty_rec, ..
+            } => Some(ty_rec.tkn),
             _ => None,
         };
 
@@ -1337,6 +1344,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let ast = Ok(Ast::PrimaryExpr {
                     meta: MetaAst::new(self.next(), self.currtkn.line, self.currtkn.pos),
                     ty_rec: TyRecord::new(self.currtkn.clone(), self.next_sym()),
+                    is_self: false,
                 });
                 self.consume();
                 ast
@@ -1376,6 +1384,7 @@ impl<'l, 's> Parser<'l, 's> {
                 let ast = Ok(Ast::PrimaryExpr {
                     meta: MetaAst::new(self.next(), self.currtkn.line, self.currtkn.pos),
                     ty_rec: ty_rec.clone(),
+                    is_self: expr_in_cls,
                 });
                 self.consume();
                 ast
