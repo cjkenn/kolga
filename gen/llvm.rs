@@ -30,14 +30,22 @@ impl<'gc> GenCtx<'gc> {
 struct GenClsCtx {
     pub curr_cls: String,
     pub curr_props: HashMap<String, usize>,
+    pub curr_self: Option<LLVMValueRef>,
 }
 
 impl GenClsCtx {
-    pub fn new(cls: String, props: HashMap<String, usize>) -> GenClsCtx {
+    pub fn new() -> GenClsCtx {
         GenClsCtx {
-            curr_cls: cls,
-            curr_props: props,
+            curr_cls: String::new(), // TODO: is this needed?
+            curr_props: HashMap::new(),
+            curr_self: None,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.curr_cls = String::new();
+        self.curr_props.clear();
+        self.curr_self = None;
     }
 }
 
@@ -111,7 +119,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     /// program and generates LLVM IR for each of them. The code is written to the module,
     /// to be converted to assembly later.
     pub fn gen_ir(&mut self) {
-        let mut cctx = GenClsCtx::new(HashMap::new());
+        let mut cctx = GenClsCtx::new();
         let mut gctx = GenCtx::new(&mut cctx);
 
         match self.ast {
@@ -254,8 +262,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 ident_tkn,
                 methods,
                 props,
+                prop_pos,
                 ..
-            } => self.class_decl_stmt(gctx, ident_tkn, methods, props),
+            } => self.class_decl_stmt(gctx, ident_tkn, methods, props, prop_pos),
             _ => unimplemented!("Ast type {:?} is not implemented for codegen", stmt),
         }
     }
@@ -412,8 +421,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 // TODO: class vars (using self) are not in a valtab here
                 None if is_self => {
                     // We need a gep instruction here to retrieve the class property
-                    let class = gctx.clsctx.curr_cls.clone();
+                    let c_name = self.c_str(&name);
                     let pos = gctx.clsctx.curr_props.get(name).unwrap();
+                    let ptr = gctx.clsctx.curr_self.unwrap();
+
+                    unsafe {
+                        let gep_val = LLVMBuildStructGEP(self.builder, ptr, *pos as u32, c_name);
+                        Some(gep_val)
+                    }
                 }
                 None => None,
             },
@@ -767,8 +782,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
 
             for (idx, param) in param_value_vec.iter().enumerate() {
-                let name = self.c_str(&fn_params[idx].tkn.get_name());
-                LLVMSetValueName(*param, name);
+                let name = &fn_params[idx].tkn.get_name();
+                let c_name = self.c_str(name);
+                LLVMSetValueName(*param, c_name);
+                if name == "self" {
+                    // set gctx.currself here
+                    gctx.clsctx.curr_self = Some(*param);
+                }
 
                 // If the param is a pointer, we dont want to
                 // build an alloca/store for it.
@@ -978,6 +998,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
         ident_tkn: &Token,
         methods: &Vec<Ast>,
         props: &Vec<Ast>,
+        prop_pos: &HashMap<String, usize>,
     ) -> Vec<LLVMValueRef> {
         let mut prop_tys = Vec::new();
 
@@ -1016,6 +1037,9 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             // to insert the class as a 'self' param.
             self.classtab.store(&class_name, llvm_struct);
         }
+
+        gctx.clsctx.curr_cls = class_name.clone();
+        gctx.clsctx.curr_props = prop_pos.clone();
 
         // Methods are generated like any other method, but with a pointer to
         // the enclosing class as the first parameter ('self'). This pointer can be
@@ -1071,6 +1095,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 _ => (),
             }
         }
+
+        gctx.clsctx.reset();
 
         Vec::new()
     }
