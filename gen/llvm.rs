@@ -355,7 +355,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
     }
 
     /// Generate LLVM IR for a primary expression. This returns an Option because
-    /// it's possible that we cant retrieve an identifier from the value table (if it's
+    /// it's possible that we can't retrieve an identifier from the value table (if it's
     /// undefined).
     fn primary_expr(&mut self, ty_rec: &TyRecord, is_self: bool) -> Option<LLVMValueRef> {
         match ty_rec.tkn.ty {
@@ -723,14 +723,14 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 slice::from_raw_parts(llvm_params, param_tys.len()).to_vec();
 
             for (idx, param) in param_value_vec.iter().enumerate() {
+                let name = self.c_str(&fn_params[idx].tkn.get_name());
+                LLVMSetValueName(*param, name);
+
                 // If the param is a pointer, we dont want to
                 // build an alloca/store for it.
                 if LLVMGetTypeKind(LLVMTypeOf(*param)) == LLVMTypeKind::LLVMPointerTypeKind {
                     continue;
                 }
-
-                let name = self.c_str(&fn_params[idx].tkn.get_name());
-                LLVMSetValueName(*param, name);
 
                 let alloca_instr = self.build_entry_bb_alloca(
                     llvm_fn,
@@ -987,10 +987,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     // We need to add the class declaration type to the list of
                     // params so we obtain a pointer to it inside the method body.
                     // The name isn't important here, as long the ty value is correct.
+                    let mut param_tkn = class_tkn.clone();
+                    param_tkn.ty = TknTy::Ident("self".to_string());
+
                     let fake_class_param = TyRecord {
-                        name: String::new(),
+                        name: "self".to_string(),
                         ty: KolgaTy::Class(class_name.clone()),
-                        tkn: class_tkn.clone(),
+                        tkn: param_tkn,
                     };
 
                     let mut new_params = fn_params.clone();
