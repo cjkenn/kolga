@@ -5,6 +5,7 @@ extern crate ty;
 
 use error::KolgaErr;
 use gen::llvm::CodeGenerator;
+use gen::obj::ObjGenerator;
 use gen::valtab::ValTab;
 use kolgac::lexer::Lexer;
 use kolgac::parser::Parser;
@@ -96,4 +97,10 @@ fn main() {
 
     // TODO: create obj files with obj gen to make an executable
     llvm_codegen.dump_ir();
+
+    let prefix = filename.split(".").collect::<Vec<&str>>()[0];
+    let obj_filename = format!("{}.{}", prefix, "o");
+
+    let mut obj_gen = ObjGenerator::new(llvm_codegen.module);
+    obj_gen.emit(&obj_filename);
 }

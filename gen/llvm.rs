@@ -69,7 +69,7 @@ pub struct CodeGenerator<'t, 'v> {
     builder: LLVMBuilderRef,
 
     /// LLVM Module. We use only a single module for single file programs.
-    module: LLVMModuleRef,
+    pub module: LLVMModuleRef,
 
     /// Owned CStrings that we use for naming things in our LLVM module.
     strings: Vec<CString>,

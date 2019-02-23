@@ -2,7 +2,7 @@ use llvm_sys::prelude::*;
 use llvm_sys::target::*;
 use llvm_sys::target_machine::*;
 
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::ptr;
 
 pub struct ObjGenerator {
@@ -14,7 +14,7 @@ impl ObjGenerator {
         ObjGenerator { ir: module }
     }
 
-    pub fn emit(&mut self, _filename: &str) {
+    pub fn emit(&mut self, filename: &str) {
         unsafe {
             let triple = LLVMGetDefaultTargetTriple();
 
@@ -45,15 +45,16 @@ impl ObjGenerator {
             );
 
             let mut gen_obj_error = c_str!("error generating object file") as *mut i8;
+            let c_file = CString::new(filename).unwrap();
 
-            // TODO: actually use the filename for output file
             let result = LLVMTargetMachineEmitToFile(
                 target_machine,
                 self.ir,
-                c_str!("test.o") as *mut i8,
+                c_file.as_ptr() as *mut i8,
                 LLVMCodeGenFileType::LLVMObjectFile,
                 &mut gen_obj_error,
             );
+
             if result != 0 {
                 let cmsg = CStr::from_ptr(gen_obj_error as *const _);
                 panic!("{:?}", cmsg);
