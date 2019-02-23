@@ -70,7 +70,7 @@ class mClass {
   }
   
   fn triple()~num {
-    return y * 3;
+    return self.y * 3;
   }
 }
 
@@ -80,6 +80,7 @@ let instance~mClass {
 };
 
 instance.nop();
+let tripled ~= instance.triple(); // 30
 ```
 
 ### Project Layout
