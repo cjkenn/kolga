@@ -418,16 +418,21 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                     let c_name = self.c_str(&name);
                     Some(LLVMBuildLoad(self.builder, val, c_name))
                 },
-                // TODO: class vars (using self) are not in a valtab here
                 None if is_self => {
-                    // We need a gep instruction here to retrieve the class property
+                    // In this branch, we don't have a value in the value table, but
+                    // the variable belongs to self, which means it's declared inside
+                    // a class we're generating code for. We need to get the position
+                    // of the property, as well as the pointer to self from the gen context.
+                    // Then, we build a GEP instruction to get the class property, and then
+                    // load it.
                     let c_name = self.c_str(&name);
                     let pos = gctx.clsctx.curr_props.get(name).unwrap();
                     let ptr = gctx.clsctx.curr_self.unwrap();
 
                     unsafe {
                         let gep_val = LLVMBuildStructGEP(self.builder, ptr, *pos as u32, c_name);
-                        Some(gep_val)
+                        let ld_val = LLVMBuildLoad(self.builder, gep_val, self.c_str(&name));
+                        Some(ld_val)
                     }
                 }
                 None => None,
@@ -863,7 +868,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 }
                     if ret_expr.is_some() =>
                 {
-                    println!("ret expr in llvm: {:#?}", ret_expr);
                     let llvm_val = self.gen_expr(gctx, &ret_expr.clone().unwrap());
                     unsafe {
                         LLVMBuildRet(self.builder, llvm_val.unwrap());
