@@ -7,8 +7,9 @@ use error::KolgaErr;
 use gen::llvm::CodeGenerator;
 use gen::obj::ObjGenerator;
 use gen::valtab::ValTab;
+use kolgac::ast::Ast;
 use kolgac::lexer::Lexer;
-use kolgac::parser::Parser;
+use kolgac::parser::{Parser, ParserResult};
 use kolgac::symtab::SymbolTable;
 use std::env;
 use std::fs::File;
@@ -24,64 +25,91 @@ fn main() {
     }
 
     let filename = &args[1];
-    let infile = match File::open(filename) {
-        Ok(file) => file,
-        Err(e) => {
-            println!("kolga: could not open file '{}': {:?}", filename, e.kind());
+    let mut symtab = SymbolTable::new();
+
+    // 1. Run the lexer/parser.
+    let parse_result = run_parser(&filename, &mut symtab);
+
+    // Any errors should already have been emitted by the
+    // parser, whether or not they are continuable.
+    if parse_result.has_err {
+        println!("kolgac: Exiting due to parser errors");
+        return;
+    }
+
+    // 2. Run the type inferrer and the type checker.
+    let mut ast = parse_result.ast.unwrap();
+    let ty_result = run_tys(&mut ast, &mut symtab);
+    match ty_result {
+        Ok(()) => (),
+        Err(()) => {
+            println!("kolgac: Exiting due to type errors");
             return;
         }
     };
 
-    let mut symtab = SymbolTable::new();
-    let parse_result;
-
-    // New scope for this so the borrow of the symbol table
-    // expires so we can use it in the type checker. We don't care if the
-    // lexer or parser go out of scope either, since we only need the ast
-    // in the result later on
-    {
-        let mut lexer = Lexer::new(infile);
-        let mut parser = Parser::new(&mut lexer, &mut symtab);
-        parse_result = parser.parse();
-    }
-
-    // Any errors should already have been emitted by the compiler, whether or
-    // not they are continuable. We exit here if there are any errors.
-    if parse_result.has_err {
-        return;
-    }
-
-    // The ast is made mutable so that type inference can write to ast nodes with
-    // type information later on.
-    let mut ast = parse_result.ast.unwrap();
-
-    // Open a new scope for ty inference and checking, because we need
-    // a mutable reference to the ast in order to build the types in place.
-    // We can be assured that all ast values are Some, since None is only returned
-    // if there are parsing errors.
-    {
-        let result = TyInfer::new().infer(&mut ast);
-        match result {
-            Ok(()) => (),
-            Err(e) => {
-                e.emit();
-                return;
-            }
-        }
-
-        let check_result = TyCheck::new(&ast, &mut symtab).check();
-
-        if check_result.len() > 0 {
-            for err in &check_result {
-                err.emit();
-            }
-
+    // 3. Run the LLVM IR code generator and the object file creator.
+    let gen_result = run_gen(&ast, &filename);
+    match gen_result {
+        Ok(()) => (),
+        Err(()) => {
+            println!("kolgac: Exiting due to LLVM IR gen errors");
             return;
         }
     }
+}
 
-    // Create a new LLVM module and generate IR inside it. The IR can then be passed
-    // to the object generator to build machine code.
+/// Opens the file from the filename provided, creates a lexer for that file
+/// and a parser for that lexer. Fully parses the input file, and returns
+/// the result from the parser. This result will contain any errors, as well
+/// as the AST from parsing (which will be None if there are errors).
+fn run_parser(filename: &str, symtab: &mut SymbolTable) -> ParserResult {
+    let infile = match File::open(filename) {
+        Ok(file) => file,
+        Err(e) => {
+            panic!("kolgac: could not open file '{}': {:?}", filename, e.kind());
+        }
+    };
+
+    let mut lexer = Lexer::new(infile);
+    let mut parser = Parser::new(&mut lexer, symtab);
+    parser.parse()
+}
+
+/// Given a valid AST from parsing, infers any types that were not defined in the
+/// source code. After inferring, runs a second pass to check all the types in
+/// the AST. Returns an empty result, which can be used as a flag to decide
+/// whether to continue to other compilation stages or not.
+/// This function also prints any errors encountered during inference/checking.
+fn run_tys(ast: &mut Ast, symtab: &mut SymbolTable) -> Result<(), ()> {
+    let result = TyInfer::new().infer(ast);
+    match result {
+        Ok(()) => (),
+        Err(e) => {
+            e.emit();
+            return Err(());
+        }
+    }
+
+    let check_result = TyCheck::new(ast, symtab).check();
+
+    if check_result.len() > 0 {
+        for err in &check_result {
+            err.emit();
+        }
+
+        return Err(());
+    }
+
+    Ok(())
+}
+
+/// Given a valid AST with all types inferred and checked, generates LLVM IR
+/// from that AST, and then creates an object file from that IR. Like the
+/// run_tys() function, this returns an empty result to be used as a flag to decide
+/// whether or not to continue with compilation stages. This will print any errors
+/// encountered during codegen.
+fn run_gen(ast: &Ast, filename: &str) -> Result<(), ()> {
     let mut valtab = ValTab::new();
     let mut llvm_codegen = CodeGenerator::new(&ast, &mut valtab);
 
@@ -92,15 +120,17 @@ fn main() {
             err.emit();
         }
 
-        return;
+        return Err(());
     }
 
-    // TODO: create obj files with obj gen to make an executable
     llvm_codegen.dump_ir();
 
+    // Generate an object file from LLVM IR
     let prefix = filename.split(".").collect::<Vec<&str>>()[0];
     let obj_filename = format!("{}.{}", prefix, "o");
 
     let mut obj_gen = ObjGenerator::new(llvm_codegen.module);
     obj_gen.emit(&obj_filename);
+
+    Ok(())
 }
