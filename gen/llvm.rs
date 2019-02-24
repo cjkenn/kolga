@@ -647,12 +647,8 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let fn_val = LLVMGetBasicBlockParent(insert_bb);
 
             // Set up our blocks
-            let entry_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("entry"));
             let while_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("while"));
             let merge_bb = LLVMAppendBasicBlockInContext(self.context, fn_val, self.c_str("merge"));
-
-            LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-            let phi_bb = LLVMBuildPhi(self.builder, self.double_ty(), self.c_str("phi"));
             LLVMPositionBuilderAtEnd(self.builder, insert_bb);
 
             // Evaluate the conditional expression
@@ -663,7 +659,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             }
 
             // Buld the conditional branch
-            LLVMPositionBuilderAtEnd(self.builder, entry_bb);
             LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
             LLVMPositionBuilderAtEnd(self.builder, while_bb);
 
@@ -678,12 +673,6 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             LLVMBuildCondBr(self.builder, updated_cond_val.unwrap(), while_bb, merge_bb);
             let while_end_bb = LLVMGetInsertBlock(self.builder);
             LLVMPositionBuilderAtEnd(self.builder, merge_bb);
-            LLVMAddIncoming(
-                phi_bb,
-                stmt_vals.as_mut_ptr(),
-                vec![while_end_bb].as_mut_ptr(),
-                1,
-            );
         }
 
         return_stmt_vec
