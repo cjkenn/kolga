@@ -3,6 +3,8 @@ extern crate gen;
 extern crate kolgac;
 extern crate ty;
 
+mod opts;
+
 use error::KolgaErr;
 use gen::llvm::CodeGenerator;
 use gen::obj::ObjGenerator;
@@ -11,53 +13,11 @@ use kolgac::ast::Ast;
 use kolgac::lexer::Lexer;
 use kolgac::parser::{Parser, ParserResult};
 use kolgac::symtab::SymbolTable;
-use std::collections::HashMap;
+use opts::KolgaOpts;
 use std::env;
 use std::fs::File;
 use ty::check::TyCheck;
 use ty::infer::TyInfer;
-
-#[derive(Default, Debug, Clone)]
-struct KolgaOpts {
-    pub filename: String,
-    pub dump_ast: bool,
-    pub dump_ir: bool,
-}
-
-impl KolgaOpts {
-    pub fn new() -> KolgaOpts {
-        KolgaOpts::default()
-    }
-
-    pub fn from_args(args: Vec<String>) -> Result<KolgaOpts, String> {
-        if args.len() < 2 {
-            return Err(String::from("usage: kolga [filename]"));
-        }
-
-        let filename = args[1].clone();
-        let mut arg_map: HashMap<String, bool> = [
-            (String::from("dump-ast"), false),
-            (String::from("dump-ir"), false),
-        ]
-            .iter()
-            .cloned()
-            .collect();
-
-        for arg in args {
-            if arg_map.contains_key(&arg) {
-                arg_map.insert(arg, true);
-            }
-        }
-
-        let opts = KolgaOpts {
-            filename: filename,
-            dump_ast: *arg_map.get("dump-ast").unwrap(),
-            dump_ir: *arg_map.get("dump-ir").unwrap(),
-        };
-
-        Ok(opts)
-    }
-}
 
 fn main() {
     let args: Vec<String> = env::args().collect();

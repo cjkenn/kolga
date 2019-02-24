@@ -8,13 +8,13 @@ scratch:
 	cargo run scratch.kol
 
 debug:
-	RUST_BACKTRACE=1 cargo run scratch.kol dump-ast dump-ir
+	RUST_BACKTRACE=1 cargo run scratch.kol --dump-ast --dump-ir
 
 ast:
-	RUST_BACKTRACE=1 cargo run scratch.kol dump-ast
+	RUST_BACKTRACE=1 cargo run scratch.kol --dump-ast
 
 ir:
-	RUST_BACKTRACE=1 cargo run scratch.kol dump-ir
+	RUST_BACKTRACE=1 cargo run scratch.kol --dump-ir
 
 link: scratch
 	clang scratch.o -o scratch
