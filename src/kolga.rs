@@ -11,24 +11,67 @@ use kolgac::ast::Ast;
 use kolgac::lexer::Lexer;
 use kolgac::parser::{Parser, ParserResult};
 use kolgac::symtab::SymbolTable;
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use ty::check::TyCheck;
 use ty::infer::TyInfer;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    // TODO: repl
-    if args.len() < 2 {
-        println!("Usage: kolga [filename]");
-        return;
+#[derive(Default, Debug, Clone)]
+struct KolgaOpts {
+    pub filename: String,
+    pub dump_ast: bool,
+    pub dump_ir: bool,
+}
+
+impl KolgaOpts {
+    pub fn new() -> KolgaOpts {
+        KolgaOpts::default()
     }
 
-    let filename = &args[1];
-    let mut symtab = SymbolTable::new();
+    pub fn from_args(args: Vec<String>) -> Result<KolgaOpts, String> {
+        if args.len() < 2 {
+            return Err(String::from("usage: kolga [filename]"));
+        }
+
+        let filename = args[1].clone();
+        let mut arg_map: HashMap<String, bool> = [
+            (String::from("dump-ast"), false),
+            (String::from("dump-ir"), false),
+        ]
+            .iter()
+            .cloned()
+            .collect();
+
+        for arg in args {
+            if arg_map.contains_key(&arg) {
+                arg_map.insert(arg, true);
+            }
+        }
+
+        let opts = KolgaOpts {
+            filename: filename,
+            dump_ast: *arg_map.get("dump-ast").unwrap(),
+            dump_ir: *arg_map.get("dump-ir").unwrap(),
+        };
+
+        Ok(opts)
+    }
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let opts = match KolgaOpts::from_args(args) {
+        Ok(opts) => opts,
+        Err(error) => {
+            println!("{}", error);
+            return;
+        }
+    };
 
     // 1. Run the lexer/parser.
-    let parse_result = run_parser(&filename, &mut symtab);
+    let mut symtab = SymbolTable::new();
+    let parse_result = run_parser(&opts.filename, &mut symtab);
 
     // Any errors should already have been emitted by the
     // parser, whether or not they are continuable.
@@ -48,8 +91,12 @@ fn main() {
         }
     };
 
+    if opts.dump_ast {
+        println!("{:#?}", ast);
+    }
+
     // 3. Run the LLVM IR code generator and the object file creator.
-    let gen_result = run_gen(&ast, &filename);
+    let gen_result = run_gen(&ast, &opts);
     match gen_result {
         Ok(()) => (),
         Err(()) => {
@@ -109,7 +156,7 @@ fn run_tys(ast: &mut Ast, symtab: &mut SymbolTable) -> Result<(), ()> {
 /// run_tys() function, this returns an empty result to be used as a flag to decide
 /// whether or not to continue with compilation stages. This will print any errors
 /// encountered during codegen.
-fn run_gen(ast: &Ast, filename: &str) -> Result<(), ()> {
+fn run_gen(ast: &Ast, opts: &KolgaOpts) -> Result<(), ()> {
     let mut valtab = ValTab::new();
     let mut llvm_codegen = CodeGenerator::new(&ast, &mut valtab);
 
@@ -123,10 +170,12 @@ fn run_gen(ast: &Ast, filename: &str) -> Result<(), ()> {
         return Err(());
     }
 
-    llvm_codegen.dump_ir();
+    if opts.dump_ir {
+        llvm_codegen.dump_ir();
+    }
 
     // Generate an object file from LLVM IR
-    let prefix = filename.split(".").collect::<Vec<&str>>()[0];
+    let prefix = opts.filename.split(".").collect::<Vec<&str>>()[0];
     let obj_filename = format!("{}.{}", prefix, "o");
 
     let mut obj_gen = ObjGenerator::new(llvm_codegen.module);
