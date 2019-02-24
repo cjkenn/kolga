@@ -1,15 +1,17 @@
 use std::collections::HashMap;
 
+// Rudimentary command line flag "parsing"
+// TODO: probably should get around to using structopt or clap?
+static HELP_FLAG: &str = "--help";
+static AST_FLAG: &str = "--dump-ast";
+static IR_FLAG: &str = "--dump-ir";
+
 #[derive(Default, Debug, Clone)]
 pub struct KolgaOpts {
     pub filename: String,
     pub dump_ast: bool,
     pub dump_ir: bool,
 }
-
-static HELP_FLAG: &str = "--help";
-static AST_FLAG: &str = "--dump-ast";
-static IR_FLAG: &str = "--dump-ir";
 
 impl KolgaOpts {
     pub fn new() -> KolgaOpts {
