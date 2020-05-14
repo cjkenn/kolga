@@ -1,16 +1,16 @@
 # kolga
 
-kolga is an educational compiler (always WIP) with the following goals:
+kolga is a compiler (indefinitely WIP) with the following goals:
 
-1. Learn the LLVM API by using it to generate LLVM IR and machine code.
-2. Learn about type systems by building a type checker, type inference, and more complex ADT's.
-3. Support object oriented composability.
-4. Eventually (maybe), build some light concurrency primitives like coroutines.
+1. Use the LLVM API to generate IR and machine code.
+2. Build a type checker, implement type inference, and provide more complex ADT's.
+3. Support object/struct composability.
+4. Build some light concurrency primitives like coroutines.
 
 Right now, kolga features basic language syntax:
 1. Functions (with recursion)
 2. Classes
-3. Basic control flow: if/else/else if, while loops, for loops
+3. Basic control flow
 4. A few different types: 64-bit numbers, ASCII strings, bool, and void
 
 Some compiler features so far:
@@ -18,11 +18,11 @@ Some compiler features so far:
 2. Type checking, including for ADT's
 3. Basic type inference for variable assignments. Functions still require type annotations.
 4. LLVM IR codegen directly from AST (no additional IR) and optimization manager
- 
+
 ### Requirements
 
 1. [rust](https://rust-lang.org)
-2. [llvm (supports 6.0)](https://llvm.org)
+2. [llvm (supports 10.0)](https://llvm.org)
 
 ### Running
 ```sh
@@ -64,11 +64,11 @@ fn negate(y~bool)~bool {
 class mClass {
   let z~num;
   let y~num;
-  
+
   fn nop()~void {
     return;
   }
-  
+
   fn triple()~num {
     return self.y * 3;
   }
