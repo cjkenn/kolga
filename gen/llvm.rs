@@ -246,7 +246,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 },
                 false => unsafe {
                     let insert_bb = LLVMGetInsertBlock(self.builder);
-                    let mut llvm_func = LLVMGetBasicBlockParent(insert_bb);
+                    let llvm_func = LLVMGetBasicBlockParent(insert_bb);
                     let alloca_instr = self.build_entry_bb_alloca(
                         llvm_func,
                         ty_rec.clone(),
@@ -481,7 +481,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             let mut elif_bb_vec = Vec::new();
             for i in 0..else_if_stmts.len() {
                 let name = format!("{}{}{}", "elifcond", i, "\0");
-                let mut tmp_bb = LLVMAppendBasicBlockInContext(
+                let tmp_bb = LLVMAppendBasicBlockInContext(
                     self.context,
                     fn_val,
                     name.as_bytes().as_ptr() as *const i8,
@@ -549,11 +549,11 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         // Get the conditional block from the vector made above. Create a seperate
                         // block to the elif code to live in, that we can branch to from the
                         // elif conditioanl block.
-                        let mut elif_cond_bb = elif_bb_vec[idx];
+                        let elif_cond_bb = elif_bb_vec[idx];
                         LLVMPositionBuilderAtEnd(self.builder, elif_cond_bb);
                         LLVMMoveBasicBlockAfter(elif_cond_bb, else_bb);
                         let name = format!("{}{}{}", "elifblck", idx, "\0");
-                        let mut elif_code_bb = LLVMAppendBasicBlockInContext(
+                        let elif_code_bb = LLVMAppendBasicBlockInContext(
                             self.context,
                             fn_val,
                             name.as_ptr() as *const i8,
@@ -593,7 +593,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                         let mut elif_expr_vals = self.gen_stmt(gctx, &stmts.clone());
                         return_stmt_vec.extend(elif_expr_vals.clone());
                         LLVMBuildBr(self.builder, merge_bb);
-                        let mut elif_end_bb = LLVMGetInsertBlock(self.builder);
+                        let elif_end_bb = LLVMGetInsertBlock(self.builder);
                         LLVMPositionBuilderAtEnd(self.builder, merge_bb);
                         LLVMAddIncoming(
                             phi_bb,
@@ -662,7 +662,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             LLVMBuildCondBr(self.builder, cond_val.unwrap(), while_bb, merge_bb);
             LLVMPositionBuilderAtEnd(self.builder, while_bb);
 
-            let mut stmt_vals = self.gen_stmt(gctx, &stmts.clone());
+            let stmt_vals = self.gen_stmt(gctx, &stmts.clone());
             return_stmt_vec.extend(stmt_vals.clone());
 
             // Evaluate the conditional expression again. This will handle reading
@@ -671,7 +671,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             // this.
             let updated_cond_val = self.gen_expr(gctx, &cond_expr.clone());
             LLVMBuildCondBr(self.builder, updated_cond_val.unwrap(), while_bb, merge_bb);
-            let while_end_bb = LLVMGetInsertBlock(self.builder);
+            let _ = LLVMGetInsertBlock(self.builder);
             LLVMPositionBuilderAtEnd(self.builder, merge_bb);
         }
 
@@ -778,7 +778,7 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
             for (idx, param) in param_value_vec.iter().enumerate() {
                 let name = &fn_params[idx].tkn.get_name();
                 let c_name = self.c_str(name);
-                LLVMSetValueName(*param, c_name);
+                LLVMSetValueName2(*param, c_name, name.len());
                 if name == "self" {
                     // set gctx.currself here
                     gctx.clsctx.curr_self = Some(*param);
@@ -846,17 +846,13 @@ impl<'t, 'v> CodeGenerator<'t, 'v> {
                 Ast::RetStmt {
                     meta: _,
                     ref ret_expr,
-                }
-                    if ret_expr.is_none() =>
-                unsafe {
+                } if ret_expr.is_none() => unsafe {
                     LLVMBuildRet(self.builder, ptr::null_mut());
-                }
+                },
                 Ast::RetStmt {
                     meta: _,
                     ref ret_expr,
-                }
-                    if ret_expr.is_some() =>
-                {
+                } if ret_expr.is_some() => {
                     let llvm_val = self.gen_expr(gctx, &ret_expr.clone().unwrap());
                     unsafe {
                         LLVMBuildRet(self.builder, llvm_val.unwrap());

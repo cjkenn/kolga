@@ -177,7 +177,7 @@ impl<'l, 's> Parser<'l, 's> {
 
         let mut is_class_type = false;
         let mut var_err = None;
-        let mut var_ty_tkn = None;
+        let var_ty_tkn;
 
         // Check for a type annotation. If there is one, set var_ty_tkn so we can use it later
         // to create type records. If there is no type, we will try to infer one later. If the

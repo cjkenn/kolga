@@ -26,7 +26,7 @@ impl FPM {
     /// Initializes the pass manager and add all desired function passes.
     pub fn init(&mut self) {
         unsafe {
-            LLVMAddPromoteMemoryToRegisterPass(self.fpm);
+            //LLVMAddPromoteMemoryToRegisterPass(self.fpm);
             LLVMAddInstructionCombiningPass(self.fpm);
             LLVMAddReassociatePass(self.fpm);
             LLVMInitializeFunctionPassManager(self.fpm);

@@ -14,10 +14,6 @@ pub struct KolgaOpts {
 }
 
 impl KolgaOpts {
-    pub fn new() -> KolgaOpts {
-        KolgaOpts::default()
-    }
-
     pub fn from_args(args: Vec<String>) -> Result<KolgaOpts, String> {
         if args.len() < 2 {
             return Err(usage());
@@ -32,9 +28,9 @@ impl KolgaOpts {
             (String::from(AST_FLAG), false),
             (String::from(IR_FLAG), false),
         ]
-            .iter()
-            .cloned()
-            .collect();
+        .iter()
+        .cloned()
+        .collect();
 
         for arg in args {
             if arg_map.contains_key(&arg) {

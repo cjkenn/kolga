@@ -72,9 +72,9 @@ impl Lexer {
             (String::from("void"), TknTy::Void),
             (String::from("self"), TknTy::SelfKw),
         ]
-            .iter()
-            .cloned()
-            .collect();
+        .iter()
+        .cloned()
+        .collect();
 
         Lexer {
             curr: currch,
@@ -221,7 +221,11 @@ impl Lexer {
         // Rewind the reader to its place before we performed
         // reads in the lex() call
         let seek_bytes = (self.bytes_read - start_bytes_read) as i64;
-        self.reader.seek(SeekFrom::Current(-seek_bytes));
+        // TODO: don't panic here?
+        match self.reader.seek(SeekFrom::Current(-seek_bytes)) {
+            Err(e) => panic!("failed to seek in input file: {}", e),
+            Ok(_) => {}
+        };
 
         // Reset the state of the lexer to what it was before the peek
         self.curr = start_curr;
