@@ -86,10 +86,10 @@ let tripled ~= instance.triple(); // 30
 ### Project Layout
 `kolgac` contains code for lexing and parsing, as well as appropriate token and AST data structures. This is the core compiler.
 
-`ty` contains type checking/inference
+`kolgac_types` contains type checking/inference
 
-`gen` handles generating the llvm ir from the ast
+`kolgac_codegen` handles generating the llvm ir from the ast
 
-`error` contains error handling/emitting functions, are well as error types for each stage in the compiler
+`kolgac_errors` contains error handling/emitting functions, are well as error types for each stage in the compiler
 
 The `src` directory contains the file `kolga.rs`, which is the main entry point into the compiler.

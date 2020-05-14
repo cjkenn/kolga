@@ -1,7 +1,8 @@
 [package]
 name = "kolga"
 version = "0.1.0"
-authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
+authors = ["cjkenn"]
+edition = "2018"
 
 [[bin]]
 name = "kolga_bin"
@@ -9,7 +10,7 @@ path = "./src/kolga.rs"
 
 [dependencies]
 kolgac = { path = "kolgac" }
-gen = { path = "gen" }
-error = { path = "error" }
-ty = { path = "ty" }
+gen = { path = "kolgac_codegen" }
+error = { path = "kolgac_errors" }
+ty = { path = "kolgac_types" }
 clap = "3.0.0-beta.1"

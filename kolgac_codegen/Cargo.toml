@@ -1,13 +1,13 @@
 [package]
 name = "gen"
 version = "0.1.0"
-authors = ["cjkenn <cam.j.kennedy@gmail.com>"]
+authors = ["cjkenn"]
 
 [lib]
 name = "gen"
 path = "lib.rs"
 
 [dependencies]
-error = { path = "../error" }
+error = { path = "../kolgac_errors" }
 kolgac = { path = "../kolgac" }
 llvm-sys = "100.0.1"
