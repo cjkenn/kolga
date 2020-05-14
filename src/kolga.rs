@@ -1,10 +1,10 @@
+extern crate clap;
 extern crate error;
 extern crate gen;
 extern crate kolgac;
 extern crate ty;
 
-mod opts;
-
+use clap::Clap;
 use error::KolgaErr;
 use gen::llvm::CodeGenerator;
 use gen::obj::ObjGenerator;
@@ -13,21 +13,22 @@ use kolgac::ast::Ast;
 use kolgac::lexer::Lexer;
 use kolgac::parser::{Parser, ParserResult};
 use kolgac::symtab::SymbolTable;
-use opts::KolgaOpts;
-use std::env;
 use std::fs::File;
 use ty::check::TyCheck;
 use ty::infer::TyInfer;
 
+#[derive(Clap)]
+#[clap(version = "1.0")]
+pub struct KolgaOpts {
+    filename: String,
+    #[clap(long)]
+    dump_ast: bool,
+    #[clap(long)]
+    dump_ir: bool,
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let opts = match KolgaOpts::from_args(args) {
-        Ok(opts) => opts,
-        Err(error) => {
-            println!("{}", error);
-            return;
-        }
-    };
+    let opts: KolgaOpts = KolgaOpts::parse();
 
     // 1. Run the lexer/parser.
     let mut symtab = SymbolTable::new();

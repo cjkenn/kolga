@@ -12,3 +12,4 @@ kolgac = { path = "kolgac" }
 gen = { path = "gen" }
 error = { path = "error" }
 ty = { path = "ty" }
+clap = "3.0.0-beta.1"
