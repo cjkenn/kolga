@@ -29,5 +29,5 @@ cmpexpr    ::= addexpr { [ ">" ] [ ">=" ] [ "<" ] [ "<=" ] addexpr } ;
 addexpr    ::= mulexpr { [ "+" ] [ "-" ] mulexpr } ;
 mulexpr    ::= unaryexpr { [ "!" ] [ "-" ] unaryexpr } ;
 unaryexpr  ::= [ "-" ]  [ "!" ] unaryexpr | funccall ;
-primary    ::= NUMBER | STRING | TRUE | FALSE | NULL | IDENT | groupexpr ;
+primary    ::= NUMBER | STRING | TRUE | FALSE | NULL | IDENT | "self" | groupexpr ;
 groupexpr  ::= "(" expr ")" ;
