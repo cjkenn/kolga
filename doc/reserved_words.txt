@@ -1,0 +1,27 @@
+Reserved keywords:
+
+let
+imm
+fn
+return
+class
+this
+if
+elif
+then
+el
+else
+while
+in
+for
+num
+string
+str
+bool
+true
+false
+or
+and
+null
+void
+self

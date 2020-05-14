@@ -1,0 +1,33 @@
+prog ::= { decl } ;
+decl ::= vardecl | funcdecl | classdecl | { stmt } ;
+
+vardecl   ::= "let" [ "imm" ] IDENT "~" [ typename ] expr ;
+funcdecl  ::= "func" IDENT "(" [ params ] ")" "~" typename block ;
+classdecl ::= "class" IDENT "{" [ decl ] "}" ;
+params    ::= IDENT "~" typename ;
+
+stmt       ::= ifstmt | whilestmt | forstmt | exprstmt | retstmt | block ;
+ifstmt     ::= "if" expr block { "elif" expr block } [ "else" block ] ;
+whilestmt  ::= "while" expr block ;
+forstmt    ::= "for" { vardecl } { exprstmt } { exprstmt } block ;
+exprstmt   ::= expr ";" ;
+retstmt    ::= "return" [ expr ] ";" ;
+
+funccall   ::= primary { [ "(" [ funccallparams ] ")" ] [ "." IDENT ] } ;
+funccallparams ::= IDENT { "," IDENT } ;
+
+block    ::= "{" { decl } "}" ;
+typename ::= "num" | "string" | "bool" | classname ;
+classname ::= IDENT
+
+expr       ::= assignexpr ;
+assignexpr ::= { funccall "." } IDENT "=" assignexpr | logicor ;
+logicor    ::= logicand { [ "||" ] [ "or" ] logicand } ;
+logicand   ::= eqexpr { [ "&&" ] [ "and" ] eqexpr } ;
+eqexpr     ::= cmpexpr { [ "!=" ] [ "==" ] cmpexpr } ;
+cmpexpr    ::= addexpr { [ ">" ] [ ">=" ] [ "<" ] [ "<=" ] addexpr } ;
+addexpr    ::= mulexpr { [ "+" ] [ "-" ] mulexpr } ;
+mulexpr    ::= unaryexpr { [ "!" ] [ "-" ] unaryexpr } ;
+unaryexpr  ::= [ "-" ]  [ "!" ] unaryexpr | funccall ;
+primary    ::= NUMBER | STRING | TRUE | FALSE | NULL | IDENT | groupexpr ;
+groupexpr  ::= "(" expr ")" ;
