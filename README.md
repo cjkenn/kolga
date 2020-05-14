@@ -36,6 +36,7 @@ cargo test -- --nocapture
 
 ### Some Examples
 ```
+# some basic type inference
 fn basicFunc(x~num)~num {
   let inferMe ~= x + 10;
   let dontInferMe~num = x - 1;
@@ -61,6 +62,7 @@ fn negate(y~bool)~bool {
 ```
 
 ```
+# simple class declaration and use
 class mClass {
   let z~num;
   let y~num;
