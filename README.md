@@ -93,7 +93,3 @@ let tripled ~= instance.triple(); // 30
 `error` contains error handling/emitting functions, are well as error types for each stage in the compiler
 
 The `src` directory contains the file `kolga.rs`, which is the main entry point into the compiler.
-
-### A note on command line parsing
-This project does not follow the standard rust docs on command line parsing, and really just hacks in its own implementation of a rudimentary argument parser. Why? `structopt` was having some problems working properly on my machine, and was messing up my terminal when printing some messages.
-
