@@ -95,8 +95,13 @@ impl Lexer {
         }
 
         // Skip whitespace
-        while self.curr.unwrap().is_whitespace() {
-            self.advance();
+        self.skip_whitespace();
+        if self.curr.is_none() {
+            return self.eof_tkn();
+        }
+
+        if self.curr.unwrap() == '#' {
+            self.advance_to_next_line();
             if self.curr.is_none() {
                 return self.eof_tkn();
             }
@@ -377,6 +382,22 @@ impl Lexer {
             self.curr = None;
         } else {
             self.curr = Some(self.buffer[self.pos]);
+        }
+    }
+
+    fn advance_to_next_line(&mut self) {
+        while self.curr.unwrap() != '\n' {
+            self.advance();
+        }
+
+        // We are on a \n character here, so move ahead to next line.
+        self.advance();
+        self.skip_whitespace();
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self.curr.is_some() && self.curr.unwrap().is_whitespace() {
+            self.advance();
         }
     }
 
