@@ -1,16 +1,6 @@
-extern crate gen;
-extern crate kolgac;
-
-use std::fs;
-use std::fs::File;
-use std::io::prelude::*;
-
-use gen::llvm::CodeGenerator;
-use gen::valtab::ValTab;
-
-use kolgac::lexer::Lexer;
-use kolgac::parser::Parser;
-use kolgac::symtab::SymbolTable;
+use kolgac::{lexer::Lexer, parser::Parser, symtab::SymbolTable};
+use kolgac_codegen::{llvm::CodeGenerator, valtab::ValTab};
+use std::{fs, fs::File, io::prelude::*};
 
 fn run(input_filename: &str, output_filename: &str, expected_filename: &str) {
     let mut lexer = Lexer::new(File::open(input_filename).unwrap());

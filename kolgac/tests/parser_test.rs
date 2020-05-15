@@ -1,12 +1,11 @@
-extern crate kolgac;
+use kolgac::{lexer::Lexer, parser::Parser, symtab::SymbolTable};
 
-use kolgac::lexer::Lexer;
-use kolgac::parser::Parser;
-use kolgac::symtab::SymbolTable;
-use std::fs;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::{
+    fs,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::PathBuf,
+};
 
 struct ParseExpect {
     pub is_pass: bool,
@@ -77,15 +76,21 @@ fn parse_expectations(expectations: String) -> Result<ParseExpect, &'static str>
     }
 
     if parts.len() < 2 {
-        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+        return Err(
+            "Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'",
+        );
     }
 
     if !parts[0].contains("expect") {
-        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+        return Err(
+            "Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'",
+        );
     }
 
     if parts[1] != "fail" && parts[1] != "pass" {
-        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+        return Err(
+            "Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'",
+        );
     }
 
     if parts[1] == "pass" {
@@ -97,7 +102,9 @@ fn parse_expectations(expectations: String) -> Result<ParseExpect, &'static str>
     }
 
     if parts.len() < 4 {
-        return Err("Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'");
+        return Err(
+            "Invalid test expectation string. Usage: 'expect::[pass][fail]::[line]::[pos]'",
+        );
     }
 
     let line = parts[2].parse::<usize>();

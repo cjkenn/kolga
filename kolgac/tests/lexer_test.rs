@@ -1,9 +1,7 @@
-extern crate kolgac;
+//extern crate kolgac;
+use kolgac::{lexer::Lexer, token::TknTy};
 
 use std::fs::File;
-
-use kolgac::lexer::Lexer;
-use kolgac::token::TknTy;
 
 #[test]
 fn lexer() {
