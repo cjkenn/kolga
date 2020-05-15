@@ -1,17 +1,21 @@
-use classtab::ClassTab;
-use error::gen::{GenErr, GenErrTy};
-use kolgac::ast::Ast;
-use kolgac::token::{TknTy, Token};
-use kolgac::ty_rec::{KolgaTy, TyRecord};
-use llvm_sys::core::*;
-use llvm_sys::prelude::*;
-use llvm_sys::{LLVMRealPredicate, LLVMTypeKind};
-use valtab::ValTab;
-//use fpm::FPM;
-use std::collections::HashMap;
-use std::ffi::CString;
-use std::ptr;
-use std::slice;
+use crate::{classtab::ClassTab, valtab::ValTab};
+//use crate::fpm::FPM;
+
+use kolgac_errors::gen::{GenErr, GenErrTy};
+
+use kolgac::{
+    ast::Ast,
+    token::{TknTy, Token},
+    ty_rec::{KolgaTy, TyRecord},
+};
+
+use llvm_sys::{
+    core::*,
+    prelude::*,
+    {LLVMRealPredicate, LLVMTypeKind},
+};
+
+use std::{collections::HashMap, ffi::CString, ptr, slice};
 
 const LLVM_FALSE: LLVMBool = 0;
 

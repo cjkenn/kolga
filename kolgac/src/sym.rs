@@ -1,6 +1,4 @@
-use ast::Ast;
-use token::Token;
-use ty_rec::TyRecord;
+use crate::{ast::Ast, token::Token, ty_rec::TyRecord};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SymTy {

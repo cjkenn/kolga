@@ -1,6 +1,7 @@
+use crate::token::Token;
+use crate::ty_rec::TyRecord;
+
 use std::collections::HashMap;
-use token::Token;
-use ty_rec::TyRecord;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MetaAst {

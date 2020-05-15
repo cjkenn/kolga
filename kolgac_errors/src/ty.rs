@@ -1,4 +1,4 @@
-use KolgaErr;
+use crate::KolgaErr;
 
 #[derive(Debug, Clone)]
 pub enum TypeErrTy {

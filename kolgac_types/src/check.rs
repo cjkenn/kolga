@@ -1,11 +1,14 @@
-use error::ty::{TypeErr, TypeErrTy};
-use kolgac::ast::{Ast, MetaAst};
-use kolgac::sym::Sym;
-use kolgac::symtab::SymbolTable;
-use kolgac::token::{TknTy, Token};
-use kolgac::ty_rec::KolgaTy;
-use std::collections::HashMap;
-use std::rc::Rc;
+use kolgac_errors::ty::{TypeErr, TypeErrTy};
+
+use kolgac::{
+    ast::{Ast, MetaAst},
+    sym::Sym,
+    symtab::SymbolTable,
+    token::{TknTy, Token},
+    ty_rec::KolgaTy,
+};
+
+use std::{collections::HashMap, rc::Rc};
 
 pub struct TyCheck<'t, 's> {
     ast: &'t Ast,
@@ -316,9 +319,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                             ref ty_rec,
                             ref ident_tkn,
                             ..
-                        }
-                            if ident_tkn.get_name() == prop_name =>
-                        {
+                        } if ident_tkn.get_name() == prop_name => {
                             prop_ty = Some(ty_rec.ty.clone());
                         }
                         _ => (),

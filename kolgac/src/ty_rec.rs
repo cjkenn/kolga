@@ -1,5 +1,5 @@
+use crate::token::{TknTy, Token};
 use std::fmt;
-use token::{TknTy, Token};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum KolgaTy {

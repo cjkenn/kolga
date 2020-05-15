@@ -1,10 +1,15 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use crate::token::{TknTy, Token};
 
-use error::lex::{LexErr, LexErrTy};
-use error::KolgaErr;
-use token::{TknTy, Token};
+use kolgac_errors::{
+    lex::{LexErr, LexErrTy},
+    KolgaErr,
+};
+
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader, Seek, SeekFrom},
+};
 
 #[derive(Debug)]
 pub struct Lexer {

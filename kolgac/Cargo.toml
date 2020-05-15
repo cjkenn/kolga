@@ -2,10 +2,7 @@
 name = "kolgac"
 version = "0.1.0"
 authors = ["cjkenn"]
-
-[lib]
-name = "kolgac"
-path = "lib.rs"
+edition = "2018"
 
 [dependencies]
-error = { path = "../kolgac_errors" }
+kolgac_errors = { path = "../kolgac_errors" }

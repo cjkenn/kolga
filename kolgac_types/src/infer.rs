@@ -1,7 +1,11 @@
-use error::ty::{TypeErr, TypeErrTy};
-use kolgac::ast::{Ast, MetaAst};
-use kolgac::token::TknTy;
-use kolgac::ty_rec::KolgaTy;
+use kolgac_errors::ty::{TypeErr, TypeErrTy};
+
+use kolgac::{
+    ast::{Ast, MetaAst},
+    token::TknTy,
+    ty_rec::KolgaTy,
+};
+
 use std::collections::HashMap;
 
 /// Represents an pair of types that can be unified. It's possible that the types
