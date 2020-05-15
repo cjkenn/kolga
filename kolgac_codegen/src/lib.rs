@@ -1,5 +1,5 @@
-extern crate error;
 extern crate kolgac;
+extern crate kolgac_errors;
 extern crate llvm_sys;
 
 macro_rules! c_str {

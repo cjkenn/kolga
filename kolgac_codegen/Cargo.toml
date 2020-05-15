@@ -1,13 +1,10 @@
 [package]
-name = "gen"
+name = "kolgac_codegen"
 version = "0.1.0"
 authors = ["cjkenn"]
-
-[lib]
-name = "gen"
-path = "lib.rs"
+edition = "2018"
 
 [dependencies]
-error = { path = "../kolgac_errors" }
+kolgac_errors = { path = "../kolgac_errors" }
 kolgac = { path = "../kolgac" }
 llvm-sys = "100.0.1"

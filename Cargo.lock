@@ -64,19 +64,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "error"
-version = "0.1.0"
-
-[[package]]
-name = "gen"
-version = "0.1.0"
-dependencies = [
- "error 0.1.0",
- "kolgac 0.1.0",
- "llvm-sys 100.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "heck"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -101,21 +88,42 @@ dependencies = [
 ]
 
 [[package]]
-name = "kolga"
-version = "0.1.0"
-dependencies = [
- "clap 3.0.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "error 0.1.0",
- "gen 0.1.0",
- "kolgac 0.1.0",
- "ty 0.1.0",
-]
-
-[[package]]
 name = "kolgac"
 version = "0.1.0"
 dependencies = [
- "error 0.1.0",
+ "kolgac_errors 0.1.0",
+]
+
+[[package]]
+name = "kolgac_codegen"
+version = "0.1.0"
+dependencies = [
+ "kolgac 0.1.0",
+ "kolgac_errors 0.1.0",
+ "llvm-sys 100.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "kolgac_driver"
+version = "0.1.0"
+dependencies = [
+ "clap 3.0.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "kolgac 0.1.0",
+ "kolgac_codegen 0.1.0",
+ "kolgac_errors 0.1.0",
+ "kolgac_types 0.1.0",
+]
+
+[[package]]
+name = "kolgac_errors"
+version = "0.1.0"
+
+[[package]]
+name = "kolgac_types"
+version = "0.1.0"
+dependencies = [
+ "kolgac 0.1.0",
+ "kolgac_errors 0.1.0",
 ]
 
 [[package]]
@@ -266,14 +274,6 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "lazy_static 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ty"
-version = "0.1.0"
-dependencies = [
- "error 0.1.0",
- "kolgac 0.1.0",
 ]
 
 [[package]]

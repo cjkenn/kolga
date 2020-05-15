@@ -1,12 +1,9 @@
 [package]
-name = "ty"
+name = "kolgac_types"
 version = "0.1.0"
 authors = ["cjkenn"]
-
-[lib]
-name = "ty"
-path = "lib.rs"
+edition = "2018"
 
 [dependencies]
-error = { path = "../kolgac_errors" }
+kolgac_errors = { path = "../kolgac_errors" }
 kolgac = { path = "../kolgac" }

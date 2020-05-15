@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-use std::rc::Rc;
+use crate::sym::Sym;
 
-use sym::Sym;
+use std::{collections::HashMap, rc::Rc};
 
 type Scope = HashMap<String, Rc<Sym>>;
 

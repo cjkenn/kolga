@@ -1,9 +1,9 @@
-use llvm_sys::prelude::*;
-use llvm_sys::target::*;
-use llvm_sys::target_machine::*;
+use llvm_sys::{prelude::*, target::*, target_machine::*};
 
-use std::ffi::{CStr, CString};
-use std::ptr;
+use std::{
+    ffi::{CStr, CString},
+    ptr,
+};
 
 pub struct ObjGenerator {
     ir: LLVMModuleRef,

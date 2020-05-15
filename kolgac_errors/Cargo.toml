@@ -1,8 +1,9 @@
 [package]
-name = "error"
+name = "kolgac_errors"
 version = "0.1.0"
 authors = ["cjkenn"]
+edition = "2018"
 
 [lib]
-name = "error"
-path = "lib.rs"
+name = "kolgac_errors"
+path = "./src/lib.rs"

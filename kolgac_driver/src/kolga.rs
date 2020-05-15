@@ -1,21 +1,24 @@
 extern crate clap;
-extern crate error;
-extern crate gen;
-extern crate kolgac;
-extern crate ty;
+
+extern crate kolgac_codegen;
+extern crate kolgac_errors;
+extern crate kolgac_types;
 
 use clap::Clap;
-use error::KolgaErr;
-use gen::llvm::CodeGenerator;
-use gen::obj::ObjGenerator;
-use gen::valtab::ValTab;
-use kolgac::ast::Ast;
-use kolgac::lexer::Lexer;
-use kolgac::parser::{Parser, ParserResult};
-use kolgac::symtab::SymbolTable;
+use kolgac_errors::KolgaErr;
+
+use kolgac_codegen::{llvm::CodeGenerator, obj::ObjGenerator, valtab::ValTab};
+
+use kolgac::{
+    ast::Ast,
+    lexer::Lexer,
+    parser::{Parser, ParserResult},
+    symtab::SymbolTable,
+};
+
+use kolgac_types::{check::TyCheck, infer::TyInfer};
+
 use std::fs::File;
-use ty::check::TyCheck;
-use ty::infer::TyInfer;
 
 #[derive(Clap)]
 #[clap(version = "1.0")]

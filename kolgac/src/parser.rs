@@ -1,13 +1,18 @@
-use ast::{Ast, MetaAst};
-use error::parse::{ParseErr, ParseErrTy};
-use error::KolgaErr;
-use lexer::Lexer;
-use std::collections::HashMap;
-use std::rc::Rc;
-use sym::{Sym, SymTy};
-use symtab::SymbolTable;
-use token::{TknTy, Token};
-use ty_rec::{KolgaTy, TyRecord};
+use crate::{
+    ast::{Ast, MetaAst},
+    lexer::Lexer,
+    sym::{Sym, SymTy},
+    symtab::SymbolTable,
+    token::{TknTy, Token},
+    ty_rec::{KolgaTy, TyRecord},
+};
+
+use kolgac_errors::{
+    parse::{ParseErr, ParseErrTy},
+    KolgaErr,
+};
+
+use std::{collections::HashMap, rc::Rc};
 
 const FN_PARAM_MAX_LEN: usize = 64;
 
