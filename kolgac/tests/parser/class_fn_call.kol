@@ -6,7 +6,7 @@ class cls {
   }
 }
 
-let x~cls;
+let x~cls{};
 x.clsFn();
 
 let q~num = x.clsFn();
@@ -17,5 +17,13 @@ class cls2 {
   }
 }
 
-let y~cls2;
+let y~cls2{};
 let g~num = y.cls2Fn(5);
+
+class cls3 {
+  let p1~num;
+}
+
+let z~cls3{
+  p1 = 5,
+};

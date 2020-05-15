@@ -13,11 +13,12 @@ forstmt    ::= "for" { vardecl } { exprstmt } { exprstmt } block ;
 exprstmt   ::= expr ";" ;
 retstmt    ::= "return" [ expr ] ";" ;
 
-funccall   ::= primary { [ "(" [ funccallparams ] ")" ] [ "." IDENT ] } ;
+funccall       ::= primary { [ "(" [ funccallparams ] ")" ] [ "." IDENT ] } ;
 funccallparams ::= IDENT { "," IDENT } ;
 
 block    ::= "{" { decl } "}" ;
 typename ::= "num" | "string" | "bool" | classname ;
+
 classname ::= IDENT
 
 expr       ::= assignexpr ;
@@ -31,3 +32,5 @@ mulexpr    ::= unaryexpr { [ "!" ] [ "-" ] unaryexpr } ;
 unaryexpr  ::= [ "-" ]  [ "!" ] unaryexpr | funccall ;
 primary    ::= NUMBER | STRING | TRUE | FALSE | NULL | IDENT | "self" | groupexpr ;
 groupexpr  ::= "(" expr ")" ;
+
+classconstrexpr ::= "{" { [ IDENT "=" expr ] } "}" ";" ;

@@ -105,7 +105,7 @@ impl Lexer {
             return self.eof_tkn();
         }
 
-        if self.curr.unwrap() == '#' {
+        while self.curr.unwrap() == '#' {
             self.advance_to_next_line();
             if self.curr.is_none() {
                 return self.eof_tkn();
