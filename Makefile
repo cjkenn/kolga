@@ -1,6 +1,4 @@
-# This is a mini makefile, mostly for running some debug commands. I like to have a scratch
-# file used to run some programs and test things. This makefile assumes that a scratch.kol
-# file exists to run some small test programs.
+# This makefile makes use of a scratch.kol file for running test kolga programs.
 
 create-scratch:
 	test -s scratch.kol || touch scratch.kol
