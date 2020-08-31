@@ -7,4 +7,4 @@ edition = "2018"
 [dependencies]
 kolgac_errors = { path = "../kolgac_errors" }
 kolgac = { path = "../kolgac" }
-llvm-sys = "100.0.1"
+llvm-sys = "100.2.0"

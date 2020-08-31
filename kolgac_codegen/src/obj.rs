@@ -3,6 +3,7 @@ use llvm_sys::{prelude::*, target::*, target_machine::*};
 use std::{
     ffi::{CStr, CString},
     ptr,
+    mem,
 };
 
 pub struct ObjGenerator {
@@ -25,40 +26,51 @@ impl ObjGenerator {
             LLVM_InitializeAllAsmPrinters();
 
             let mut target = ptr::null_mut();
-            let mut err_msg = ptr::null_mut();
-            LLVMGetTargetFromTriple(triple, &mut target, &mut err_msg);
+            let mut target_err_str = ptr::null_mut();
+            LLVMGetTargetFromTriple(triple, &mut target, &mut target_err_str);
             if target.is_null() {
-                let cmsg = CStr::from_ptr(err_msg as *const _);
+                let cmsg = CStr::from_ptr(target_err_str as *const _);
                 panic!("{:?}", cmsg);
             }
 
-            let cpu = c_str!("generic");
-            let features = c_str!("");
+            let cpu = CString::new("generic").expect("invalid cpu name provided");
+            let features = CString::new("").expect("invalid feature provided");
+
             let target_machine = LLVMCreateTargetMachine(
                 target,
                 triple,
-                cpu,
-                features,
-                LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
+                cpu.as_ptr() as *const _,
+                features.as_ptr() as *const _,
+                LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
                 LLVMRelocMode::LLVMRelocDefault,
                 LLVMCodeModel::LLVMCodeModelDefault,
             );
 
-            let mut gen_obj_error = c_str!("error generating object file") as *mut i8;
-            let c_file = CString::new(filename).unwrap();
+            let output_file = CString::new(filename).expect("invalid filename provided");
+            let mut err_str = CString::new("writing obj file failed")
+                .unwrap()
+                .as_ptr() as *mut _;
+
+            println!("here");
+
+            llvm_sys::core::LLVMDumpModule(self.ir);
 
             let result = LLVMTargetMachineEmitToFile(
                 target_machine,
                 self.ir,
-                c_file.as_ptr() as *mut i8,
+                output_file.as_ptr() as *mut i8,
                 LLVMCodeGenFileType::LLVMObjectFile,
-                &mut gen_obj_error,
+                &mut err_str,
             );
 
+            println!("here2");
+
             if result != 0 {
-                let cmsg = CStr::from_ptr(gen_obj_error as *const _);
+                let cmsg = CStr::from_ptr(err_str as *const _);
                 panic!("{:?}", cmsg);
             }
+
+            LLVMDisposeTargetMachine(target_machine);
         }
     }
 }
