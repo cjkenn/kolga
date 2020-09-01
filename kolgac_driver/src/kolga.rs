@@ -139,11 +139,11 @@ fn run_gen(ast: &Ast, opts: &KolgaOpts) -> Result<(), ()> {
     }
 
     // Generate an object file from LLVM IR
-    let prefix = opts.filename.split(".").collect::<Vec<&str>>()[0];
-    let obj_filename = format!("{}.{}", prefix, "o");
+    // let prefix = opts.filename.split(".").collect::<Vec<&str>>()[0];
+    // let obj_filename = format!("{}.{}", prefix, "o");
 
-    let mut obj_gen = ObjGenerator::new(llvm_codegen.module);
-    obj_gen.emit(&obj_filename);
+    // let mut obj_gen = ObjGenerator::new(llvm_codegen.module);
+    // obj_gen.emit(&obj_filename);
 
     Ok(())
 }

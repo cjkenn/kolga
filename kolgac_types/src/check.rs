@@ -5,7 +5,7 @@ use kolgac::{
     sym::Sym,
     symtab::SymbolTable,
     token::{TknTy, Token},
-    ty_rec::KolgaTy,
+    ty_rec::{KolgaTy, TyRecord},
 };
 
 use std::{collections::HashMap, rc::Rc};
@@ -402,13 +402,42 @@ impl<'t, 's> TyCheck<'t, 's> {
                 meta: _,
                 ty_rec: _,
                 class_tkn: _,
-                class_name: _,
+                class_name,
                 fn_tkn,
                 fn_params,
                 sc,
             } => {
-                let fn_sym = self.find_fn_sym(&fn_tkn.clone(), sc);
-                let fn_param_tys = &fn_sym.unwrap().fn_params.clone().unwrap();
+                let fn_name = fn_tkn.get_name();
+                let class_sym = self.find_class_sym(&class_name, sc);
+                let fn_param_tys = match class_sym.unwrap().assign_val.as_ref().unwrap() {
+                    Ast::ClassDeclStmt {
+                        meta: _,
+                        ty_rec: _,
+                        ident_tkn: _,
+                        methods,
+                        ..
+                    } => {
+                        let mut prms: Option<Vec<TyRecord>> = None;
+                        for m in methods {
+                            match m {
+                                Ast:: FnDeclStmt {
+                                    meta: _,
+                                    ident_tkn,
+                                    fn_params: fnp,
+                                    ..
+                                } => {
+                                    if ident_tkn.get_name() == fn_name {
+                                        prms = Some(fnp.to_vec());
+                                        break;
+                                    }
+                                },
+                                _ => {}
+                            };
+                        }
+                        prms
+                    },
+                    _ => None
+                };
 
                 let mut passed_in_param_tys = Vec::new();
 
@@ -416,7 +445,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                     passed_in_param_tys.push(self.check_expr(&ast, 0));
                 }
 
-                for (idx, mb_ty_rec) in fn_param_tys.iter().enumerate() {
+                for (idx, mb_ty_rec) in fn_param_tys.unwrap().iter().enumerate() {
                     let ty_name = mb_ty_rec.clone().ty;
                     if passed_in_param_tys[idx] != ty_name {
                         self.ty_mismatch(&fn_tkn.clone(), &passed_in_param_tys[idx], &ty_name);
@@ -561,6 +590,14 @@ impl<'t, 's> TyCheck<'t, 's> {
                 self.error(ident_tkn.line, ident_tkn.pos, TypeErrTy::InvalidFn(name));
                 None
             }
+        }
+    }
+
+    fn find_class_sym(&mut self, name: &str, sc: usize) -> Option<Rc<Sym>> {
+        let sym = self.symtab.retrieve_from_finalized_sc(name, sc);
+        match sym {
+            Some(symbol) => Some(symbol),
+            None => None
         }
     }
 

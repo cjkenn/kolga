@@ -3,7 +3,6 @@ use llvm_sys::{prelude::*, target::*, target_machine::*};
 use std::{
     ffi::{CStr, CString},
     ptr,
-    mem,
 };
 
 pub struct ObjGenerator {

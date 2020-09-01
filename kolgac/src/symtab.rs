@@ -12,7 +12,7 @@ pub struct SymbolTable {
 
     /// The actual symbol table, as a stack of maps. Each new block scope is pushed onto
     /// this stack, and popped off/finalized when we exit the block.
-    table: Vec<Scope>,
+    pub table: Vec<Scope>,
 
     /// Current level of the finalized scope. This is different from the current
     /// level of the symbol table, because we may have created/closed many
