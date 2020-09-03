@@ -1,5 +1,5 @@
 use kolgac::{lexer::Lexer, parser::Parser, symtab::SymbolTable};
-use kolgac_codegen::{llvm::CodeGenerator, valtab::ValTab};
+use kolgac_llvm::{llvm::CodeGenerator, valtab::ValTab};
 use std::{fs, fs::File, io::prelude::*};
 
 fn run(input_filename: &str, output_filename: &str, expected_filename: &str) {

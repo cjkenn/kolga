@@ -1,5 +1,5 @@
 [package]
-name = "kolgac_codegen"
+name = "kolgac_llvm"
 version = "0.1.0"
 authors = ["cjkenn"]
 edition = "2018"

@@ -3,6 +3,6 @@ members = [
   "kolgac",
   "kolgac_driver",
   "kolgac_errors",
-  "kolgac_codegen",
+  "kolgac_llvm",
   "kolgac_types",
 ]

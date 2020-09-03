@@ -1,13 +1,13 @@
 extern crate clap;
 
-extern crate kolgac_codegen;
+extern crate kolgac_llvm;
 extern crate kolgac_errors;
 extern crate kolgac_types;
 
 use clap::Clap;
 use kolgac_errors::KolgaErr;
 
-use kolgac_codegen::{llvm::CodeGenerator, obj::ObjGenerator, valtab::ValTab};
+use kolgac_llvm::{llvm::CodeGenerator, obj::ObjGenerator, valtab::ValTab};
 
 use kolgac::{
     ast::Ast,

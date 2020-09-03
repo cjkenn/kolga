@@ -10,7 +10,7 @@ path = "./src/kolga.rs"
 
 [dependencies]
 kolgac = { path = "../kolgac" }
-kolgac_codegen = { path = "../kolgac_codegen" }
+kolgac_llvm = { path = "../kolgac_llvm" }
 kolgac_errors = { path = "../kolgac_errors" }
 kolgac_types = { path = "../kolgac_types" }
 clap = "3.0.0-beta.1"
