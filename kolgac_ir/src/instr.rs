@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub enum OpCode {
+pub enum IROperator {
     Mv,
     Jmp,
     JmpE,
@@ -10,22 +10,29 @@ pub enum OpCode {
     Div,
 }
 
+#[derive(Debug)]
+pub enum IROperand {
+    KolNum(f64),
+    KolStr(String),
+    KolReg(String),
+}
+
 /// Instr is the representation of an instruction in the three-address
 /// linear code for kolga's ir. Each instruction expects two operands,
 /// an operator, and a result (or resulting location).
 #[derive(Debug)]
 pub struct Instr {
     /// First operand.
-    op1: String,
+    op1: IROperand,
 
-    /// Second operand.
-    op2: String,
+    /// Second operand. This is optional for some instructions (ie. mv, jmp).
+    op2: Option<IROperand>,
 
     /// Operator.
-    opcode: OpCode,
+    opcode: IROperator,
 
     /// Result destination.
-    result: String,
+    result: IROperand,
 
     /// Current label. This encodes the top level label
     /// of the instruction.
@@ -33,7 +40,13 @@ pub struct Instr {
 }
 
 impl Instr {
-    pub fn build(op1: String, op2: String, opc: OpCode, result: String, lbl: String) -> Instr {
+    pub fn build(
+        op1: IROperand,
+        op2: Option<IROperand>,
+        opc: IROperator,
+        result: IROperand,
+        lbl: String,
+    ) -> Instr {
         Instr {
             op1: op1,
             op2: op2,
