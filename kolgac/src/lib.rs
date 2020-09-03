@@ -7,3 +7,4 @@ pub mod sym;
 pub mod symtab;
 pub mod token;
 pub mod ty_rec;
+pub mod visit;

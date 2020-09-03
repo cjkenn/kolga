@@ -1,6 +1,6 @@
 use crate::instr::Instr;
 
-use kolgac::ast::Ast;
+use kolgac::{ast::Ast, visit::*};
 
 #[derive(Debug)]
 pub struct IRGen<'t> {
@@ -18,6 +18,15 @@ impl<'t> IRGen<'t> {
         IRGen {
             ast: ast,
             ir: Vec::new(),
+        }
+    }
+}
+
+impl<'t> AstVisitor for IRGen<'t> {
+    fn visit_ast(&mut self, node: &Ast) {
+        match node {
+            Ast::Prog { .. } => walk_prog(self, node),
+            _ => {}
         }
     }
 }
