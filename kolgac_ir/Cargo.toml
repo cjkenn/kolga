@@ -1,0 +1,9 @@
+[package]
+name = "kolgac_ir"
+version = "0.1.0"
+authors = ["cjkenn"]
+edition = "2018"
+
+[dependencies]
+kolgac_errors = { path = "../kolgac_errors" }
+kolgac = { path = "../kolgac" }

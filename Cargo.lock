@@ -120,6 +120,14 @@ name = "kolgac_errors"
 version = "0.1.0"
 
 [[package]]
+name = "kolgac_ir"
+version = "0.1.0"
+dependencies = [
+ "kolgac",
+ "kolgac_errors",
+]
+
+[[package]]
 name = "kolgac_llvm"
 version = "0.1.0"
 dependencies = [

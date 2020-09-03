@@ -1,7 +1,7 @@
 extern crate clap;
 
-extern crate kolgac_llvm;
 extern crate kolgac_errors;
+extern crate kolgac_llvm;
 extern crate kolgac_types;
 
 use clap::Clap;

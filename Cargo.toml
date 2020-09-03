@@ -5,4 +5,5 @@ members = [
   "kolgac_errors",
   "kolgac_llvm",
   "kolgac_types",
+  "kolgac_ir",
 ]

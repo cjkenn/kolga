@@ -420,7 +420,7 @@ impl<'t, 's> TyCheck<'t, 's> {
                         let mut prms: Option<Vec<TyRecord>> = None;
                         for m in methods {
                             match m {
-                                Ast:: FnDeclStmt {
+                                Ast::FnDeclStmt {
                                     meta: _,
                                     ident_tkn,
                                     fn_params: fnp,
@@ -430,13 +430,13 @@ impl<'t, 's> TyCheck<'t, 's> {
                                         prms = Some(fnp.to_vec());
                                         break;
                                     }
-                                },
+                                }
                                 _ => {}
                             };
                         }
                         prms
-                    },
-                    _ => None
+                    }
+                    _ => None,
                 };
 
                 let mut passed_in_param_tys = Vec::new();
@@ -597,7 +597,7 @@ impl<'t, 's> TyCheck<'t, 's> {
         let sym = self.symtab.retrieve_from_finalized_sc(name, sc);
         match sym {
             Some(symbol) => Some(symbol),
-            None => None
+            None => None,
         }
     }
 

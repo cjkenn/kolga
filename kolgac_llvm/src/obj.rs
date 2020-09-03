@@ -46,9 +46,7 @@ impl ObjGenerator {
             );
 
             let output_file = CString::new(filename).expect("invalid filename provided");
-            let mut err_str = CString::new("writing obj file failed")
-                .unwrap()
-                .as_ptr() as *mut _;
+            let mut err_str = CString::new("writing obj file failed").unwrap().as_ptr() as *mut _;
 
             println!("here");
 
