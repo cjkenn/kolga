@@ -23,6 +23,8 @@ pub enum IROp {
     Neq,
     LogAnd,
     LogOr,
+
+    Ret,
 }
 
 impl fmt::Display for IROp {
@@ -46,6 +48,7 @@ impl fmt::Display for IROp {
             IROp::Neq => "neq".to_string(),
             IROp::LogAnd => "and".to_string(),
             IROp::LogOr => "or".to_string(),
+            IROp::Ret => "ret".to_string(),
         };
 
         write!(f, "{}", formatted)
@@ -77,7 +80,7 @@ impl fmt::Display for IRArg {
 #[derive(Debug)]
 pub struct Instr {
     /// First operand.
-    op1: IRArg,
+    op1: Option<IRArg>,
 
     /// Second operand. This is optional for some instructions (ie. mv, jmp).
     op2: Option<IRArg>,
@@ -97,7 +100,10 @@ impl fmt::Display for Instr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let dest = format!("{}", self.result);
         let opc = format!("{}", self.opcode);
-        let op1 = format!("{}", self.op1);
+        let op1 = match &self.op1 {
+            Some(o) => format!("{}", o),
+            None => "".to_string(),
+        };
         let op2 = match &self.op2 {
             Some(o) => format!("{}", o),
             None => "".to_string(),
@@ -109,7 +115,13 @@ impl fmt::Display for Instr {
 }
 
 impl Instr {
-    pub fn build(op1: IRArg, op2: Option<IRArg>, opc: IROp, result: IRArg, lbl: String) -> Instr {
+    pub fn build(
+        op1: Option<IRArg>,
+        op2: Option<IRArg>,
+        opc: IROp,
+        result: IRArg,
+        lbl: String,
+    ) -> Instr {
         Instr {
             op1: op1,
             op2: op2,

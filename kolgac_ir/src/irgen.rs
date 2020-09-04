@@ -43,6 +43,7 @@ impl<'t> IRGen<'t> {
     pub fn instr_seq(&mut self, node: &Ast) -> Vec<Instr> {
         match node {
             Ast::ExprStmt { meta: _, expr } => self.instr_seq(expr),
+
             Ast::BlckStmt { meta: _, stmts, .. } => {
                 let mut seq = Vec::new();
                 for stmt in stmts {
@@ -51,12 +52,14 @@ impl<'t> IRGen<'t> {
                 }
                 seq
             }
+
             Ast::VarDeclExpr { .. } => {
                 // we don't generate any instructions for an empty declaration,
                 // we assume that the ident exists later when we refer to it
                 // in expressions.
                 Vec::new()
             }
+
             Ast::VarAssignExpr {
                 meta: _,
                 ty_rec: _,
@@ -64,27 +67,8 @@ impl<'t> IRGen<'t> {
                 is_imm: _,
                 is_global: _,
                 value,
-            } => {
-                let mut seq = Vec::new();
-                let assign_seq = self.instr_seq(value);
-                seq.extend(assign_seq);
+            } => self.var_assign(ident_tkn, value),
 
-                // We must advance to the next reg first here, in order to
-                // correctly get the previously used reg name, which is where the
-                // rhs of the assign expr is stored/
-                self.next_reg();
-                let rhs_reg = self.last_used_reg_name();
-
-                let op1 = IRArg::Str(ident_tkn.get_name());
-                let op2 = IRArg::Reg(rhs_reg);
-                let dest = IRArg::Reg(self.reg_name());
-                let op = IROp::St;
-
-                let bin_instr = Instr::build(op1, Some(op2), op, dest, String::new());
-                seq.push(bin_instr);
-
-                seq
-            }
             Ast::BinaryExpr {
                 meta: _,
                 ty_rec: _,
@@ -99,9 +83,12 @@ impl<'t> IRGen<'t> {
                 lhs,
                 rhs,
             } => self.bin_op(op_tkn, lhs, rhs),
+
             Ast::PrimaryExpr {
                 meta: _, ty_rec, ..
             } => self.primary(ty_rec),
+
+            Ast::RetStmt { meta: _, ret_expr } => self.ret(ret_expr),
 
             _ => Vec::new(),
         }
@@ -127,7 +114,7 @@ impl<'t> IRGen<'t> {
         let op = self.opr_from_tkn(op_tkn);
         let dest = IRArg::Reg(self.reg_name());
 
-        let bin_instr = Instr::build(op1, Some(op2), op, dest, String::new());
+        let bin_instr = Instr::build(Some(op1), Some(op2), op, dest, String::new());
         seq.push(bin_instr);
 
         seq
@@ -149,7 +136,55 @@ impl<'t> IRGen<'t> {
         let dest = IRArg::Reg(self.reg_name());
         self.next_reg();
 
-        vec![Instr::build(op1, None, opr, dest, String::new())]
+        vec![Instr::build(Some(op1), None, opr, dest, String::new())]
+    }
+
+    fn var_assign(&mut self, ident_tkn: &Token, value: &Ast) -> Vec<Instr> {
+        let mut seq = Vec::new();
+        let assign_seq = self.instr_seq(value);
+        seq.extend(assign_seq);
+
+        // We must advance to the next reg first here, in order to
+        // correctly get the previously used reg name, which is where the
+        // rhs of the assign expr is stored/
+        self.next_reg();
+        let rhs_reg = self.last_used_reg_name();
+
+        let op1 = IRArg::Str(ident_tkn.get_name());
+        let op2 = IRArg::Reg(rhs_reg);
+        let dest = IRArg::Reg(self.reg_name());
+        let op = IROp::St;
+
+        let bin_instr = Instr::build(Some(op1), Some(op2), op, dest, String::new());
+        seq.push(bin_instr);
+
+        seq
+    }
+
+    fn ret(&mut self, ret_expr: &Option<Box<Ast>>) -> Vec<Instr> {
+        match ret_expr {
+            Some(expr) => {
+                let mut seq = Vec::new();
+                let ret_seq = self.instr_seq(&expr);
+                seq.extend(ret_seq);
+                let op1 = IRArg::Reg(self.last_used_reg_name());
+                let op = IROp::Ret;
+                let dest = IRArg::Reg(self.reg_name());
+
+                self.next_reg();
+
+                let ret_instr = Instr::build(Some(op1), None, op, dest, String::new());
+                seq.push(ret_instr);
+                seq
+            }
+            None => {
+                let op = IROp::Ret;
+                let dest = IRArg::Reg(self.reg_name());
+                self.next_reg();
+
+                vec![Instr::build(None, None, op, dest, String::new())]
+            }
+        }
     }
 
     fn reg_name(&self) -> String {
