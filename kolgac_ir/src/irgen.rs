@@ -1,6 +1,9 @@
-use crate::instr::Instr;
+use crate::instr::{IROperand, IROperator, Instr};
 
-use kolgac::{ast::Ast, visit::*};
+use kolgac::{
+    ast::Ast,
+    token::{TknTy, Token},
+};
 
 #[derive(Debug)]
 pub struct IRGen<'t> {
@@ -24,6 +27,71 @@ impl<'t> IRGen<'t> {
         }
     }
 
+    pub fn gen(&mut self) {
+        match self.ast {
+            Ast::Prog { meta: _, stmts } => {
+                for stmt in stmts {
+                    let iseq = self.instr_seq(stmt);
+                    self.ir.extend(iseq);
+                }
+            }
+            _ => panic!("invalid ast provided to ir gen"),
+        }
+    }
+
+    pub fn instr_seq(&mut self, node: &Ast) -> Vec<Instr> {
+        match node {
+            Ast::BinaryExpr {
+                meta: _,
+                ty_rec: _,
+                op_tkn,
+                lhs,
+                rhs,
+            } => {
+                let mut seq = Vec::new();
+
+                let lhs_seq = self.instr_seq(lhs);
+                seq.extend(lhs_seq);
+
+                // save current register here, for use in final instr
+                let lhs_reg = self.last_used_reg_name();
+
+                let rhs_seq = self.instr_seq(rhs);
+                seq.extend(rhs_seq);
+
+                // save current register here again, for second op in last instr
+                let rhs_reg = self.last_used_reg_name();
+
+                let op1 = IROperand::IRReg(lhs_reg);
+                let op2 = IROperand::IRReg(rhs_reg);
+                let op = self.opr_from_tkn(op_tkn);
+                let dest = IROperand::IRReg(self.reg_name());
+
+                let bin_instr = Instr::build(op1, Some(op2), op, dest, String::new());
+                seq.push(bin_instr);
+
+                seq
+            }
+            Ast::PrimaryExpr {
+                meta: _, ty_rec, ..
+            } => {
+                let op1 = match &ty_rec.tkn.ty {
+                    TknTy::Str(s) => IROperand::IRStr(s.to_string()),
+                    TknTy::Val(v) => IROperand::IRNum(*v),
+                    TknTy::Ident(i) => IROperand::IRStr(i.to_string()),
+                    _ => panic!("invalid primary tkn ty"),
+                };
+
+                let opr = IROperator::Mv;
+                let dest = IROperand::IRReg(self.reg_name());
+                self.next_reg();
+
+                vec![Instr::build(op1, None, opr, dest, String::new())]
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn reg_name(&self) -> String {
         format!("r{}", self.reg)
     }
@@ -32,28 +100,18 @@ impl<'t> IRGen<'t> {
         // TOOD: gets more complex with reg constraints.
         self.reg = self.reg + 1
     }
-}
 
-impl<'t> AstVisitor for IRGen<'t> {
-    fn visit_ast(&mut self, node: &Ast) {
-        match node {
-            Ast::Prog { .. } => walk_prog(self, node),
-            Ast::BlckStmt { .. } => walk_blck_stmt(self, node),
-            Ast::BinaryExpr {
-                meta: _,
-                ty_rec: _,
-                op_tkn,
-                lhs,
-                rhs,
-            } => {
-                // 4 + x
-                // r0 = mv 4
-                // r1 = ld x
-                // r2 = r0 + r1
-            }
-            Ast::ExprStmt { .. } => walk_expr_stmt(self, node),
-            Ast::PrimaryExpr { .. } => walk_primary(self, node),
-            _ => {}
+    fn last_used_reg_name(&self) -> String {
+        format!("r{}", self.reg - 1)
+    }
+
+    fn opr_from_tkn(&self, tkn: &Token) -> IROperator {
+        match tkn.ty {
+            TknTy::Plus => IROperator::Add,
+            TknTy::Minus => IROperator::Sub,
+            TknTy::Star => IROperator::Mul,
+            TknTy::Slash => IROperator::Div,
+            _ => panic!("invalid operator token"),
         }
     }
 }
