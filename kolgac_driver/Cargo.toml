@@ -13,4 +13,5 @@ kolgac = { path = "../kolgac" }
 kolgac_llvm = { path = "../kolgac_llvm" }
 kolgac_errors = { path = "../kolgac_errors" }
 kolgac_types = { path = "../kolgac_types" }
+kolgac_ir = { path = "../kolgac_ir" }
 clap = "3.0.0-beta.1"

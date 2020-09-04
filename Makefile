@@ -9,16 +9,20 @@ scratch: create-scratch
 .PHONY: scratch
 
 debug: create-scratch
-	RUST_BACKTRACE=1 cargo run scratch.kol --dump-ast --dump-ir
+	RUST_BACKTRACE=1 cargo run scratch.kol --show-ast --show-kir
 .PHONY: debug
 
 ast: create-scratch
-	RUST_BACKTRACE=1 cargo run scratch.kol --dump-ast
+	RUST_BACKTRACE=1 cargo run scratch.kol --show-ast
 PHONY: ast
 
-ir: create-scratch
-	RUST_BACKTRACE=1 cargo run scratch.kol --dump-ir
-.PHONY: ir
+llvm-ir: create-scratch
+	RUST_BACKTRACE=1 cargo run scratch.kol --use-llvm --show-llvm-ir
+.PHONY: llvm-ir
+
+kir: create-scratch
+	cargo run scratch.kol --show-kir
+.PHONE: kir
 
 link: scratch
 	clang scratch.o -o scratch

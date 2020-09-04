@@ -1,13 +1,11 @@
 extern crate clap;
 
 extern crate kolgac_errors;
+extern crate kolgac_ir;
 extern crate kolgac_llvm;
 extern crate kolgac_types;
 
 use clap::Clap;
-use kolgac_errors::KolgaErr;
-
-use kolgac_llvm::{llvm::CodeGenerator, obj::ObjGenerator, valtab::ValTab};
 
 use kolgac::{
     ast::Ast,
@@ -15,7 +13,9 @@ use kolgac::{
     parser::{Parser, ParserResult},
     symtab::SymbolTable,
 };
-
+use kolgac_errors::KolgaErr;
+use kolgac_ir::irgen::IRGen;
+use kolgac_llvm::{llvm::CodeGenerator, obj::ObjGenerator, valtab::ValTab};
 use kolgac_types::{check::TyCheck, infer::TyInfer};
 
 use std::fs::File;
@@ -24,10 +24,15 @@ use std::fs::File;
 #[clap(version = "1.0")]
 pub struct KolgaOpts {
     filename: String,
+
     #[clap(long)]
-    dump_ast: bool,
+    use_llvm: bool,
     #[clap(long)]
-    dump_ir: bool,
+    show_ast: bool,
+    #[clap(long)]
+    show_llvm_ir: bool,
+    #[clap(long)]
+    show_kir: bool,
 }
 
 fn main() {
@@ -55,17 +60,31 @@ fn main() {
         }
     };
 
-    if opts.dump_ast {
+    if opts.show_ast {
         println!("{:#?}", ast);
     }
 
-    // 3. Run the LLVM IR code generator and the object file creator.
-    let gen_result = run_gen(&ast, &opts);
-    match gen_result {
-        Ok(()) => (),
-        Err(()) => {
-            println!("kolgac: Exiting due to LLVM IR gen errors");
-            return;
+    // 3. Choose backend from options and generate appropriate code.
+    if opts.use_llvm {
+        // Using LLVM will create an object file containing bytecode.
+        let llvm_result = run_llvm_codegen(&ast, &opts);
+        match llvm_result {
+            Ok(()) => (),
+            Err(()) => {
+                println!("kolgac: Exiting due to LLVM IR errors");
+                return;
+            }
+        }
+    } else {
+        // If not using LLVM, we generate KIR and can perform
+        // analysis on it before generating native code.
+        let kir_result = run_kir_codegen(&ast, &opts);
+        match kir_result {
+            Ok(()) => (),
+            Err(()) => {
+                println!("kolgac: Exiting due to KolIR errors");
+                return;
+            }
         }
     }
 }
@@ -120,7 +139,7 @@ fn run_tys(ast: &mut Ast, symtab: &mut SymbolTable) -> Result<(), ()> {
 /// run_tys() function, this returns an empty result to be used as a flag to decide
 /// whether or not to continue with compilation stages. This will print any errors
 /// encountered during codegen.
-fn run_gen(ast: &Ast, opts: &KolgaOpts) -> Result<(), ()> {
+fn run_llvm_codegen(ast: &Ast, opts: &KolgaOpts) -> Result<(), ()> {
     let mut valtab = ValTab::new();
     let mut llvm_codegen = CodeGenerator::new(&ast, &mut valtab);
 
@@ -134,16 +153,29 @@ fn run_gen(ast: &Ast, opts: &KolgaOpts) -> Result<(), ()> {
         return Err(());
     }
 
-    if opts.dump_ir {
+    if opts.show_llvm_ir {
         llvm_codegen.dump_ir();
     }
 
     // Generate an object file from LLVM IR
-    // let prefix = opts.filename.split(".").collect::<Vec<&str>>()[0];
-    // let obj_filename = format!("{}.{}", prefix, "o");
+    let prefix = opts.filename.split(".").collect::<Vec<&str>>()[0];
+    let obj_filename = format!("{}.{}", prefix, "o");
 
-    // let mut obj_gen = ObjGenerator::new(llvm_codegen.module);
-    // obj_gen.emit(&obj_filename);
+    let mut obj_gen = ObjGenerator::new(llvm_codegen.module);
+    obj_gen.emit(&obj_filename);
+
+    Ok(())
+}
+
+fn run_kir_codegen(ast: &Ast, opts: &KolgaOpts) -> Result<(), ()> {
+    let mut kir = IRGen::new(ast);
+    kir.gen();
+
+    if opts.show_kir {
+        for instr in kir.ir {
+            println!("{}", instr);
+        }
+    }
 
     Ok(())
 }

@@ -1,28 +1,51 @@
 use std::fmt;
 
 #[derive(Debug)]
-pub enum IROperator {
+pub enum IROp {
     Mv,
+    St,
+    Ld,
+
     Jmp,
     JmpE,
     JmpNe,
+
     Add,
     Sub,
     Mul,
     Div,
+
+    Lt,
+    Gt,
+    EqEq,
+    LtEq,
+    GtEq,
+    Neq,
+    LogAnd,
+    LogOr,
 }
 
-impl fmt::Display for IROperator {
+impl fmt::Display for IROp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let formatted = match self {
-            IROperator::Mv => "mv".to_string(),
-            IROperator::Jmp => "jmp".to_string(),
-            IROperator::JmpE => "jmpe".to_string(),
-            IROperator::JmpNe => "jmpne".to_string(),
-            IROperator::Add => "add".to_string(),
-            IROperator::Sub => "sub".to_string(),
-            IROperator::Mul => "mul".to_string(),
-            IROperator::Div => "div".to_string(),
+            IROp::Mv => "mv".to_string(),
+            IROp::St => "st".to_string(),
+            IROp::Ld => "ld".to_string(),
+            IROp::Jmp => "jmp".to_string(),
+            IROp::JmpE => "jmpe".to_string(),
+            IROp::JmpNe => "jmpne".to_string(),
+            IROp::Add => "add".to_string(),
+            IROp::Sub => "sub".to_string(),
+            IROp::Mul => "mul".to_string(),
+            IROp::Div => "div".to_string(),
+            IROp::Lt => "lt".to_string(),
+            IROp::Gt => "gt".to_string(),
+            IROp::EqEq => "eq".to_string(),
+            IROp::LtEq => "lteq".to_string(),
+            IROp::GtEq => "gteq".to_string(),
+            IROp::Neq => "neq".to_string(),
+            IROp::LogAnd => "and".to_string(),
+            IROp::LogOr => "or".to_string(),
         };
 
         write!(f, "{}", formatted)
@@ -30,18 +53,18 @@ impl fmt::Display for IROperator {
 }
 
 #[derive(Debug)]
-pub enum IROperand {
-    IRNum(f64),
-    IRStr(String),
-    IRReg(String),
+pub enum IRArg {
+    Num(f64),
+    Str(String),
+    Reg(String),
 }
 
-impl fmt::Display for IROperand {
+impl fmt::Display for IRArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let formatted = match self {
-            IROperand::IRNum(n) => format!("{}", n),
-            IROperand::IRStr(s) => s.to_string(),
-            IROperand::IRReg(r) => r.to_string(),
+            IRArg::Num(n) => format!("{}", n),
+            IRArg::Str(s) => s.to_string(),
+            IRArg::Reg(r) => r.to_string(),
         };
 
         write!(f, "{}", formatted)
@@ -54,16 +77,16 @@ impl fmt::Display for IROperand {
 #[derive(Debug)]
 pub struct Instr {
     /// First operand.
-    op1: IROperand,
+    op1: IRArg,
 
     /// Second operand. This is optional for some instructions (ie. mv, jmp).
-    op2: Option<IROperand>,
+    op2: Option<IRArg>,
 
     /// Operator.
-    opcode: IROperator,
+    opcode: IROp,
 
     /// Result destination.
-    result: IROperand,
+    result: IRArg,
 
     /// Current label. This encodes the top level label
     /// of the instruction.
@@ -86,13 +109,7 @@ impl fmt::Display for Instr {
 }
 
 impl Instr {
-    pub fn build(
-        op1: IROperand,
-        op2: Option<IROperand>,
-        opc: IROperator,
-        result: IROperand,
-        lbl: String,
-    ) -> Instr {
+    pub fn build(op1: IRArg, op2: Option<IRArg>, opc: IROp, result: IRArg, lbl: String) -> Instr {
         Instr {
             op1: op1,
             op2: op2,

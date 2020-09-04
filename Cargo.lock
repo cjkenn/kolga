@@ -111,6 +111,7 @@ dependencies = [
  "clap",
  "kolgac",
  "kolgac_errors",
+ "kolgac_ir",
  "kolgac_llvm",
  "kolgac_types",
 ]
