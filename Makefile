@@ -16,9 +16,9 @@ ast: create-scratch
 	RUST_BACKTRACE=1 cargo run scratch.kol --show-ast
 PHONY: ast
 
-llvm-ir: create-scratch
+llvm: create-scratch
 	RUST_BACKTRACE=1 cargo run scratch.kol --use-llvm --show-llvm-ir
-.PHONY: llvm-ir
+.PHONY: llvm
 
 kir: create-scratch
 	cargo run scratch.kol --show-kir
