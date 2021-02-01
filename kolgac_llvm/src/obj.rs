@@ -48,10 +48,6 @@ impl ObjGenerator {
             let output_file = CString::new(filename).expect("invalid filename provided");
             let mut err_str = CString::new("writing obj file failed").unwrap().as_ptr() as *mut _;
 
-            println!("here");
-
-            llvm_sys::core::LLVMDumpModule(self.ir);
-
             let result = LLVMTargetMachineEmitToFile(
                 target_machine,
                 self.ir,
@@ -59,8 +55,6 @@ impl ObjGenerator {
                 LLVMCodeGenFileType::LLVMObjectFile,
                 &mut err_str,
             );
-
-            println!("here2");
 
             if result != 0 {
                 let cmsg = CStr::from_ptr(err_str as *const _);
